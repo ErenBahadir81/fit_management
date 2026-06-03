@@ -5,10 +5,16 @@ export const dynamic = "force-dynamic";
 
 /** ?index=0..6 önceliklidir; yoksa ?day=1..7; ikisi de yoksa 1. gün. */
 function parseStart(url: URL): number {
-  const idx = Number(url.searchParams.get("index"));
-  if (Number.isInteger(idx) && idx >= 0 && idx <= 6) return idx;
-  const day = Number(url.searchParams.get("day"));
-  if (Number.isInteger(day) && day >= 1 && day <= 7) return day - 1;
+  const idxRaw = url.searchParams.get("index");
+  if (idxRaw !== null && idxRaw.trim() !== "") {
+    const idx = Number(idxRaw);
+    if (Number.isInteger(idx) && idx >= 0 && idx <= 6) return idx;
+  }
+  const dayRaw = url.searchParams.get("day");
+  if (dayRaw !== null && dayRaw.trim() !== "") {
+    const day = Number(dayRaw);
+    if (Number.isInteger(day) && day >= 1 && day <= 7) return day - 1;
+  }
   return 0;
 }
 
