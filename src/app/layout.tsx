@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "FitFloow — Antrenman & Yenilenme",
   description:
     "Antrenman programı, kas yenilenme takibi, kilo & yağ oranı ve diyet — tek yerde.",
-  manifest: undefined,
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

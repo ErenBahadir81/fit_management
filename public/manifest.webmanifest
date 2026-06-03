@@ -1,0 +1,18 @@
+{
+  "name": "FitFloow — Antrenman & Yenilenme",
+  "short_name": "FitFloow",
+  "description": "Antrenman programı, kas yenilenme takibi, kilo & yağ oranı ve diyet.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3f4f7",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
