@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fb;
+  --border: #e8eaf0;
+  --ink: #0f141c;
+  --muted: #6a7180;
+  --primary: #4f46e5;
+  --primary-soft: #ececfd;
+  --ready: #16a34a;
+  --recovering: #f59e0b;
+  --fatigued: #ef4444;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+@layer base {
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .tap {
+    @apply transition-transform duration-100 active:scale-[0.97];
+  }
+  .pad-safe-b {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+  }
+  .h-safe-b {
+    height: env(safe-area-inset-bottom);
+  }
+}
+
+/* Recharts polish */
+.recharts-default-tooltip {
+  border-radius: 0.75rem !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.12) !important;
+}
+.recharts-cartesian-axis-tick-value {
+  font-size: 11px;
+  fill: var(--muted);
+}
