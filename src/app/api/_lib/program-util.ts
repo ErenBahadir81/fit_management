@@ -92,16 +92,26 @@ export function sanitizeSets(raw: unknown): SetEntryDTO[] {
   }));
 }
 
+/**
+ * Loglanan hareketleri temizler. Her hareket kendine yeter:
+ * - source: 'planned' (programdan) | 'extra' (o güne özel eklenen)
+ * - skipped: true ise yorgunluğa SAYILMAZ ve setleri boş tutulur
+ */
 export function sanitizeStrengthEntries(raw: unknown): StrengthEntryDTO[] {
   if (!Array.isArray(raw)) return [];
-  return raw.slice(0, 30).map((e: any) => ({
-    name: String(e?.name ?? "").slice(0, 80) || "Hareket",
-    muscles: sanitizeMuscles(e?.muscles),
-    plannedSets: toIntInRange(e?.plannedSets, 0, 30, 0),
-    plannedReps: toIntInRange(e?.plannedReps, 0, 100, 0),
-    plannedRIR: sanitizeRIR(e?.plannedRIR),
-    sets: sanitizeSets(e?.sets),
-  }));
+  return raw.slice(0, 40).map((e: any) => {
+    const skipped = !!e?.skipped;
+    return {
+      name: String(e?.name ?? "").slice(0, 80) || "Hareket",
+      muscles: sanitizeMuscles(e?.muscles),
+      plannedSets: toIntInRange(e?.plannedSets, 0, 30, 0),
+      plannedReps: toIntInRange(e?.plannedReps, 0, 100, 0),
+      plannedRIR: sanitizeRIR(e?.plannedRIR),
+      source: e?.source === "extra" ? "extra" : "planned",
+      skipped,
+      sets: skipped ? [] : sanitizeSets(e?.sets),
+    };
+  });
 }
 
 export function sanitizeSegments(raw: unknown): RunSegmentDTO[] {
@@ -116,11 +126,9 @@ export function sanitizeSegments(raw: unknown): RunSegmentDTO[] {
 
 /**
  * En iyi tempoya (dk/km) göre bir sonraki hafta hedefini hesaplar.
- * Kullanıcı kuralı:
  *  bestPace = min(seg.min / seg.km)  (km > 0 olan segmentlerde)
  *  projected = round(bestPace * targetKm)
  *  newMin = clamp(projected, round(targetKm * 3), targetMin)
- * Hiç geçerli segment yoksa mevcut targetMin korunur.
  */
 export function progressedRunTargetMin(
   segments: RunSegmentDTO[],
@@ -129,9 +137,7 @@ export function progressedRunTargetMin(
 ): number {
   let best = Infinity;
   for (const s of segments) {
-    if (s.km > 0 && s.min > 0) {
-      best = Math.min(best, s.min / s.km);
-    }
+    if (s.km > 0 && s.min > 0) best = Math.min(best, s.min / s.km);
   }
   if (!Number.isFinite(best) || targetKm <= 0) return targetMin;
   const projected = Math.round(best * targetKm);
@@ -153,6 +159,18 @@ export function runTotals(segments: RunSegmentDTO[]): {
     totalKm: Math.round(totalKm * 100) / 100,
     totalMin: Math.round(totalMin * 100) / 100,
   };
+}
+
+/** Loglanacak run nesnesini kurar (o güne özelse hedefler 0 olabilir). */
+export function buildRunEntry(
+  segments: RunSegmentDTO[],
+  targetKm: number,
+  targetMin: number
+): RunEntryDTO | null {
+  const ran = segments.some((s) => s.km > 0 || s.min > 0);
+  if (!ran) return null;
+  const { totalKm, totalMin } = runTotals(segments);
+  return { segments, totalKm, totalMin, targetKm, targetMin };
 }
 
 /* ------------------------------ serializers ----------------------------- */
@@ -220,6 +238,8 @@ export function toWorkoutLogDTO(doc: any): WorkoutLogDTO {
       plannedSets: toFiniteNumber(e.plannedSets, 0),
       plannedReps: toFiniteNumber(e.plannedReps, 0),
       plannedRIR: e.plannedRIR ?? null,
+      source: e.source === "extra" ? "extra" : "planned",
+      skipped: !!e.skipped,
       sets: (e.sets ?? []).map((s: any) => ({
         reps: toFiniteNumber(s.reps, 0),
         rir: s.rir ?? null,

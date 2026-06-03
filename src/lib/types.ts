@@ -42,12 +42,18 @@ export interface SetEntryDTO {
   rir: number | null;
 }
 
+export type ExerciseSource = "planned" | "extra";
+
 export interface StrengthEntryDTO {
   name: string;
   muscles: MuscleKey[];
   plannedSets: number;
   plannedReps: number;
   plannedRIR: number | null;
+  /** Programdan gelen mi yoksa o güne özel eklenen mi */
+  source?: ExerciseSource;
+  /** O gün bu hareket atlandıysa true (yorgunluğa sayılmaz) */
+  skipped?: boolean;
   sets: SetEntryDTO[];
 }
 

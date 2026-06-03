@@ -73,6 +73,8 @@ const StrengthEntrySchema = new Schema(
     plannedSets: { type: Number, default: 0 },
     plannedReps: { type: Number, default: 0 },
     plannedRIR: { type: Number, default: null },
+    source: { type: String, enum: ["planned", "extra"], default: "planned" },
+    skipped: { type: Boolean, default: false },
     sets: { type: [SetEntrySchema], default: [] },
   },
   { _id: false }

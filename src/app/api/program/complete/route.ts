@@ -4,9 +4,9 @@ import { requireUser, json, badRequest, serverError } from "@/lib/http";
 import { clamp } from "@/lib/utils";
 import type { StrengthEntryDTO } from "@/lib/types";
 import {
+  buildRunEntry,
   dayBounds,
   progressedRunTargetMin,
-  runTotals,
   sanitizeSegments,
   sanitizeStrengthEntries,
   toProgramDTO,
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 interface CompleteBody {
   strength?: StrengthEntryDTO[];
-  run?: { segments?: { km: number; min: number }[] };
+  run?: { segments?: { km: number; min: number }[] } | null;
 }
 
 export async function POST(req: Request) {
@@ -35,16 +35,15 @@ export async function POST(req: Request) {
     const day = program.days?.[currentIndex];
     if (!day) return badRequest("Gün bulunamadı");
 
+    // Tamamen kendine yeten seans (kaslar payload'dan gelir; işaretçi karışmaz).
     const strength = sanitizeStrengthEntries(body?.strength);
-    const segments = day.run ? sanitizeSegments(body?.run?.segments) : [];
-    const { totalKm, totalMin } = runTotals(segments);
 
+    // Koşu: planlı koşu olmasa bile o güne özel girilebilir.
+    const segments = sanitizeSegments(body?.run?.segments);
     const targetKm: number = day.run?.targetKm ?? 0;
     const targetMin: number = day.run?.targetMin ?? 0;
-
-    const runEntry = day.run
-      ? { segments, totalKm, totalMin, targetKm, targetMin }
-      : null;
+    const runEntry = buildRunEntry(segments, targetKm, targetMin);
+    const ran = !!runEntry;
 
     const { start, end } = dayBounds(new Date());
     const existing = await WorkoutLog.findOne({
@@ -63,7 +62,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // İlk kez tamamlama (veya bugünkü dinlenme kaydını eziyoruz) -> kaydet + ilerlet.
     const now = new Date();
     const logData = {
       userId: auth.userId,
@@ -86,13 +84,13 @@ export async function POST(req: Request) {
       savedLog = await WorkoutLog.create(logData);
     }
 
-    // Koşu ilerlemesi: en iyi tempoya göre bir sonraki hafta hedefini düşür.
-    if (day.run && totalKm > 0 && totalMin > 0) {
+    // Koşu ilerlemesi: SADECE planlı koşu günlerinde (o güne özel koşu ilerletmez).
+    if (day.run && ran) {
       const newMin = progressedRunTargetMin(segments, targetKm, targetMin);
       program.days[currentIndex].run.targetMin = clamp(newMin, 0, 1000);
     }
 
-    // Pointer ilerlet; 7. günden sonra hafta artar (şablon kopyalanır).
+    // Pointer ilerlet; 7. günden sonra hafta artar (şablon korunur = kopya).
     const newIndex = (currentIndex + 1) % 7;
     if (currentIndex === 6) program.weekNumber = (program.weekNumber ?? 1) + 1;
     program.currentIndex = newIndex;
