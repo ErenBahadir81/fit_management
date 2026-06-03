@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { ProfileButton } from "@/components/layout/ProfileButton";
 import {
@@ -19,8 +19,11 @@ import {
   Pencil,
   CalendarRange,
   Info,
+  Play,
+  Check,
 } from "lucide-react";
 import { cn, fmtNum } from "@/lib/utils";
+import { apiSend } from "@/lib/fetcher";
 import type { DayDTO, ProgramDTO, WorkoutLogDTO } from "@/lib/types";
 import { EditDaySheet } from "@/components/workout/EditDaySheet";
 import type { ScheduleEntry } from "@/components/workout/WeekStrip";
@@ -121,6 +124,13 @@ export default function ProgramPage() {
             {/* Gün kartları */}
             <section>
               <SectionTitle title="Günler" />
+              <div className="mb-3 flex items-start gap-2 px-1">
+                <Info size={14} className="text-muted shrink-0 mt-0.5" />
+                <p className="text-[12px] text-muted leading-snug">
+                  İstediğin günden devam edebilirsin; sıra korunur, yorgunluk
+                  etkilenmez.
+                </p>
+              </div>
               <div className="space-y-3">
                 {program.days.map((day, i) => (
                   <DayCard
@@ -158,6 +168,25 @@ function DayCard({
   onEdit: () => void;
 }) {
   const Icon = day.kind === "run" ? Footprints : Dumbbell;
+  const [confirm, setConfirm] = useState(false);
+  const [jumping, setJumping] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function jumpHere() {
+    setJumping(true);
+    setErr(null);
+    try {
+      // order 1..7 -> index 0..6. Sıra korunur, yorgunluk etkilenmez.
+      await apiSend("/api/program/current", "PUT", { index: day.order - 1 });
+      await mutate("/api/program");
+      setConfirm(false);
+    } catch (e: any) {
+      setErr(e?.message || "Güncellenemedi");
+    } finally {
+      setJumping(false);
+    }
+  }
+
   return (
     <Card className={cn(isCurrent && "ring-2 ring-primary/30")}>
       <CardBody className="p-4">
@@ -216,9 +245,52 @@ function DayCard({
           )}
         </div>
 
-        <Button variant="ghost" fullWidth size="sm" className="mt-3" onClick={onEdit}>
-          <Pencil size={15} /> Düzenle
-        </Button>
+        {isCurrent ? (
+          <Button
+            variant="ghost"
+            fullWidth
+            size="sm"
+            className="mt-3"
+            onClick={onEdit}
+          >
+            <Pencil size={15} /> Düzenle
+          </Button>
+        ) : confirm ? (
+          <div className="mt-3 rounded-2xl border border-border bg-surface-2/60 p-3">
+            <p className="text-sm font-semibold text-center">
+              {day.order}. günden devam edilsin mi?
+            </p>
+            <p className="text-[12px] text-muted text-center mt-0.5">
+              Sıra korunur, yorgunluk etkilenmez.
+            </p>
+            {err && (
+              <p className="text-xs text-fatigued text-center mt-1.5">{err}</p>
+            )}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setConfirm(false);
+                  setErr(null);
+                }}
+              >
+                Vazgeç
+              </Button>
+              <Button loading={jumping} onClick={jumpHere}>
+                <Check size={16} /> Evet
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button variant="ghost" size="sm" onClick={onEdit}>
+              <Pencil size={15} /> Düzenle
+            </Button>
+            <Button variant="soft" size="sm" onClick={() => setConfirm(true)}>
+              <Play size={15} /> Buradan devam et
+            </Button>
+          </div>
+        )}
       </CardBody>
     </Card>
   );

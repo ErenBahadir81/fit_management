@@ -14,7 +14,7 @@ import {
   Flame,
   Timer,
 } from "lucide-react";
-import { fmtNum, fmtMinutes, fmtPace } from "@/lib/utils";
+import { cn, fmtNum, fmtMinutes, fmtPace } from "@/lib/utils";
 import { apiSend } from "@/lib/fetcher";
 import type { DayDTO, WorkoutLogDTO } from "@/lib/types";
 import { LogSheet } from "./LogSheet";
@@ -79,11 +79,29 @@ export function TodayCard({ day, todayLog }: TodayCardProps) {
                   key={i}
                   className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5"
                 >
-                  <span className="font-semibold text-sm truncate">{e.name}</span>
-                  <span className="text-xs font-bold text-muted tabular-nums shrink-0">
-                    {e.sets.length} set ·{" "}
-                    {e.sets.map((s) => s.reps).join("·")} tkr
+                  <span className="min-w-0 flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "font-semibold text-sm truncate",
+                        e.skipped && "line-through text-muted"
+                      )}
+                    >
+                      {e.name}
+                    </span>
+                    {e.source === "extra" && (
+                      <Badge color="var(--primary)">Ekstra</Badge>
+                    )}
                   </span>
+                  {e.skipped ? (
+                    <span className="text-xs font-bold text-muted shrink-0">
+                      atlandı
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-muted tabular-nums shrink-0">
+                      {e.sets.length} set ·{" "}
+                      {e.sets.map((s) => s.reps).join("·")} tkr
+                    </span>
+                  )}
                 </div>
               ))}
               {todayLog.run && (

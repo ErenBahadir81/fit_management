@@ -26,7 +26,7 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }: Shee
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-x-0 top-0 z-50 flex h-[100dvh] items-end justify-center">
       <div
         className="absolute inset-0 bg-ink/40 animate-fade-in"
         onClick={onClose}
@@ -34,7 +34,7 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }: Shee
       <div
         className={cn(
           "relative w-full max-w-app bg-surface rounded-t-3xl shadow-sheet",
-          "animate-sheet-up flex flex-col max-h-[92vh]"
+          "animate-sheet-up flex flex-col max-h-[92dvh]"
         )}
       >
         <div className="pt-3 flex justify-center shrink-0">
@@ -57,7 +57,12 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }: Shee
             </button>
           </div>
         )}
-        <div className="px-5 pb-2 overflow-y-auto no-scrollbar flex-1">
+        <div
+          className={cn(
+            "px-5 overflow-y-auto no-scrollbar flex-1",
+            footer ? "pb-2" : "pb-[max(env(safe-area-inset-bottom),1rem)]"
+          )}
+        >
           {children}
         </div>
         {footer && (

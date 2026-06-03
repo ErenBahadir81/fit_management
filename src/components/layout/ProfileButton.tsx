@@ -33,18 +33,11 @@ export function ProfileButton() {
         {initial}
       </button>
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="Profil">
-        <div className="flex items-center gap-3 py-2">
-          <div className="h-14 w-14 grid place-items-center rounded-2xl bg-primary-soft text-primary">
-            <UserIcon size={26} />
-          </div>
-          <div>
-            <p className="font-bold text-lg leading-tight">{user?.displayName}</p>
-            <p className="text-sm text-muted">@{user?.username}</p>
-          </div>
-        </div>
-
-        <div className="mt-4 pb-4">
+      <Sheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Profil"
+        footer={
           <Button
             variant="soft"
             fullWidth
@@ -55,6 +48,16 @@ export function ProfileButton() {
           >
             <LogOut size={18} /> Çıkış Yap
           </Button>
+        }
+      >
+        <div className="flex items-center gap-3 py-2">
+          <div className="h-14 w-14 grid place-items-center rounded-2xl bg-primary-soft text-primary">
+            <UserIcon size={26} />
+          </div>
+          <div>
+            <p className="font-bold text-lg leading-tight">{user?.displayName}</p>
+            <p className="text-sm text-muted">@{user?.username}</p>
+          </div>
         </div>
       </Sheet>
     </>
