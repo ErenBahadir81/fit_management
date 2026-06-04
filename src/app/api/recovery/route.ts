@@ -2,6 +2,7 @@ import { dbConnect } from "@/lib/mongodb";
 import { WorkoutLog } from "@/lib/models";
 import { requireUser, json, serverError } from "@/lib/http";
 import { readinessFromLogs } from "@/lib/services/fatigue";
+import { trStartOfDay } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +14,8 @@ export async function GET() {
     await dbConnect();
 
     // Son 7 gün yeterli: haftalık set istatistiği + en uzun yenilenme penceresi (48s).
-    const since = new Date();
-    since.setHours(0, 0, 0, 0);
-    since.setDate(since.getDate() - 7);
+    // Türkiye gün başına göre (sunucu saat diliminden bağımsız).
+    const since = new Date(trStartOfDay().getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const logs = await WorkoutLog.find({
       userId: auth.userId,

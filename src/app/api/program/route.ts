@@ -1,7 +1,8 @@
 import { dbConnect } from "@/lib/mongodb";
 import { Program, WorkoutLog } from "@/lib/models";
 import { requireUser, json, badRequest, serverError } from "@/lib/http";
-import { WEEKDAYS_TR, WEEKDAYS_TR_LONG, mondayIndex } from "@/lib/utils";
+import { WEEKDAYS_TR, WEEKDAYS_TR_LONG } from "@/lib/utils";
+import { trStartOfDay, trAddDays, trMondayIndex } from "@/lib/time";
 import type { DayDTO, WorkoutLogDTO } from "@/lib/types";
 import {
   sanitizeDay,
@@ -34,13 +35,11 @@ export async function GET() {
       ? toWorkoutLogDTO(logDoc)
       : null;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = trStartOfDay();
     const schedule = Array.from({ length: 7 }).map((_, i) => {
       const d = dto.days[(index + i) % 7];
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      const wi = mondayIndex(date);
+      const date = trAddDays(today, i);
+      const wi = trMondayIndex(date);
       return {
         dateISO: date.toISOString(),
         weekdayShort: WEEKDAYS_TR[wi],

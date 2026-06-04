@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
+import { trDateKey, trMondayIndex } from "./time";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -37,11 +38,9 @@ export function fmtPace(minPerKm: number) {
   return `${m}'${String(s).padStart(2, "0")}"/km`;
 }
 
+/** 'YYYY-MM-DD' — Türkiye yerel günü (saat dilimi: Europe/Istanbul). */
 export function todayKey(d: Date = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return trDateKey(d);
 }
 
 export const WEEKDAYS_TR = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
@@ -55,7 +54,7 @@ export const WEEKDAYS_TR_LONG = [
   "Pazar",
 ];
 
-/** JS getDay() (0=Paz) -> bizim index (0=Pzt) */
+/** 0=Pazartesi … 6=Pazar — Türkiye gününe göre. */
 export function mondayIndex(d: Date = new Date()) {
-  return (d.getDay() + 6) % 7;
+  return trMondayIndex(d);
 }

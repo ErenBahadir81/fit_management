@@ -12,6 +12,7 @@ function fullDate(iso: string): string {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "Europe/Istanbul",
   });
 }
 

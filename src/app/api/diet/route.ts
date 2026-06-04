@@ -1,7 +1,8 @@
 import { dbConnect } from "@/lib/mongodb";
 import { DietTarget, DietLog } from "@/lib/models";
 import { requireUser, json, badRequest, serverError } from "@/lib/http";
-import { WEEKDAYS_TR, mondayIndex, todayKey } from "@/lib/utils";
+import { WEEKDAYS_TR } from "@/lib/utils";
+import { trDateKey, trMondayIndexFromKey, trShiftKey } from "@/lib/time";
 import type { DietItemDTO, DietTargetDTO } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -60,21 +61,10 @@ function toTargetDTO(doc: any): DietTargetDTO {
   };
 }
 
-/** dateKey 'YYYY-MM-DD' -> yerel Date (gün başı) */
-function keyToDate(key: string): Date {
-  const [y, m, d] = key.split("-").map((p) => Number(p));
-  return new Date(y, (m || 1) - 1, d || 1);
-}
-
-/** verilen günden geriye doğru `count` adet dateKey (artan sırada) */
+/** verilen günden geriye doğru `count` adet dateKey (artan sırada, Türkiye günleri) */
 function lastKeys(baseKey: string, count: number): string[] {
-  const base = keyToDate(baseKey);
   const keys: string[] = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(base);
-    d.setDate(base.getDate() - i);
-    keys.push(todayKey(d));
-  }
+  for (let i = count - 1; i >= 0; i--) keys.push(trShiftKey(baseKey, -i));
   return keys;
 }
 
@@ -88,7 +78,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const qDate = url.searchParams.get("date");
     const dateKey =
-      qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : todayKey();
+      qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : trDateKey();
 
     // Hedef (yoksa varsayılan oluştur)
     let targetDoc = await DietTarget.findOne({ userId: auth.userId }).lean();
@@ -126,7 +116,7 @@ export async function GET(req: Request) {
       const t = byKey.get(key) ?? emptyTotals();
       return {
         dateKey: key,
-        weekdayShort: WEEKDAYS_TR[mondayIndex(keyToDate(key))],
+        weekdayShort: WEEKDAYS_TR[trMondayIndexFromKey(key)],
         calories: t.calories,
         protein: t.protein,
         carbs: t.carbs,
@@ -162,7 +152,7 @@ export async function POST(req: Request) {
     };
 
     await dbConnect();
-    const dateKey = todayKey();
+    const dateKey = trDateKey();
     const log = await DietLog.findOneAndUpdate(
       { userId: auth.userId, dateKey },
       { $push: { items: item }, $setOnInsert: { userId: auth.userId, dateKey } },
@@ -188,7 +178,7 @@ export async function DELETE(req: Request) {
     }
 
     await dbConnect();
-    const dateKey = todayKey();
+    const dateKey = trDateKey();
     const log = await DietLog.findOne({ userId: auth.userId, dateKey });
 
     if (!log || !Array.isArray(log.items) || index >= log.items.length) {

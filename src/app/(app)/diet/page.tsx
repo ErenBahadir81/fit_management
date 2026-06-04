@@ -37,6 +37,7 @@ function longDateTR(): string {
     day: "numeric",
     month: "long",
     weekday: "long",
+    timeZone: "Europe/Istanbul",
   });
 }
 

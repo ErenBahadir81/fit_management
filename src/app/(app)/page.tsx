@@ -27,7 +27,7 @@ interface RecoveryResponse {
 function todayLongDate(): string {
   const d = new Date();
   const wd = WEEKDAYS_TR_LONG[mondayIndex(d)];
-  return `${wd}, ${d.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}`;
+  return `${wd}, ${d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "Europe/Istanbul" })}`;
 }
 
 export default function HomePage() {

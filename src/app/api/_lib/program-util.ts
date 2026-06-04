@@ -12,6 +12,7 @@ import type {
 } from "@/lib/types";
 import { MUSCLE_ORDER, MuscleKey } from "@/lib/muscles";
 import { clamp } from "@/lib/utils";
+import { trDayBounds } from "@/lib/time";
 
 const MUSCLE_SET = new Set<MuscleKey>(MUSCLE_ORDER);
 
@@ -249,11 +250,7 @@ export function toWorkoutLogDTO(doc: any): WorkoutLogDTO {
   };
 }
 
-/** [bugün 00:00, yarın 00:00) sınırları. */
-export function dayBounds(d: Date): { start: Date; end: Date } {
-  const start = new Date(d);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 1);
-  return { start, end };
+/** Türkiye yerel gününün [00:00, ertesi 00:00) sınırları (Europe/Istanbul). */
+export function dayBounds(d: Date = new Date()): { start: Date; end: Date } {
+  return trDayBounds(d);
 }
