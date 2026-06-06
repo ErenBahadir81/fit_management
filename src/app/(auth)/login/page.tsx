@@ -65,8 +65,9 @@ export default function LoginPage() {
       </form>
 
       <p className="text-center text-xs text-muted mt-6">
-        Demo hesabı:{" "}
-        <span className="font-semibold text-ink">eren</span> /{" "}
+        Hesaplar:{" "}
+        <span className="font-semibold text-ink">eren</span> ·{" "}
+        <span className="font-semibold text-ink">inci</span> /{" "}
         <span className="font-semibold text-ink">Asd*123</span>
       </p>
     </div>

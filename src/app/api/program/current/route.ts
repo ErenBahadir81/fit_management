@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * İşaretçiyi (currentIndex) doğrudan değiştirir — "canım istedi, E'den devam"
  * senaryosu. Sırayı bozmaz (sonraki tamamlamada +1 ilerler) ve yorgunluğu
  * ETKİLEMEZ (yorgunluk yalnız loglardan gelir).
- * Body: { index: 0..6 }  veya  { day: 1..7 }
+ * Body: { index: 0..days.length-1 }  veya  { day: 1..days.length }
  */
 export async function PUT(req: Request) {
   const auth = requireUser();
@@ -21,18 +21,24 @@ export async function PUT(req: Request) {
       day?: number;
     };
 
-    let index: number | null = null;
-    if (Number.isInteger(body?.index) && body!.index! >= 0 && body!.index! <= 6) {
-      index = body!.index!;
-    } else if (Number.isInteger(body?.day) && body!.day! >= 1 && body!.day! <= 7) {
-      index = body!.day! - 1;
-    }
-    if (index === null) return badRequest("Geçersiz gün (0-6 index veya 1-7 day)");
-
     await dbConnect();
     const program = await Program.findOne({ userId: auth.userId });
     if (!program) return badRequest("Program bulunamadı");
-    if (!program.days?.[index]) return badRequest("Gün bulunamadı");
+
+    const len = program.days?.length || 0;
+    if (len === 0) return badRequest("Program boş");
+
+    let index: number | null = null;
+    if (Number.isInteger(body?.index) && body!.index! >= 0 && body!.index! < len) {
+      index = body!.index!;
+    } else if (
+      Number.isInteger(body?.day) &&
+      body!.day! >= 1 &&
+      body!.day! <= len
+    ) {
+      index = body!.day! - 1;
+    }
+    if (index === null) return badRequest("Geçersiz gün");
 
     program.currentIndex = index;
     program.lastActionAt = new Date();

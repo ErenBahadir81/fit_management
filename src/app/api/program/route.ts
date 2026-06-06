@@ -23,7 +23,9 @@ export async function GET() {
     if (!program) return badRequest("Program bulunamadı");
 
     const dto = toProgramDTO(program);
-    const index = dto.currentIndex;
+    const len = dto.days.length || 1;
+    // currentIndex'i döngü uzunluğuna göre güvenli aralığa al (İnci 4, Eren 7).
+    const index = ((Math.trunc(dto.currentIndex) % len) + len) % len;
     const day = dto.days[index];
 
     const { start, end } = dayBounds(new Date());
@@ -35,9 +37,10 @@ export async function GET() {
       ? toWorkoutLogDTO(logDoc)
       : null;
 
+    // Önümüzdeki 7 takvim günü; döngü gününe % len ile eşlenir.
     const today = trStartOfDay();
     const schedule = Array.from({ length: 7 }).map((_, i) => {
-      const d = dto.days[(index + i) % 7];
+      const d = dto.days[(index + i) % len];
       const date = trAddDays(today, i);
       const wi = trMondayIndex(date);
       return {
@@ -70,7 +73,7 @@ export async function PUT(req: Request) {
   try {
     const body = (await req.json()) as { dayIndex?: number; day?: DayDTO };
     const dayIndex = Number(body?.dayIndex);
-    if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex > 6) {
+    if (!Number.isInteger(dayIndex) || dayIndex < 0) {
       return badRequest("Geçersiz gün");
     }
     if (!body?.day) return badRequest("Gün verisi eksik");

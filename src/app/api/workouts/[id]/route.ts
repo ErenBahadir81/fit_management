@@ -10,14 +10,18 @@ import {
 
 export const dynamic = "force-dynamic";
 
+interface CardioBody {
+  segments?: { km: number; min: number }[];
+}
 interface EditBody {
   strength?: unknown;
-  run?: { segments?: { km: number; min: number }[] } | null;
+  run?: CardioBody | null;
+  swim?: CardioBody | null;
 }
 
 /**
  * Mevcut bir antrenman kaydını ID ile düzenler.
- * İşaretçiye DOKUNMAZ, hafta ilerletmez, koşu hedefi progression'ı yapmaz.
+ * İşaretçiye DOKUNMAZ, hafta ilerletmez, kardiyo hedefi progression'ı yapmaz.
  * Bu sayede "tamamlanmış günü düzenle" işlemi sıradaki günle karışmaz.
  */
 export async function PUT(
@@ -39,15 +43,15 @@ export async function PUT(
     if (log.isOffDay) return badRequest("Dinlenme günü düzenlenemez");
 
     const strength = sanitizeStrengthEntries(body?.strength);
-    const segments = sanitizeSegments(body?.run?.segments);
-    // Mevcut hedefler korunur (varsa).
-    const targetKm = log.run?.targetKm ?? 0;
-    const targetMin = log.run?.targetMin ?? 0;
+    const runSegs = sanitizeSegments(body?.run?.segments);
+    const swimSegs = sanitizeSegments(body?.swim?.segments);
 
     log.strength = strength;
-    log.run = buildRunEntry(segments, targetKm, targetMin);
+    log.run = buildRunEntry(runSegs, log.run?.targetKm ?? 0, log.run?.targetMin ?? 0);
+    log.swim = buildRunEntry(swimSegs, log.swim?.targetKm ?? 0, log.swim?.targetMin ?? 0);
     log.markModified("strength");
     log.markModified("run");
+    log.markModified("swim");
     await log.save();
 
     return json({ log: toWorkoutLogDTO(log) });

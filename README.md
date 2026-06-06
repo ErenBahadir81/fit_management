@@ -2,16 +2,16 @@
 
 Mobil öncelikli (mobile-first), flat tasarımlı bir **antrenman + yenilenme + vücut + diyet** takip uygulaması. Tamamı **Next.js 14 (App Router)** içinde çalışır — ayrı bir backend yoktur, veritabanı işlemleri route handler'lar üzerinden **MongoDB**'ye yapılır.
 
-> İlk kullanıcı: **eren** / **Asd\*123** (uygulama ilk açıldığında otomatik oluşturulur).
+> Kullanıcılar: **eren** (7 günlük split) ve **inci** (4 günlük döngü) — ikisi de **Asd\*123**. Eksik olan (genel veri / her kullanıcı) deployment'ta **katmanlı ve idempotent** şekilde otomatik oluşturulur; mevcut veriler bozulmaz.
 
 ## ✨ Özellikler
 
-### 1. Antrenman Programı (dinamik 7 günlük döngü)
-- 7 günlük şablon + bir **işaretçi** (`currentIndex`) = sıradaki yapılacak gün.
-- **Tamamla** → işaretçi ilerler. **Atla (off day)** → işaretçi ilerlemez, takvim kayar. Yani Pzt = A yapıldı, Salı atlandı ⇒ Çarşamba yine B olur.
-- 7. günden sonra hafta numarası artar; şablon korunur (**önceki haftayı kopyalama**), böylece bir sonraki Pazartesi push-up yine aynı hedefle gelir.
-- **Hypertrophy / strength**: set × tekrar + opsiyonel **RIR** ("kaç tekrar daha yapabilirdin?"). Aktif gün set bazında güncellenebilir — ör. 4×5 yapıp 5. seti 6 tekrar girebilirsin.
-- **Koşu (run)**: tek seferde yapmak zorunda değilsin; birden çok segment girilir (3 km 20 dk + 2 km 8 dk). Sonraki haftanın hedefi **en iyi tempoya** göre otomatik güncellenir.
+### 1. Antrenman Programı (dinamik, değişken uzunlukta döngü)
+- N günlük şablon + bir **işaretçi** (`currentIndex`) = sıradaki yapılacak gün. Döngü uzunluğu kullanıcıya göre değişir (Eren 7, İnci 4 — `% days.length`, sonunda başa döner).
+- **Tamamla** → işaretçi ilerler. **Atla (off day)** → işaretçi ilerlemez, takvim kayar. **Buradan devam et** ile istediğin güne atlayabilirsin (sıra korunur, yorgunluk etkilenmez).
+- Döngü sonunda hafta numarası artar; şablon korunur (**önceki haftayı kopyalama**).
+- **Hareket tipleri:** tekrar (`reps`), **süre** (`time`, ör. Handstand 5×30 sn) ve **esneme** (`stretch`, mobilite — kas yükü yok). Opsiyonel **RIR**. Aktif gün set bazında güncellenebilir; o güne özel hareket/koşu/yüzme eklenebilir (şablona/haftaya yansımaz) ve tek hareket atlanabilir.
+- **Koşu & Yüzme**: aynı metrikler (km/dk, çok segmentli). Sonraki haftanın hedefi **en iyi tempoya** göre otomatik güncellenir.
 
 ### 2. Kas Yenilenme Takibi (projenin kalbi)
 Her hareket, ilgili kas gruplarını **set sayısıyla orantılı** yorar. Her an her kasın **yenilenme yüzdesi** görülür.

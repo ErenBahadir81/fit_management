@@ -1,6 +1,7 @@
 import type {
   DayDTO,
   DayKind,
+  ExerciseMetric,
   ExerciseTargetDTO,
   ProgramDTO,
   RunEntryDTO,
@@ -45,7 +46,11 @@ function sanitizeRIR(v: unknown): number | null {
 }
 
 function sanitizeKind(v: unknown): DayKind {
-  return v === "run" ? "run" : "strength";
+  return v === "run" || v === "swim" || v === "stretch" ? v : "strength";
+}
+
+function sanitizeMetric(v: unknown): ExerciseMetric {
+  return v === "time" || v === "stretch" ? v : "reps";
 }
 
 function sanitizeExercise(raw: any): ExerciseTargetDTO {
@@ -53,8 +58,9 @@ function sanitizeExercise(raw: any): ExerciseTargetDTO {
     name: String(raw?.name ?? "").slice(0, 80) || "Hareket",
     muscles: sanitizeMuscles(raw?.muscles),
     targetSets: toIntInRange(raw?.targetSets, 1, 30, 3),
-    targetReps: toIntInRange(raw?.targetReps, 1, 100, 10),
+    targetReps: toIntInRange(raw?.targetReps, 1, 1000, 10),
     targetRIR: sanitizeRIR(raw?.targetRIR),
+    metric: sanitizeMetric(raw?.metric),
   };
 }
 
@@ -69,7 +75,6 @@ function sanitizeRunTarget(raw: any): RunTargetDTO | null {
 
 /** Bir günü tamamen temizler; order = dayIndex + 1 olur. */
 export function sanitizeDay(raw: any, dayIndex: number): DayDTO {
-  const kind = sanitizeKind(raw?.kind);
   const exercises = Array.isArray(raw?.exercises)
     ? raw.exercises.slice(0, 20).map(sanitizeExercise)
     : [];
@@ -77,9 +82,10 @@ export function sanitizeDay(raw: any, dayIndex: number): DayDTO {
     order: dayIndex + 1,
     title: String(raw?.title ?? "").slice(0, 60) || `${dayIndex + 1}. Gün`,
     focus: String(raw?.focus ?? "").slice(0, 60),
-    kind,
+    kind: sanitizeKind(raw?.kind),
     exercises,
     run: sanitizeRunTarget(raw?.run),
+    swim: sanitizeRunTarget(raw?.swim),
   };
 }
 
@@ -97,6 +103,7 @@ export function sanitizeSets(raw: unknown): SetEntryDTO[] {
  * Loglanan hareketleri temizler. Her hareket kendine yeter:
  * - source: 'planned' (programdan) | 'extra' (o güne özel eklenen)
  * - skipped: true ise yorgunluğa SAYILMAZ ve setleri boş tutulur
+ * - metric: reps | time(sn) | stretch
  */
 export function sanitizeStrengthEntries(raw: unknown): StrengthEntryDTO[] {
   if (!Array.isArray(raw)) return [];
@@ -106,10 +113,11 @@ export function sanitizeStrengthEntries(raw: unknown): StrengthEntryDTO[] {
       name: String(e?.name ?? "").slice(0, 80) || "Hareket",
       muscles: sanitizeMuscles(e?.muscles),
       plannedSets: toIntInRange(e?.plannedSets, 0, 30, 0),
-      plannedReps: toIntInRange(e?.plannedReps, 0, 100, 0),
+      plannedReps: toIntInRange(e?.plannedReps, 0, 1000, 0),
       plannedRIR: sanitizeRIR(e?.plannedRIR),
       source: e?.source === "extra" ? "extra" : "planned",
       skipped,
+      metric: sanitizeMetric(e?.metric),
       sets: skipped ? [] : sanitizeSets(e?.sets),
     };
   });
@@ -123,10 +131,10 @@ export function sanitizeSegments(raw: unknown): RunSegmentDTO[] {
   }));
 }
 
-/* ---------------------------- run progression --------------------------- */
+/* ---------------------------- cardio progression ------------------------ */
 
 /**
- * En iyi tempoya (dk/km) göre bir sonraki hafta hedefini hesaplar.
+ * En iyi tempoya (dk/km) göre bir sonraki hafta hedefini hesaplar (koşu & yüzme).
  *  bestPace = min(seg.min / seg.km)  (km > 0 olan segmentlerde)
  *  projected = round(bestPace * targetKm)
  *  newMin = clamp(projected, round(targetKm * 3), targetMin)
@@ -162,7 +170,7 @@ export function runTotals(segments: RunSegmentDTO[]): {
   };
 }
 
-/** Loglanacak run nesnesini kurar (o güne özelse hedefler 0 olabilir). */
+/** Loglanacak kardiyo nesnesini kurar (o güne özelse hedefler 0 olabilir). */
 export function buildRunEntry(
   segments: RunSegmentDTO[],
   targetKm: number,
@@ -188,12 +196,20 @@ export function toProgramDTO(doc: any): ProgramDTO {
       targetSets: toFiniteNumber(e.targetSets, 0),
       targetReps: toFiniteNumber(e.targetReps, 0),
       targetRIR: e.targetRIR ?? null,
+      metric: sanitizeMetric(e.metric),
     })),
     run: d.run
       ? {
           targetKm: toFiniteNumber(d.run.targetKm, 0),
           targetMin: toFiniteNumber(d.run.targetMin, 0),
           label: d.run.label || undefined,
+        }
+      : null,
+    swim: d.swim
+      ? {
+          targetKm: toFiniteNumber(d.swim.targetKm, 0),
+          targetMin: toFiniteNumber(d.swim.targetMin, 0),
+          label: d.swim.label || undefined,
         }
       : null,
   }));
@@ -241,12 +257,14 @@ export function toWorkoutLogDTO(doc: any): WorkoutLogDTO {
       plannedRIR: e.plannedRIR ?? null,
       source: e.source === "extra" ? "extra" : "planned",
       skipped: !!e.skipped,
+      metric: sanitizeMetric(e.metric),
       sets: (e.sets ?? []).map((s: any) => ({
         reps: toFiniteNumber(s.reps, 0),
         rir: s.rir ?? null,
       })),
     })),
     run: toRunEntryDTO(doc.run),
+    swim: toRunEntryDTO(doc.swim),
   };
 }
 

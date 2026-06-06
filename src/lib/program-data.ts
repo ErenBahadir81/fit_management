@@ -83,3 +83,50 @@ export const SEED_PROGRAM_DAYS: DayDTO[] = [
     run: { targetKm: 5, targetMin: 35, label: "Hafif Koşu" },
   },
 ];
+
+/**
+ * İnci'nin 4 günlük döngüsü. Sırasıyla: Squat → Handstand (süre) → Leg Raises → Stretch,
+ * 4. günden sonra başa döner (değişken döngü uzunluğu = days.length).
+ */
+export const SEED_INCI_PROGRAM_DAYS: DayDTO[] = [
+  {
+    order: 1,
+    title: "Squat",
+    focus: "Bacak",
+    kind: "strength",
+    exercises: [
+      { name: "Squat", muscles: ["legs"], targetSets: 5, targetReps: 10, targetRIR: 2, metric: "reps" },
+    ],
+    run: null,
+  },
+  {
+    order: 2,
+    title: "Handstand",
+    focus: "Omuz & Denge",
+    kind: "strength",
+    exercises: [
+      { name: "Handstand", muscles: ["frontDelt", "sideDelt", "traps"], targetSets: 5, targetReps: 30, targetRIR: null, metric: "time" },
+    ],
+    run: null,
+  },
+  {
+    order: 3,
+    title: "Leg Raises",
+    focus: "Karın",
+    kind: "strength",
+    exercises: [
+      { name: "Leg Raises", muscles: ["abs"], targetSets: 5, targetReps: 6, targetRIR: 2, metric: "reps" },
+    ],
+    run: null,
+  },
+  {
+    order: 4,
+    title: "Stretch",
+    focus: "Esneklik",
+    kind: "stretch",
+    exercises: [
+      { name: "Stretch", muscles: [], targetSets: 1, targetReps: 1, targetRIR: null, metric: "stretch" },
+    ],
+    run: null,
+  },
+];

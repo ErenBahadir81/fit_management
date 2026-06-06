@@ -15,9 +15,13 @@ import {
 
 export const dynamic = "force-dynamic";
 
+interface CardioBody {
+  segments?: { km: number; min: number }[];
+}
 interface CompleteBody {
   strength?: StrengthEntryDTO[];
-  run?: { segments?: { km: number; min: number }[] } | null;
+  run?: CardioBody | null;
+  swim?: CardioBody | null;
 }
 
 export async function POST(req: Request) {
@@ -31,19 +35,20 @@ export async function POST(req: Request) {
     const program = await Program.findOne({ userId: auth.userId });
     if (!program) return badRequest("Program bulunamadı");
 
-    const currentIndex: number = program.currentIndex ?? 0;
-    const day = program.days?.[currentIndex];
+    const len = program.days?.length || 0;
+    if (len === 0) return badRequest("Program boş");
+    const currentIndex = clamp(program.currentIndex ?? 0, 0, len - 1);
+    const day = program.days[currentIndex];
     if (!day) return badRequest("Gün bulunamadı");
 
-    // Tamamen kendine yeten seans (kaslar payload'dan gelir; işaretçi karışmaz).
+    // Tamamen kendine yeten seans (kaslar/metric payload'dan gelir; işaretçi karışmaz).
     const strength = sanitizeStrengthEntries(body?.strength);
 
-    // Koşu: planlı koşu olmasa bile o güne özel girilebilir.
-    const segments = sanitizeSegments(body?.run?.segments);
-    const targetKm: number = day.run?.targetKm ?? 0;
-    const targetMin: number = day.run?.targetMin ?? 0;
-    const runEntry = buildRunEntry(segments, targetKm, targetMin);
-    const ran = !!runEntry;
+    // Koşu & yüzme: planlı olmasa bile o güne özel girilebilir.
+    const runSegs = sanitizeSegments(body?.run?.segments);
+    const runEntry = buildRunEntry(runSegs, day.run?.targetKm ?? 0, day.run?.targetMin ?? 0);
+    const swimSegs = sanitizeSegments(body?.swim?.segments);
+    const swimEntry = buildRunEntry(swimSegs, day.swim?.targetKm ?? 0, day.swim?.targetMin ?? 0);
 
     const { start, end } = dayBounds(new Date());
     const existing = await WorkoutLog.findOne({
@@ -55,6 +60,7 @@ export async function POST(req: Request) {
     if (existing && !existing.isOffDay) {
       existing.strength = strength;
       existing.run = runEntry;
+      existing.swim = swimEntry;
       await existing.save();
       return json({
         program: toProgramDTO(program),
@@ -74,6 +80,7 @@ export async function POST(req: Request) {
       isOffDay: false,
       strength,
       run: runEntry,
+      swim: swimEntry,
     };
 
     let savedLog;
@@ -84,15 +91,26 @@ export async function POST(req: Request) {
       savedLog = await WorkoutLog.create(logData);
     }
 
-    // Koşu ilerlemesi: SADECE planlı koşu günlerinde (o güne özel koşu ilerletmez).
-    if (day.run && ran) {
-      const newMin = progressedRunTargetMin(segments, targetKm, targetMin);
-      program.days[currentIndex].run.targetMin = clamp(newMin, 0, 1000);
+    // Kardiyo ilerlemesi: SADECE planlı koşu/yüzme günlerinde (o güne özel ilerletmez).
+    if (day.run && runEntry) {
+      program.days[currentIndex].run.targetMin = clamp(
+        progressedRunTargetMin(runSegs, day.run.targetKm, day.run.targetMin),
+        0,
+        1000
+      );
+    }
+    if (day.swim && swimEntry) {
+      program.days[currentIndex].swim.targetMin = clamp(
+        progressedRunTargetMin(swimSegs, day.swim.targetKm, day.swim.targetMin),
+        0,
+        1000
+      );
     }
 
-    // Pointer ilerlet; 7. günden sonra hafta artar (şablon korunur = kopya).
-    const newIndex = (currentIndex + 1) % 7;
-    if (currentIndex === 6) program.weekNumber = (program.weekNumber ?? 1) + 1;
+    // Pointer ilerlet; döngü sonunda hafta artar (şablon korunur = kopya).
+    // Döngü uzunluğu sabit değil: % days.length (İnci 4, Eren 7).
+    const newIndex = (currentIndex + 1) % len;
+    if (currentIndex === len - 1) program.weekNumber = (program.weekNumber ?? 1) + 1;
     program.currentIndex = newIndex;
     program.lastActionAt = now;
     program.markModified("days");

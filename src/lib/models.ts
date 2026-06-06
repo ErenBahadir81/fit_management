@@ -1,5 +1,8 @@
 import { Schema, model, models, Model, Types } from "mongoose";
 
+const DAY_KINDS = ["strength", "run", "swim", "stretch"];
+const METRICS = ["reps", "time", "stretch"];
+
 /* ------------------------------- User ------------------------------- */
 const UserSchema = new Schema(
   {
@@ -21,6 +24,7 @@ const ExerciseTargetSchema = new Schema(
     targetSets: { type: Number, default: 3 },
     targetReps: { type: Number, default: 10 },
     targetRIR: { type: Number, default: null },
+    metric: { type: String, enum: METRICS, default: "reps" },
   },
   { _id: false }
 );
@@ -36,12 +40,13 @@ const RunTargetSchema = new Schema(
 
 const DaySchema = new Schema(
   {
-    order: { type: Number, required: true }, // 1..7
+    order: { type: Number, required: true }, // 1..N
     title: { type: String, required: true },
     focus: { type: String, default: "" },
-    kind: { type: String, enum: ["strength", "run"], default: "strength" },
+    kind: { type: String, enum: DAY_KINDS, default: "strength" },
     exercises: { type: [ExerciseTargetSchema], default: [] },
     run: { type: RunTargetSchema, default: null },
+    swim: { type: RunTargetSchema, default: null },
   },
   { _id: false }
 );
@@ -51,7 +56,7 @@ const ProgramSchema = new Schema(
     userId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     name: { type: String, default: "Haftalık Program" },
     days: { type: [DaySchema], default: [] },
-    currentIndex: { type: Number, default: 0 }, // sıradaki yapılacak gün (0..6)
+    currentIndex: { type: Number, default: 0 }, // sıradaki yapılacak gün (0..days.length-1)
     weekNumber: { type: Number, default: 1 },
     startedAt: { type: Date, default: Date.now },
     lastActionAt: { type: Date, default: Date.now },
@@ -75,6 +80,7 @@ const StrengthEntrySchema = new Schema(
     plannedRIR: { type: Number, default: null },
     source: { type: String, enum: ["planned", "extra"], default: "planned" },
     skipped: { type: Boolean, default: false },
+    metric: { type: String, enum: METRICS, default: "reps" },
     sets: { type: [SetEntrySchema], default: [] },
   },
   { _id: false }
@@ -104,10 +110,11 @@ const WorkoutLogSchema = new Schema(
     dayOrder: { type: Number, default: 0 },
     weekNumber: { type: Number, default: 1 },
     title: { type: String, default: "" },
-    kind: { type: String, enum: ["strength", "run"], default: "strength" },
+    kind: { type: String, enum: DAY_KINDS, default: "strength" },
     isOffDay: { type: Boolean, default: false },
     strength: { type: [StrengthEntrySchema], default: [] },
     run: { type: RunEntrySchema, default: null },
+    swim: { type: RunEntrySchema, default: null },
   },
   { timestamps: true }
 );
