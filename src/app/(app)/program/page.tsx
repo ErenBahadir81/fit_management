@@ -14,8 +14,8 @@ import {
   EmptyState,
 } from "@/components/ui";
 import {
-  Dumbbell,
   Footprints,
+  Waves,
   Pencil,
   CalendarRange,
   Info,
@@ -24,9 +24,18 @@ import {
 } from "lucide-react";
 import { cn, fmtNum } from "@/lib/utils";
 import { apiSend } from "@/lib/fetcher";
-import type { DayDTO, ProgramDTO, WorkoutLogDTO } from "@/lib/types";
+import type { ExerciseMetric, ExerciseTargetDTO, DayDTO, ProgramDTO, WorkoutLogDTO } from "@/lib/types";
 import { EditDaySheet } from "@/components/workout/EditDaySheet";
 import type { ScheduleEntry } from "@/components/workout/WeekStrip";
+import { kindIcon } from "@/components/workout/workout-ui";
+
+/** Hedef metni (reps -> 5×10, time -> 5×30 sn, stretch -> Esneme). */
+function targetText(e: ExerciseTargetDTO): string {
+  const metric: ExerciseMetric = e.metric ?? "reps";
+  if (metric === "stretch") return "Esneme / Mobilite";
+  if (metric === "time") return `${e.targetSets}×${e.targetReps} sn`;
+  return `${e.targetSets}×${e.targetReps}`;
+}
 
 interface ProgramResponse {
   program: ProgramDTO;
@@ -70,7 +79,7 @@ export default function ProgramPage() {
                 <CardBody className="p-2">
                   {data.schedule.map((s) => {
                     const today = s.offset === 0;
-                    const Icon = s.kind === "run" ? Footprints : Dumbbell;
+                    const Icon = kindIcon(s.kind);
                     return (
                       <div
                         key={s.offset}
@@ -167,7 +176,7 @@ function DayCard({
   isCurrent: boolean;
   onEdit: () => void;
 }) {
-  const Icon = day.kind === "run" ? Footprints : Dumbbell;
+  const Icon = kindIcon(day.kind);
   const [confirm, setConfirm] = useState(false);
   const [jumping, setJumping] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -176,7 +185,7 @@ function DayCard({
     setJumping(true);
     setErr(null);
     try {
-      // order 1..7 -> index 0..6. Sıra korunur, yorgunluk etkilenmez.
+      // order 1..N -> index 0..N-1 (döngü uzunluğu sabit değil). Sıra korunur, yorgunluk etkilenmez.
       await apiSend("/api/program/current", "PUT", { index: day.order - 1 });
       await mutate("/api/program");
       setConfirm(false);
@@ -213,22 +222,25 @@ function DayCard({
         </div>
 
         <div className="mt-3 space-y-1.5">
-          {day.exercises.map((e, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2"
-            >
-              <span className="font-medium text-sm truncate">{e.name}</span>
-              <span className="flex items-center gap-1.5 shrink-0">
-                <span className="text-xs font-bold text-muted tabular-nums">
-                  {e.targetSets}×{e.targetReps}
+          {day.exercises.map((e, i) => {
+            const isStretch = (e.metric ?? "reps") === "stretch";
+            return (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2"
+              >
+                <span className="font-medium text-sm truncate">{e.name}</span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs font-bold text-muted tabular-nums">
+                    {targetText(e)}
+                  </span>
+                  {!isStretch && e.targetRIR !== null && (
+                    <Badge color="var(--muted)">RIR {e.targetRIR}</Badge>
+                  )}
                 </span>
-                {e.targetRIR !== null && (
-                  <Badge color="var(--muted)">RIR {e.targetRIR}</Badge>
-                )}
-              </span>
-            </div>
-          ))}
+              </div>
+            );
+          })}
           {day.run && (
             <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2">
               <span className="font-medium text-sm inline-flex items-center gap-1.5">
@@ -240,7 +252,18 @@ function DayCard({
               </span>
             </div>
           )}
-          {day.exercises.length === 0 && !day.run && (
+          {day.swim && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2">
+              <span className="font-medium text-sm inline-flex items-center gap-1.5">
+                <Waves size={14} className="text-primary" />{" "}
+                {day.swim.label || "Yüzme"}
+              </span>
+              <span className="text-xs font-bold text-muted tabular-nums shrink-0">
+                {fmtNum(day.swim.targetKm)} km · {Math.round(day.swim.targetMin)} dk
+              </span>
+            </div>
+          )}
+          {day.exercises.length === 0 && !day.run && !day.swim && (
             <p className="text-sm text-muted px-1 py-1">Hedef tanımlı değil.</p>
           )}
         </div>

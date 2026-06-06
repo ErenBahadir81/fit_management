@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { mutate } from "swr";
 import { Sheet, Button, NumberStepper, Badge, Segmented } from "@/components/ui";
 import {
@@ -8,20 +8,31 @@ import {
   Trash2,
   Dumbbell,
   Footprints,
+  Waves,
   Timer,
-  Flag,
+  Clock,
+  StretchHorizontal,
   SkipForward,
   RotateCcw,
+  Check,
+  X,
 } from "lucide-react";
-import { cn, fmtNum, fmtMinutes, fmtPace, clamp } from "@/lib/utils";
+import { cn, clamp } from "@/lib/utils";
 import { muscleName } from "@/lib/muscles";
 import { apiSend } from "@/lib/fetcher";
 import type {
   DayDTO,
+  ExerciseMetric,
   SetEntryDTO,
   WorkoutLogDTO,
 } from "@/lib/types";
 import { AddExerciseSheet, type SessionEntry } from "./AddExerciseSheet";
+import {
+  CardioLogger,
+  parseSegments,
+  type SegmentState,
+} from "./CardioLogger";
+import { metricUnit, targetLabel, stretchDone } from "./workout-ui";
 
 interface LogSheetProps {
   open: boolean;
@@ -29,11 +40,6 @@ interface LogSheetProps {
   day: DayDTO;
   existing?: WorkoutLogDTO | null;
   onSaved?: () => void;
-}
-
-interface SegmentState {
-  km: string;
-  min: string;
 }
 
 const RIR_OPTIONS: { value: string; label: string }[] = [
@@ -52,37 +58,50 @@ function segToRir(v: string): number | null {
   return v === "none" ? null : Number(v);
 }
 
-/** En iyi tempo (dk/km) -> bir sonraki hafta hedefi (LogSheet önizlemesi). */
-function previewNextMin(
-  segs: { km: number; min: number }[],
-  targetKm: number,
-  targetMin: number
-): number {
-  let best = Infinity;
-  for (const s of segs) {
-    if (s.km > 0 && s.min > 0) best = Math.min(best, s.min / s.km);
-  }
-  if (!Number.isFinite(best) || targetKm <= 0) return targetMin;
-  const projected = Math.round(best * targetKm);
-  const floor = Math.round(targetKm * 3);
-  return clamp(projected, floor, targetMin);
+/** Süre setlerinin saniye sınırları. */
+const TIME_MIN = 5;
+const TIME_MAX = 600;
+const TIME_STEP = 5;
+
+/** Bir entry için "Set Ekle" / atlama-geri-al varsayılan set değeri. */
+function defaultSetValue(metric: ExerciseMetric, plannedReps: number): number {
+  if (metric === "time") return plannedReps || 30;
+  return plannedReps || 10;
 }
 
 /** Programdaki bir günü, kendine yeten seans hareketlerine çevirir (FRESH). */
 function entriesFromDay(day: DayDTO): SessionEntry[] {
-  return day.exercises.map((e) => ({
-    name: e.name,
-    muscles: e.muscles,
-    plannedSets: e.targetSets,
-    plannedReps: e.targetReps,
-    plannedRIR: e.targetRIR,
-    source: "planned",
-    skipped: false,
-    sets: Array.from({ length: Math.max(1, e.targetSets) }, () => ({
-      reps: e.targetReps,
-      rir: e.targetRIR,
-    })),
-  }));
+  return day.exercises.map((e) => {
+    const metric: ExerciseMetric = e.metric ?? "reps";
+    if (metric === "stretch") {
+      // FRESH varsayılan: yapıldı.
+      return {
+        name: e.name,
+        muscles: e.muscles,
+        plannedSets: e.targetSets,
+        plannedReps: e.targetReps,
+        plannedRIR: e.targetRIR,
+        source: "planned",
+        skipped: false,
+        metric,
+        sets: [{ reps: 1, rir: null }],
+      };
+    }
+    return {
+      name: e.name,
+      muscles: e.muscles,
+      plannedSets: e.targetSets,
+      plannedReps: e.targetReps,
+      plannedRIR: e.targetRIR,
+      source: "planned",
+      skipped: false,
+      metric,
+      sets: Array.from({ length: Math.max(1, e.targetSets) }, () => ({
+        reps: e.targetReps,
+        rir: e.targetRIR,
+      })),
+    };
+  });
 }
 
 /** Mevcut log'dan seans hareketlerini birebir alır (EDIT). İşaretçiye bakmaz. */
@@ -95,9 +114,8 @@ function entriesFromLog(log: WorkoutLogDTO): SessionEntry[] {
     plannedRIR: e.plannedRIR,
     source: e.source === "extra" ? "extra" : "planned",
     skipped: !!e.skipped,
-    sets: e.skipped
-      ? []
-      : e.sets.map((s) => ({ reps: s.reps, rir: s.rir })),
+    metric: e.metric ?? "reps",
+    sets: e.skipped ? [] : e.sets.map((s) => ({ reps: s.reps, rir: s.rir })),
   }));
 }
 
@@ -110,16 +128,18 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
   const isEdit = !!existing && !existing.isOffDay;
 
   const [entries, setEntries] = useState<SessionEntry[]>([]);
-  const [segments, setSegments] = useState<SegmentState[]>([]);
+  const [runSegs, setRunSegs] = useState<SegmentState[]>([]);
   const [runOn, setRunOn] = useState(false);
+  const [swimSegs, setSwimSegs] = useState<SegmentState[]>([]);
+  const [swimOn, setSwimOn] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   /* ------------------------------- seeding -------------------------------- */
   // Sheet açıldığında çalışma listesini DOĞRU kaynaktan ilklendir:
-  //  - EDIT  -> mevcut log (existing.strength / existing.run)  [day YOK SAYILIR]
-  //  - FRESH -> program günü (day.exercises / day.run)
+  //  - EDIT  -> mevcut log (existing.strength / .run / .swim)  [day YOK SAYILIR]
+  //  - FRESH -> program günü (day.exercises / .run / .swim)
   useEffect(() => {
     if (!open) return;
     setErr(null);
@@ -127,47 +147,50 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
 
     if (isEdit && existing) {
       setEntries(entriesFromLog(existing));
-      const segs = existing.run?.segments;
-      if (segs && segs.length) {
-        setSegments(segsFromState(segs));
+
+      const rSegs = existing.run?.segments;
+      if (rSegs && rSegs.length) {
+        setRunSegs(segsFromState(rSegs));
         setRunOn(true);
       } else {
-        // Düzenlemede planlı koşu hedefi yoksa, ad-hoc koşu yine eklenebilir.
-        setSegments([]);
+        setRunSegs([]);
         setRunOn(false);
+      }
+
+      const sSegs = existing.swim?.segments;
+      if (sSegs && sSegs.length) {
+        setSwimSegs(segsFromState(sSegs));
+        setSwimOn(true);
+      } else {
+        setSwimSegs([]);
+        setSwimOn(false);
       }
     } else {
       setEntries(entriesFromDay(day));
+
       if (day.run) {
-        setSegments([{ km: String(day.run.targetKm), min: "" }]);
+        setRunSegs([{ km: String(day.run.targetKm), min: "" }]);
         setRunOn(true);
       } else {
-        setSegments([]);
+        setRunSegs([]);
         setRunOn(false);
+      }
+
+      if (day.swim) {
+        setSwimSegs([{ km: String(day.swim.targetKm), min: "" }]);
+        setSwimOn(true);
+      } else {
+        setSwimSegs([]);
+        setSwimOn(false);
       }
     }
     // existing kimliği/içeriği veya gün değişince yeniden ilklendir.
   }, [open, isEdit, existing, day]);
 
-  /* --------------------------- run derived stats -------------------------- */
-  const parsedSegs = useMemo(
-    () =>
-      segments.map((s) => ({
-        km: Number(s.km.replace(",", ".")) || 0,
-        min: Number(s.min.replace(",", ".")) || 0,
-      })),
-    [segments]
-  );
-  const totalKm = parsedSegs.reduce((a, s) => a + s.km, 0);
-  const totalMin = parsedSegs.reduce((a, s) => a + s.min, 0);
-  const avgPace = totalKm > 0 ? totalMin / totalKm : 0;
-
-  // "Sonraki hafta" önizlemesi yalnız FRESH + planlı koşu günlerinde anlamlı
-  // (ad-hoc ve düzenleme koşuları ilerleme yapmaz).
+  // "Sonraki hafta" önizlemesi yalnız FRESH + planlı disiplinde anlamlı
+  // (ad-hoc ve düzenleme kardiyoları ilerleme yapmaz).
   const showRunPreview = !isEdit && !!day.run;
-  const nextMin = day.run
-    ? previewNextMin(parsedSegs, day.run.targetKm, day.run.targetMin)
-    : 0;
+  const showSwimPreview = !isEdit && !!day.swim;
 
   /* ----------------------------- set mutations ---------------------------- */
   function patchSet(ei: number, si: number, patch: Partial<SetEntryDTO>) {
@@ -186,7 +209,7 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
         const last =
           e.sets[e.sets.length - 1] ??
           ({
-            reps: e.plannedReps || 10,
+            reps: defaultSetValue(e.metric, e.plannedReps),
             rir: e.plannedRIR,
           } as SetEntryDTO);
         return { ...e, sets: [...e.sets, { ...last }] };
@@ -213,7 +236,7 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
               ? e.sets
               : [
                   {
-                    reps: e.plannedReps || 10,
+                    reps: defaultSetValue(e.metric, e.plannedReps),
                     rir: e.plannedRIR,
                   },
                 ];
@@ -221,6 +244,18 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
         }
         return { ...e, skipped: true };
       })
+    );
+  }
+  /** Esneme: yapıldı/yapılmadı toggle. */
+  function setStretchDone(ei: number, done: boolean) {
+    setEntries((prev) =>
+      prev.map((e, i) =>
+        i === ei
+          ? done
+            ? { ...e, skipped: false, sets: [{ reps: 1, rir: null }] }
+            : { ...e, skipped: true, sets: [] }
+          : e
+      )
     );
   }
   function removeEntry(ei: number) {
@@ -231,18 +266,31 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
   }
 
   /* --------------------------- segment mutations -------------------------- */
-  function patchSeg(i: number, patch: Partial<SegmentState>) {
-    setSegments((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  function patchRun(i: number, patch: Partial<SegmentState>) {
+    setRunSegs((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   }
-  function addSeg() {
-    setSegments((prev) => [...prev, { km: "0", min: "0" }]);
+  function patchSwim(i: number, patch: Partial<SegmentState>) {
+    setSwimSegs((prev) => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   }
-  function removeSeg(i: number) {
-    setSegments((prev) => prev.filter((_, j) => j !== i));
+  function addRunSeg() {
+    setRunSegs((prev) => [...prev, { km: "0", min: "0" }]);
+  }
+  function addSwimSeg() {
+    setSwimSegs((prev) => [...prev, { km: "0", min: "0" }]);
+  }
+  function removeRunSeg(i: number) {
+    setRunSegs((prev) => prev.filter((_, j) => j !== i));
+  }
+  function removeSwimSeg(i: number) {
+    setSwimSegs((prev) => prev.filter((_, j) => j !== i));
   }
   function enableRun() {
     setRunOn(true);
-    setSegments([{ km: "0", min: "0" }]);
+    setRunSegs([{ km: "0", min: "0" }]);
+  }
+  function enableSwim() {
+    setSwimOn(true);
+    setSwimSegs([{ km: "0", min: "0" }]);
   }
 
   /* -------------------------------- save ---------------------------------- */
@@ -259,10 +307,13 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
           plannedRIR: e.plannedRIR,
           source: e.source,
           skipped: e.skipped,
+          metric: e.metric,
+          // skipped -> boş set. Esneme yapıldıysa [{reps:1}], değilse skipped.
           sets: e.skipped ? [] : e.sets,
         })),
-        // Koşu yalnızca açıkça yapıldıysa (segment girildiyse) gönderilir.
-        run: runOn ? { segments: parsedSegs } : null,
+        // Kardiyo yalnızca açıkça yapıldıysa (segment girildiyse) gönderilir.
+        run: runOn ? { segments: parseSegments(runSegs) } : null,
+        swim: swimOn ? { segments: parseSegments(swimSegs) } : null,
       };
 
       if (isEdit && existing) {
@@ -287,8 +338,7 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
   }
 
   const existingNames = entries.map((e) => e.name);
-  const hasContent = entries.length > 0 || runOn;
-  const isRunDay = day.kind === "run";
+  const hasContent = entries.length > 0 || runOn || swimOn;
 
   return (
     <>
@@ -309,140 +359,183 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
         }
       >
         <div className="space-y-4 pb-1">
-          {entries.map((entry, ei) => (
-            <div
-              key={`${entry.name}-${ei}`}
-              className={cn(
-                "rounded-2xl border p-3.5 transition-colors",
-                entry.skipped
-                  ? "border-dashed border-border bg-surface-2/20 opacity-70"
-                  : "border-border bg-surface-2/40"
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Dumbbell size={16} className="text-primary shrink-0" />
-                    <span
-                      className={cn(
-                        "font-bold leading-tight truncate",
-                        entry.skipped && "line-through text-muted"
-                      )}
-                    >
-                      {entry.name}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-muted mt-1 truncate">
-                    {entry.muscles.map(muscleName).join(" · ") || "—"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {entry.source === "extra" ? (
-                    <Badge color="var(--primary)">Ekstra</Badge>
-                  ) : (
-                    <>
-                      <Badge color="var(--muted)">
-                        Hedef {entry.plannedSets}×{entry.plannedReps}
-                      </Badge>
-                      {entry.plannedRIR !== null && (
-                        <Badge color="var(--primary)">RIR {entry.plannedRIR}</Badge>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
+          {entries.map((entry, ei) => {
+            const isStretch = entry.metric === "stretch";
+            const isTime = entry.metric === "time";
+            const unit = metricUnit(entry.metric);
+            const done = stretchDone(entry.skipped, entry.sets);
 
-              {entry.skipped ? (
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-semibold text-muted inline-flex items-center gap-1.5">
-                    <SkipForward size={14} /> Bu hareket atlandı
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => toggleSkip(ei)}
-                    className="tap h-9 px-3 inline-flex items-center gap-1.5 rounded-xl border border-border text-sm font-semibold text-ink active:bg-surface-2"
-                  >
-                    <RotateCcw size={14} /> Geri al
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-2 mt-2.5">
-                    {entry.sets.map((set, si) => (
-                      <div
-                        key={si}
-                        className="rounded-xl bg-surface border border-border p-2.5"
+            return (
+              <div
+                key={`${entry.name}-${ei}`}
+                className={cn(
+                  "rounded-2xl border p-3.5 transition-colors",
+                  entry.skipped
+                    ? "border-dashed border-border bg-surface-2/20 opacity-70"
+                    : "border-border bg-surface-2/40"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <ExerciseIcon metric={entry.metric} />
+                      <span
+                        className={cn(
+                          "font-bold leading-tight truncate",
+                          entry.skipped && "line-through text-muted"
+                        )}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-bold text-muted w-12 shrink-0">
-                            Set {si + 1}
-                          </span>
-                          <NumberStepper
-                            value={set.reps}
-                            onChange={(v) => patchSet(ei, si, { reps: v })}
-                            min={1}
-                            max={100}
-                            suffix="tkr"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeSet(ei, si)}
-                            disabled={entry.sets.length <= 1}
-                            className="tap h-9 w-9 grid place-items-center rounded-xl text-muted disabled:opacity-25 active:bg-surface-2 shrink-0"
-                            aria-label="Seti sil"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[11px] font-semibold text-muted shrink-0">
-                            RIR
-                          </span>
-                          <Segmented
-                            size="sm"
-                            value={rirToSeg(set.rir)}
-                            onChange={(v) => patchSet(ei, si, { rir: segToRir(v) })}
-                            options={RIR_OPTIONS}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                        {entry.name}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted mt-1 truncate">
+                      {isStretch
+                        ? "Esneme / Mobilite"
+                        : entry.muscles.map(muscleName).join(" · ") || "—"}
+                    </p>
                   </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {entry.source === "extra" ? (
+                      <Badge color="var(--primary)">Ekstra</Badge>
+                    ) : (
+                      <>
+                        <Badge color="var(--muted)">
+                          {targetLabel(
+                            entry.metric,
+                            entry.plannedSets,
+                            entry.plannedReps
+                          )}
+                        </Badge>
+                        {!isStretch && entry.plannedRIR !== null && (
+                          <Badge color="var(--primary)">
+                            RIR {entry.plannedRIR}
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
 
-                  <p className="text-[11px] text-muted mt-2 px-0.5">
-                    RIR = kaç tekrar daha yapabilirdin
-                  </p>
-
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => addSet(ei)}
-                      className="tap flex-1 h-10 inline-flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm font-semibold text-muted active:bg-surface-2"
-                    >
-                      <Plus size={16} /> Set Ekle
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleSkip(ei)}
-                      className="tap h-10 px-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border text-sm font-semibold text-muted active:bg-surface-2"
-                    >
-                      <SkipForward size={15} /> Atla
-                    </button>
+                {isStretch ? (
+                  /* --------------------------- ESNEME --------------------------- */
+                  <div className="mt-3">
+                    <Segmented
+                      value={done ? "done" : "not"}
+                      onChange={(v) => setStretchDone(ei, v === "done")}
+                      options={[
+                        { value: "done", label: "Yapıldı", icon: <Check size={15} /> },
+                        { value: "not", label: "Yapılmadı", icon: <X size={15} /> },
+                      ]}
+                    />
                     {entry.source === "extra" && (
                       <button
                         type="button"
                         onClick={() => removeEntry(ei)}
-                        className="tap h-10 w-10 grid place-items-center rounded-xl text-fatigued border border-border active:bg-fatigued/10 shrink-0"
-                        aria-label="Hareketi sil"
+                        className="tap mt-2 w-full h-10 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border text-sm font-semibold text-fatigued active:bg-fatigued/10"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} /> Hareketi sil
                       </button>
                     )}
                   </div>
-                </>
-              )}
-            </div>
-          ))}
+                ) : entry.skipped ? (
+                  /* --------------------------- ATLANDI -------------------------- */
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-semibold text-muted inline-flex items-center gap-1.5">
+                      <SkipForward size={14} /> Bu hareket atlandı
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleSkip(ei)}
+                      className="tap h-9 px-3 inline-flex items-center gap-1.5 rounded-xl border border-border text-sm font-semibold text-ink active:bg-surface-2"
+                    >
+                      <RotateCcw size={14} /> Geri al
+                    </button>
+                  </div>
+                ) : (
+                  /* ----------------------- TEKRAR / SÜRE ------------------------ */
+                  <>
+                    <div className="space-y-2 mt-2.5">
+                      {entry.sets.map((set, si) => (
+                        <div
+                          key={si}
+                          className="rounded-xl bg-surface border border-border p-2.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-muted w-12 shrink-0">
+                              Set {si + 1}
+                            </span>
+                            <NumberStepper
+                              value={set.reps}
+                              onChange={(v) => patchSet(ei, si, { reps: v })}
+                              min={isTime ? TIME_MIN : 1}
+                              max={isTime ? TIME_MAX : 100}
+                              step={isTime ? TIME_STEP : 1}
+                              suffix={unit}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeSet(ei, si)}
+                              disabled={entry.sets.length <= 1}
+                              className="tap h-9 w-9 grid place-items-center rounded-xl text-muted disabled:opacity-25 active:bg-surface-2 shrink-0"
+                              aria-label="Seti sil"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-[11px] font-semibold text-muted shrink-0">
+                              RIR
+                            </span>
+                            <Segmented
+                              size="sm"
+                              value={rirToSeg(set.rir)}
+                              onChange={(v) =>
+                                patchSet(ei, si, { rir: segToRir(v) })
+                              }
+                              options={RIR_OPTIONS}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="text-[11px] text-muted mt-2 px-0.5">
+                      {isTime
+                        ? "Süre saniye cinsinden · RIR = kaç saniye daha dayanabilirdin"
+                        : "RIR = kaç tekrar daha yapabilirdin"}
+                    </p>
+
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => addSet(ei)}
+                        className="tap flex-1 h-10 inline-flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm font-semibold text-muted active:bg-surface-2"
+                      >
+                        <Plus size={16} /> Set Ekle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSkip(ei)}
+                        className="tap h-10 px-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border text-sm font-semibold text-muted active:bg-surface-2"
+                      >
+                        <SkipForward size={15} /> Atla
+                      </button>
+                      {entry.source === "extra" && (
+                        <button
+                          type="button"
+                          onClick={() => removeEntry(ei)}
+                          className="tap h-10 w-10 grid place-items-center rounded-xl text-fatigued border border-border active:bg-fatigued/10 shrink-0"
+                          aria-label="Hareketi sil"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
 
           {/* Hareket ekle */}
           <button
@@ -455,105 +548,16 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
 
           {/* Koşu */}
           {runOn ? (
-            <div
-              className={cn(
-                "rounded-2xl border border-border p-3.5",
-                isRunDay ? "bg-primary-soft/40" : "bg-surface-2/40"
-              )}
-            >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="flex items-center gap-2">
-                  <Footprints size={17} className="text-primary" />
-                  <span className="font-bold">{day.run?.label || "Koşu"}</span>
-                </div>
-                {day.run ? (
-                  <Badge color="var(--primary)">
-                    Hedef {fmtNum(day.run.targetKm)}km{" "}
-                    {Math.round(day.run.targetMin)}dk
-                  </Badge>
-                ) : (
-                  <Badge color="var(--primary)">Ekstra</Badge>
-                )}
-              </div>
-
-              <div className="space-y-2 mt-2.5">
-                {segments.map((seg, i) => (
-                  <div key={i} className="flex items-end gap-2">
-                    <label className="flex-1 min-w-0">
-                      <span className="block text-[11px] font-semibold text-muted mb-1">
-                        {i + 1}. Bölüm · km
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={seg.km}
-                        onChange={(e) => patchSeg(i, { km: e.target.value })}
-                        placeholder="0"
-                        className="w-full h-11 rounded-xl border border-border bg-surface px-3 text-[15px] tabular-nums outline-none focus:border-primary"
-                      />
-                    </label>
-                    <label className="flex-1 min-w-0">
-                      <span className="block text-[11px] font-semibold text-muted mb-1">
-                        dk
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={seg.min}
-                        onChange={(e) => patchSeg(i, { min: e.target.value })}
-                        placeholder="0"
-                        className="w-full h-11 rounded-xl border border-border bg-surface px-3 text-[15px] tabular-nums outline-none focus:border-primary"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => removeSeg(i)}
-                      disabled={segments.length <= 1}
-                      className="tap h-11 w-11 grid place-items-center rounded-xl text-muted disabled:opacity-25 active:bg-surface-2 shrink-0"
-                      aria-label="Bölümü sil"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={addSeg}
-                className="tap mt-2 w-full h-10 inline-flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-sm font-semibold text-muted active:bg-surface-2"
-              >
-                <Plus size={16} /> Bölüm Ekle
-              </button>
-
-              <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-surface border border-border p-3">
-                <div>
-                  <div className="text-[11px] text-muted font-medium">Toplam</div>
-                  <div className="font-bold tabular-nums">{fmtNum(totalKm)} km</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-muted font-medium">Süre</div>
-                  <div className="font-bold tabular-nums">{fmtMinutes(totalMin)}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-muted font-medium">Tempo</div>
-                  <div className="font-bold tabular-nums">{fmtPace(avgPace)}</div>
-                </div>
-              </div>
-
-              {showRunPreview && (
-                <div className="mt-2 flex items-center gap-2 rounded-xl bg-ready/10 px-3 py-2.5">
-                  <Flag size={15} className="text-ready shrink-0" />
-                  <p className="text-[12px] font-medium text-ink leading-snug">
-                    Sonraki hafta hedefi:{" "}
-                    <span className="font-bold text-ready">
-                      {fmtNum(day.run!.targetKm)}km {nextMin}dk
-                    </span>{" "}
-                    <span className="text-muted">(en iyi tempona göre)</span>
-                  </p>
-                </div>
-              )}
-            </div>
+            <CardioLogger
+              discipline="run"
+              segments={runSegs}
+              onPatch={patchRun}
+              onAdd={addRunSeg}
+              onRemove={removeRunSeg}
+              target={day.run}
+              showPreview={showRunPreview}
+              highlight={day.kind === "run"}
+            />
           ) : (
             <button
               type="button"
@@ -564,12 +568,32 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
             </button>
           )}
 
+          {/* Yüzme */}
+          {swimOn ? (
+            <CardioLogger
+              discipline="swim"
+              segments={swimSegs}
+              onPatch={patchSwim}
+              onAdd={addSwimSeg}
+              onRemove={removeSwimSeg}
+              target={day.swim}
+              showPreview={showSwimPreview}
+              highlight={day.kind === "swim"}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={enableSwim}
+              className="tap w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-sm font-bold text-muted active:bg-surface-2"
+            >
+              <Waves size={18} /> Yüzme Ekle
+            </button>
+          )}
+
           {!hasContent && (
             <div className="flex flex-col items-center text-center py-8 text-muted">
               <Timer size={26} className="mb-2" />
-              <p className="text-sm">
-                Bu seansa henüz hareket eklenmedi.
-              </p>
+              <p className="text-sm">Bu seansa henüz hareket eklenmedi.</p>
             </div>
           )}
         </div>
@@ -583,4 +607,13 @@ export function LogSheet({ open, onClose, day, existing, onSaved }: LogSheetProp
       />
     </>
   );
+}
+
+/** Metrik'e göre hareket satırı ikonu. */
+function ExerciseIcon({ metric }: { metric: ExerciseMetric }) {
+  if (metric === "time")
+    return <Clock size={16} className="text-primary shrink-0" />;
+  if (metric === "stretch")
+    return <StretchHorizontal size={16} className="text-primary shrink-0" />;
+  return <Dumbbell size={16} className="text-primary shrink-0" />;
 }

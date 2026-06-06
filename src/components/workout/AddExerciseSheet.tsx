@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Sheet, Button, Input, Badge } from "@/components/ui";
-import { Plus, Dumbbell, Sparkles, Check } from "lucide-react";
+import { Sheet, Button, Input, Badge, Segmented } from "@/components/ui";
+import { Plus, Dumbbell, Sparkles, Check, Clock, StretchHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { muscleName, MUSCLE_ORDER, MuscleKey } from "@/lib/muscles";
 import { EXERCISE_CATALOG, ExerciseDef } from "@/lib/exercises";
-import type { SetEntryDTO } from "@/lib/types";
+import type { ExerciseMetric, SetEntryDTO } from "@/lib/types";
 
 /** LogSheet'in çalışma listesindeki tek seans hareketi. */
 export interface SessionEntry {
@@ -17,6 +17,8 @@ export interface SessionEntry {
   plannedRIR: number | null;
   source: "planned" | "extra";
   skipped: boolean;
+  /** reps -> tekrar, time -> saniye, stretch -> esneme/mobilite */
+  metric: ExerciseMetric;
   sets: SetEntryDTO[];
 }
 
@@ -28,20 +30,57 @@ interface AddExerciseSheetProps {
   onAdd: (entry: SessionEntry) => void;
 }
 
-function catalogToEntry(def: ExerciseDef): SessionEntry {
+const METRIC_OPTIONS: { value: ExerciseMetric; label: string }[] = [
+  { value: "reps", label: "Tekrar" },
+  { value: "time", label: "Süre" },
+  { value: "stretch", label: "Esneme" },
+];
+
+/** Bir hareketi metric'ine göre uygun başlangıç setleriyle kurar (extra). */
+function makeEntry(
+  name: string,
+  muscles: MuscleKey[],
+  metric: ExerciseMetric,
+  seedSets: number,
+  seedValue: number
+): SessionEntry {
+  let sets: SetEntryDTO[];
+  if (metric === "stretch") {
+    // Esneme: ekstra eklendiğinde "yapıldı" varsayılır.
+    sets = [{ reps: 1, rir: null }];
+  } else {
+    sets = Array.from({ length: Math.max(1, seedSets) }, () => ({
+      reps: seedValue,
+      rir: null,
+    }));
+  }
   return {
-    name: def.name,
-    muscles: def.muscles,
+    name,
+    muscles,
     plannedSets: 0,
     plannedReps: 0,
     plannedRIR: null,
     source: "extra",
     skipped: false,
-    sets: Array.from({ length: Math.max(1, def.defaultSets) }, () => ({
-      reps: def.defaultReps,
-      rir: null,
-    })),
+    metric,
+    sets,
   };
+}
+
+function catalogToEntry(def: ExerciseDef): SessionEntry {
+  const metric = def.metric ?? "reps";
+  // time -> defaultReps saniyedir; reps -> defaultReps tekrardır.
+  return makeEntry(def.name, def.muscles, metric, def.defaultSets, def.defaultReps);
+}
+
+/** Süre tabanlı hareketler için makul varsayılan saniye. */
+const DEFAULT_TIME_SECONDS = 30;
+const DEFAULT_REPS = 10;
+
+function metricIcon(metric: ExerciseMetric) {
+  if (metric === "time") return Clock;
+  if (metric === "stretch") return StretchHorizontal;
+  return Dumbbell;
 }
 
 export function AddExerciseSheet({
@@ -53,6 +92,7 @@ export function AddExerciseSheet({
   const [custom, setCustom] = useState(false);
   const [name, setName] = useState("");
   const [muscles, setMuscles] = useState<MuscleKey[]>([]);
+  const [metric, setMetric] = useState<ExerciseMetric>("reps");
 
   // Sheet her açıldığında özel-hareket formunu sıfırla.
   useEffect(() => {
@@ -60,6 +100,7 @@ export function AddExerciseSheet({
     setCustom(false);
     setName("");
     setMuscles([]);
+    setMetric("reps");
   }, [open]);
 
   const has = useMemo(
@@ -73,23 +114,27 @@ export function AddExerciseSheet({
     );
   }
 
+  // Esnemede kas seçimi gerekmez; tekrar/süre için ≥1 kas şart.
+  const musclesRequired = metric !== "stretch";
+  const customValid =
+    name.trim().length > 0 && (!musclesRequired || muscles.length > 0);
+
   function addCustom() {
     const clean = name.trim();
-    if (!clean || muscles.length === 0) return;
-    onAdd({
-      name: clean.slice(0, 80),
-      muscles,
-      plannedSets: 0,
-      plannedReps: 0,
-      plannedRIR: null,
-      source: "extra",
-      skipped: false,
-      sets: [{ reps: 10, rir: null }],
-    });
+    if (!clean) return;
+    if (musclesRequired && muscles.length === 0) return;
+    const seedValue = metric === "time" ? DEFAULT_TIME_SECONDS : DEFAULT_REPS;
+    onAdd(
+      makeEntry(
+        clean.slice(0, 80),
+        musclesRequired ? muscles : [],
+        metric,
+        1,
+        seedValue
+      )
+    );
     onClose();
   }
-
-  const customValid = name.trim().length > 0 && muscles.length > 0;
 
   return (
     <Sheet
@@ -119,37 +164,58 @@ export function AddExerciseSheet({
             placeholder="Örn. Face Pull"
             autoFocus
           />
+
           <div>
             <span className="block text-sm font-medium text-ink mb-2">
-              Çalışan kaslar
+              Ölçü birimi
             </span>
-            <div className="flex flex-wrap gap-2">
-              {MUSCLE_ORDER.map((k) => {
-                const active = muscles.includes(k);
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => toggleMuscle(k)}
-                    className={cn(
-                      "tap inline-flex items-center gap-1.5 rounded-full border px-3.5 h-10 text-sm font-semibold transition-colors",
-                      active
-                        ? "border-primary bg-primary-soft text-primary"
-                        : "border-border bg-surface text-muted active:bg-surface-2"
-                    )}
-                  >
-                    {active && <Check size={14} />}
-                    {muscleName(k)}
-                  </button>
-                );
-              })}
-            </div>
-            {muscles.length === 0 && (
-              <p className="text-[12px] text-muted mt-2 px-0.5">
-                En az bir kas grubu seç.
-              </p>
-            )}
+            <Segmented
+              value={metric}
+              onChange={(v) => setMetric(v)}
+              options={METRIC_OPTIONS}
+            />
+            <p className="text-[12px] text-muted mt-2 px-0.5">
+              {metric === "time"
+                ? "Süre: her set saniye olarak girilir (örn. plank)."
+                : metric === "stretch"
+                ? "Esneme/mobilite: kas yükü yok, sadece yapıldı işareti."
+                : "Tekrar: klasik set × tekrar."}
+            </p>
           </div>
+
+          {musclesRequired && (
+            <div>
+              <span className="block text-sm font-medium text-ink mb-2">
+                Çalışan kaslar
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {MUSCLE_ORDER.map((k) => {
+                  const active = muscles.includes(k);
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => toggleMuscle(k)}
+                      className={cn(
+                        "tap inline-flex items-center gap-1.5 rounded-full border px-3.5 h-10 text-sm font-semibold transition-colors",
+                        active
+                          ? "border-primary bg-primary-soft text-primary"
+                          : "border-border bg-surface text-muted active:bg-surface-2"
+                      )}
+                    >
+                      {active && <Check size={14} />}
+                      {muscleName(k)}
+                    </button>
+                  );
+                })}
+              </div>
+              {muscles.length === 0 && (
+                <p className="text-[12px] text-muted mt-2 px-0.5">
+                  En az bir kas grubu seç.
+                </p>
+              )}
+            </div>
+          )}
 
           <button
             type="button"
@@ -184,6 +250,8 @@ export function AddExerciseSheet({
 
           {EXERCISE_CATALOG.map((def) => {
             const added = has.has(def.name.toLowerCase());
+            const metric = def.metric ?? "reps";
+            const MIcon = metricIcon(metric);
             return (
               <button
                 key={def.name}
@@ -196,17 +264,23 @@ export function AddExerciseSheet({
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <Dumbbell size={15} className="text-primary shrink-0" />
+                    <MIcon size={15} className="text-primary shrink-0" />
                     <span className="font-bold truncate">{def.name}</span>
                     {added && <Badge color="var(--primary)">ekli</Badge>}
                   </div>
                   <p className="text-[11px] text-muted mt-1 truncate">
-                    {def.muscles.map(muscleName).join(" · ")}
+                    {metric === "stretch"
+                      ? "Esneme / Mobilite"
+                      : def.muscles.map(muscleName).join(" · ") || "—"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs font-semibold text-muted tabular-nums">
-                    {def.defaultSets}×{def.defaultReps}
+                    {metric === "stretch"
+                      ? "—"
+                      : metric === "time"
+                      ? `${def.defaultSets}×${def.defaultReps} sn`
+                      : `${def.defaultSets}×${def.defaultReps}`}
                   </span>
                   <span className="h-8 w-8 grid place-items-center rounded-full bg-primary-soft text-primary">
                     <Plus size={16} />

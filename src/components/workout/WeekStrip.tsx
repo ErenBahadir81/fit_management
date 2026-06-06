@@ -1,8 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Dumbbell, Footprints } from "lucide-react";
 import type { DayKind } from "@/lib/types";
+import { kindIcon } from "./workout-ui";
 
 export interface ScheduleEntry {
   dateISO: string;
@@ -20,7 +20,7 @@ export function WeekStrip({ schedule }: { schedule: ScheduleEntry[] }) {
     <div className="flex gap-2.5 overflow-x-auto no-scrollbar -mx-5 px-5 pb-1">
       {schedule.map((s) => {
         const today = s.offset === 0;
-        const Icon = s.kind === "run" ? Footprints : Dumbbell;
+        const Icon = kindIcon(s.kind);
         return (
           <div
             key={s.offset}
