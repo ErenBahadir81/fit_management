@@ -13,17 +13,22 @@ import { clamp } from "./utils";
 
 let seedPromise: Promise<void> | null = null;
 
+/** Seed kullanıcılarının varsayılan şifresi (yönetim panelinde de gösterilir). */
+const DEFAULT_PASSWORD = "Asd*123";
+
 /* ------------------------------ kullanıcılar ----------------------------- */
 
 /** Eren — 7 günlük split. */
 async function createEren(startDayIndex = 0) {
-  const passwordHash = await bcrypt.hash("Asd*123", 10);
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
   const index = clamp(Math.round(startDayIndex), 0, SEED_PROGRAM_DAYS.length - 1);
 
   const user = await User.create({
     username: "eren",
     displayName: "Eren",
     passwordHash,
+    passwordPlain: DEFAULT_PASSWORD,
+    role: "admin",
     gender: "male",
     heightCm: 178,
   });
@@ -51,7 +56,7 @@ async function createEren(startDayIndex = 0) {
 
 /** İnci — 4 günlük döngü (Squat → Handstand → Leg Raises → Stretch). */
 async function createInci(startDayIndex = 0) {
-  const passwordHash = await bcrypt.hash("Asd*123", 10);
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
   const index = clamp(
     Math.round(startDayIndex),
     0,
@@ -62,6 +67,8 @@ async function createInci(startDayIndex = 0) {
     username: "inci",
     displayName: "İnci",
     passwordHash,
+    passwordPlain: DEFAULT_PASSWORD,
+    role: "user",
     gender: "female",
     heightCm: null,
   });
@@ -108,11 +115,29 @@ async function ensureUser(
  * Migration: kimseyi bozmadan eksik alanları güvenli şekilde doldurur.
  * - program egzersizlerinde eksik `metric` -> "reps"
  * - antrenman kayıtlarında eksik `metric` -> "reps"
+ * - eren/inci hesaplarında eksik `role` / `passwordPlain` -> seed varsayılanları
  * Sadece değişiklik varsa kaydeder; tamamen idempotent. Hata olursa yutulur
  * (kullanıcı girişini bloklamaz; bir sonraki deployda tekrar denenir).
  */
 async function migrate(): Promise<void> {
   try {
+    const users = await User.find({});
+    for (const u of users) {
+      let changed = false;
+      if (u.role == null) {
+        u.role = u.username === "eren" ? "admin" : "user";
+        changed = true;
+      }
+      if (
+        u.passwordPlain == null &&
+        (u.username === "eren" || u.username === "inci")
+      ) {
+        u.passwordPlain = DEFAULT_PASSWORD;
+        changed = true;
+      }
+      if (changed) await u.save();
+    }
+
     const programs = await Program.find({});
     for (const p of programs) {
       let changed = false;

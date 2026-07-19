@@ -9,6 +9,9 @@ const UserSchema = new Schema(
     username: { type: String, required: true, unique: true, lowercase: true, trim: true },
     displayName: { type: String, required: true },
     passwordHash: { type: String, required: true },
+    /** Yönetim panelinde gösterim için düz metin kopya (yalnız admin görür). */
+    passwordPlain: { type: String, default: null },
+    role: { type: String, enum: ["admin", "user"], default: "user" },
     gender: { type: String, enum: ["male", "female"], default: "male" },
     heightCm: { type: Number, default: null },
   },

@@ -101,12 +101,21 @@ export interface WorkoutLogDTO {
   swim?: RunEntryDTO | null;
 }
 
+export type UserRole = "admin" | "user";
+
 export interface UserDTO {
   id: string;
   username: string;
   displayName: string;
   gender: Gender;
   heightCm: number | null;
+  role: UserRole;
+}
+
+/** Yönetim paneli için — düz metin şifreyi de içerir (yalnız admin uçları döner). */
+export interface UserAdminDTO extends UserDTO {
+  password: string | null;
+  createdAt: string;
 }
 
 export interface BodyEntryDTO {

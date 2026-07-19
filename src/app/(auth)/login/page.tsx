@@ -6,7 +6,7 @@ import { Input, Button } from "@/components/ui";
 import { apiSend } from "@/lib/fetcher";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("eren");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,7 +43,7 @@ export default function LoginPage() {
           onChange={(e) => setUsername(e.target.value)}
           autoCapitalize="none"
           autoCorrect="off"
-          placeholder="eren"
+          placeholder="Kullanıcı adın"
         />
         <Input
           label="Şifre"
@@ -63,13 +63,6 @@ export default function LoginPage() {
           Giriş Yap
         </Button>
       </form>
-
-      <p className="text-center text-xs text-muted mt-6">
-        Hesaplar:{" "}
-        <span className="font-semibold text-ink">eren</span> ·{" "}
-        <span className="font-semibold text-ink">inci</span> /{" "}
-        <span className="font-semibold text-ink">Asd*123</span>
-      </p>
     </div>
   );
 }
