@@ -16,7 +16,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40">
+    <nav className="app-bottom-nav fixed bottom-0 inset-x-0 z-40">
       <div className="mx-auto max-w-app">
         <div className="mx-3 mb-3 pad-safe-b rounded-3xl border border-border bg-surface/95 backdrop-blur-xl shadow-pop">
           <ul className="grid grid-cols-4">

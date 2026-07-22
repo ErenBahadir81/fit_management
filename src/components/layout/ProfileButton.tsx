@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { LogOut, User as UserIcon, Users as UsersIcon } from "lucide-react";
 import { Sheet, Button } from "@/components/ui";
 import { apiSend } from "@/lib/fetcher";
 import type { UserDTO } from "@/lib/types";
@@ -11,8 +12,14 @@ export function ProfileButton() {
   const { data } = useSWR<{ user: UserDTO }>("/api/auth/me");
   const [open, setOpen] = useState(false);
   const [out, setOut] = useState(false);
+  const router = useRouter();
   const user = data?.user;
   const initial = (user?.displayName || "?").charAt(0).toUpperCase();
+
+  function goToUsers() {
+    setOpen(false);
+    router.push("/users");
+  }
 
   async function logout() {
     setOut(true);
@@ -59,6 +66,12 @@ export function ProfileButton() {
             <p className="text-sm text-muted">@{user?.username}</p>
           </div>
         </div>
+
+        {user?.role === "admin" && (
+          <Button variant="soft" fullWidth size="lg" className="mt-2" onClick={goToUsers}>
+            <UsersIcon size={18} /> Kullanıcılar
+          </Button>
+        )}
       </Sheet>
     </>
   );

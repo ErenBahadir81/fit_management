@@ -17,8 +17,10 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }: Shee
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
+      document.body.classList.add("sheet-open");
       return () => {
         document.body.style.overflow = "";
+        document.body.classList.remove("sheet-open");
       };
     }
   }, [open]);

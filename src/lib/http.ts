@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getUserId } from "./auth";
 import { dbConnect } from "./mongodb";
 import { User } from "./models";
+import { ensureSeeded } from "./seed";
 
 export function json(data: unknown, init?: number | ResponseInit) {
   const responseInit = typeof init === "number" ? { status: init } : init;
@@ -37,6 +38,7 @@ export async function requireAdmin(): Promise<
 > {
   const userId = getUserId();
   if (!userId) return { response: unauthorized() };
+  await ensureSeeded();
   await dbConnect();
   const user = await User.findById(userId);
   if (!user || user.role !== "admin") return { response: forbidden() };

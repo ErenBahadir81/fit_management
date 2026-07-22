@@ -70,6 +70,12 @@ body {
   }
 }
 
+/* Bir Sheet açıkken alt gezinme çubuğu tamamen kaldırılır — z-index'e
+   güvenmek yerine görünürlüğü kesin olarak kapatır, üst üste binmeyi önler. */
+body.sheet-open .app-bottom-nav {
+  display: none;
+}
+
 /* Recharts polish */
 .recharts-default-tooltip {
   border-radius: 0.75rem !important;
