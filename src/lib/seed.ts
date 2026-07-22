@@ -118,25 +118,30 @@ async function ensureUser(
  * - eren/inci hesaplarında eksik `role` / `passwordPlain` -> seed varsayılanları
  * Sadece değişiklik varsa kaydeder; tamamen idempotent. Hata olursa yutulur
  * (kullanıcı girişini bloklamaz; bir sonraki deployda tekrar denenir).
+ *
+ * Kullanıcı alanları ham Mongo update'leriyle (find+save değil) düzeltiliyor:
+ * Mongoose, `User.find()` ile hydrate ederken DB'de eksik olan `role`
+ * alanına şemadaki `default: "user"` değerini bellekte otomatik uyguluyor
+ * ve bu `role == null` kontrolünü hep false yapıp gerçek admin (eren)
+ * hesabının fark edilmesini engelliyordu — üstelik `passwordPlain` için
+ * bir `.save()` tetiklendiğinde bu yanlış "user" değeri DB'ye kalıcı
+ * olarak yazılabiliyordu. `$exists`/`$ne` ile ham belgeye bakan update
+ * sorguları bu maskelemeden etkilenmez.
  */
 async function migrate(): Promise<void> {
   try {
-    const users = await User.find({});
-    for (const u of users) {
-      let changed = false;
-      if (u.role == null) {
-        u.role = u.username === "eren" ? "admin" : "user";
-        changed = true;
-      }
-      if (
-        u.passwordPlain == null &&
-        (u.username === "eren" || u.username === "inci")
-      ) {
-        u.passwordPlain = DEFAULT_PASSWORD;
-        changed = true;
-      }
-      if (changed) await u.save();
-    }
+    await User.updateOne(
+      { username: "eren", role: { $ne: "admin" } },
+      { $set: { role: "admin" } }
+    );
+    await User.updateMany(
+      { username: { $ne: "eren" }, role: { $exists: false } },
+      { $set: { role: "user" } }
+    );
+    await User.updateMany(
+      { username: { $in: ["eren", "inci"] }, passwordPlain: { $exists: false } },
+      { $set: { passwordPlain: DEFAULT_PASSWORD } }
+    );
 
     const programs = await Program.find({});
     for (const p of programs) {
