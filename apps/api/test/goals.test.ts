@@ -19,7 +19,8 @@ beforeEach(async () => {
 });
 
 const api = "/api/v1";
-const eren = { heightCm: 186, neckCm: 40, waistCm: 87, weightKg: 103 };
+/** Navy body fat for these numbers is exactly 10.0 % — the worked example from the plan. */
+const eren = { heightCm: 186, neckCm: 40, waistCm: 80.7, weightKg: 103 };
 
 async function withMeasurement(opts: Parameters<typeof asUser>[1] = {}) {
   const u = await asUser(t, { gender: "male", heightCm: 186, ...(opts as object) });
@@ -45,12 +46,13 @@ async function logMeals(user: TestUser, fromKey: string, days: number, kcal: num
 }
 
 async function logWeighIns(user: TestUser, fromKey: string, days: number, start: number, perDay: number) {
-  await WeighIn.insertMany(
+  await WeighIn.bulkWrite(
     Array.from({ length: days }, (_, i) => ({
-      userId: user._id,
-      dateKey: shiftKey(fromKey, i),
-      weightKg: Math.round((start - perDay * i) * 100) / 100,
-      source: "manual",
+      updateOne: {
+        filter: { userId: user._id, dateKey: shiftKey(fromKey, i) },
+        update: { $set: { weightKg: Math.round((start - perDay * i) * 100) / 100, source: "manual" } },
+        upsert: true,
+      },
     }))
   );
 }
@@ -163,7 +165,7 @@ describe("PATCH /goals/current", () => {
     const before = created.json().goal;
 
     t.clock.now = new Date("2026-09-24T09:00:00.000Z");
-    await t.app.inject({ method: "POST", url: `${api}/body/entries`, headers, payload: { ...eren, waistCm: 85, weightKg: 101 } });
+    await t.app.inject({ method: "POST", url: `${api}/body/entries`, headers, payload: { ...eren, waistCm: 79, weightKg: 101 } });
 
     const res = await t.app.inject({ method: "PATCH", url: `${api}/goals/current`, headers, payload: { targetBodyFatPct: 7, profile: "conservative" } });
     expect(res.statusCode).toBe(200);
