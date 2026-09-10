@@ -27,18 +27,21 @@ describe("FakeApi (EXPO_PUBLIC_API_FAKE=1)", () => {
     expect(home.user.displayName.length).toBeGreaterThan(0);
     expect(home.today.calories.target).toBeGreaterThan(0);
     expect(home.recovery.top.length).toBeGreaterThan(0);
-    expect(() => zUser.parse((await api.auth.me()).user)).not.toThrow();
-    expect(() => zMascotMessage.parse(await api.mascot.message("home"))).not.toThrow();
-    expect(() => zWeeklyReport.parse(await api.reports.weekly())).not.toThrow();
-    expect(() => zBodyTrends.parse(await api.body.trends(90))).not.toThrow();
-    expect(() => zBodySummary.parse(await api.body.summary())).not.toThrow();
-    expect(() => zGoalView.parse(await api.goals.current())).not.toThrow();
-    expect(() => zProgramView.parse(await api.training.program())).not.toThrow();
-    expect(() => zRecoveryView.parse(await api.training.recovery())).not.toThrow();
-    expect(() => zTrainingStats.parse(await api.training.stats())).not.toThrow();
-    expect(() => zDayView.parse(await api.nutrition.day())).not.toThrow();
-    expect(() => zWeekNutrition.parse(await api.nutrition.week())).not.toThrow();
-    expect(() => zFoodSearchResponse.parse(await api.nutrition.search("yumurta"))).not.toThrow();
+    const checks: Array<[{ parse: (v: unknown) => unknown }, unknown]> = [
+      [zUser, (await api.auth.me()).user],
+      [zMascotMessage, await api.mascot.message("home")],
+      [zWeeklyReport, await api.reports.weekly()],
+      [zBodyTrends, await api.body.trends(90)],
+      [zBodySummary, await api.body.summary()],
+      [zGoalView, await api.goals.current()],
+      [zProgramView, await api.training.program()],
+      [zRecoveryView, await api.training.recovery()],
+      [zTrainingStats, await api.training.stats()],
+      [zDayView, await api.nutrition.day()],
+      [zWeekNutrition, await api.nutrition.week()],
+      [zFoodSearchResponse, await api.nutrition.search("yumurta")],
+    ];
+    for (const [schema, value] of checks) expect(() => schema.parse(value)).not.toThrow();
   });
 
   test("PATCH /me persists into the fake state", async () => {

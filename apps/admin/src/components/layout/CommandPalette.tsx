@@ -101,6 +101,9 @@ function PaletteInner({ onClose, extraCommands }: { onClose: () => void; extraCo
   const results = useMemo(() => filterCommands(commands, query), [commands, query]);
   const active = Math.min(index, Math.max(0, results.length - 1));
 
+  // Stable ref so re-renders never re-steal focus mid-typing.
+  const focusOnMount = useCallback((el: HTMLInputElement | null) => el?.focus(), []);
+
   const onQueryChange = useCallback((value: string) => {
     setQuery(value);
     setIndex(0);
@@ -171,7 +174,7 @@ function PaletteInner({ onClose, extraCommands }: { onClose: () => void; extraCo
         <div className="flex items-center gap-2.5 border-b border-line px-4">
           <Search className="size-4 shrink-0 text-subtle" aria-hidden />
           <input
-            ref={(el) => el?.focus()}
+            ref={focusOnMount}
             type="text"
             role="combobox"
             aria-expanded

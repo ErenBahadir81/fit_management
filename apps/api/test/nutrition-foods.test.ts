@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { zFood, zFoodSearchResponse } from "@fitfloow/core";
 import { Food } from "../src/models/nutrition";
 import { seedFoods } from "../src/modules/nutrition/seed/index";
 import { asUser, createTestApp, seedBasics, type TestApp } from "./harness";
@@ -53,8 +54,7 @@ describe("seedFoods", () => {
   it("inserts the curated catalogue once and is idempotent", async () => {
     const count = await Food.countDocuments({ source: "seed" });
     expect(count).toBeGreaterThan(390);
-    const again = await seedFoods();
-    expect(again).toEqual({ inserted: 0, skipped: true });
+    expect(await seedFoods()).toBe(0);
     expect(await Food.countDocuments({ source: "seed" })).toBe(count);
   });
 
@@ -81,6 +81,8 @@ describe("GET /nutrition/foods/search", () => {
     const body = res.json();
     expect(body.foods[0].name).toBe("Pilav");
     expect(body.remote).toEqual([]);
+    const parsed = zFoodSearchResponse.safeParse(body);
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
 
   it("folds Turkish casing and diacritics", async () => {
@@ -166,6 +168,8 @@ describe("GET /nutrition/foods/:id", () => {
     const res = await t.app.inject({ method: "GET", url: `/api/v1/nutrition/foods/${food!._id}`, headers });
     expect(res.statusCode).toBe(200);
     expect(res.json().food).toMatchObject({ name: "Pilav", source: "seed", verified: true });
+    const parsed = zFood.safeParse(res.json().food);
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
 
   it("404s for an unknown or malformed id", async () => {
@@ -202,6 +206,15 @@ describe("POST /nutrition/foods", () => {
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().food).toMatchObject({ name: "Protein topu", source: "user", verified: false, defaultServingG: 40, popularity: 0 });
+  });
+
+  it("409s when the barcode already belongs to another food", async () => {
+    const { headers } = await asUser(t);
+    const payload = { name: "Barkodlu", per100g: { kcal: 100, protein: 1, carbs: 1, fat: 1 }, barcode: "8690000009999" };
+    expect((await t.app.inject({ method: "POST", url: "/api/v1/nutrition/foods", headers, payload })).statusCode).toBe(201);
+    const dup = await t.app.inject({ method: "POST", url: "/api/v1/nutrition/foods", headers, payload: { ...payload, name: "Kopya" } });
+    expect(dup.statusCode).toBe(409);
+    expect(dup.json().error.code).toBe("CONFLICT");
   });
 
   it("rejects an invalid payload", async () => {

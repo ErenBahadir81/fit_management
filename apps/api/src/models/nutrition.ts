@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 import type { FoodDTO, MealEntryDTO, Per100g, Totals } from "@fitfloow/core";
 
 const Per100gSchema = new Schema(
@@ -54,7 +54,7 @@ FoodSchema.index({ barcode: 1 }, { unique: true, partialFilterExpression: { barc
 FoodSchema.index({ aliases: 1 });
 FoodSchema.index({ name: "text", nameEn: "text", aliases: "text" }, { default_language: "none" });
 
-export const Food: Model<FoodDoc> = (models.Food as Model<FoodDoc>) || model<FoodDoc>("Food", FoodSchema);
+export const Food: Model<FoodDoc> = (mongoose.models.Food as Model<FoodDoc>) || model<FoodDoc>("Food", FoodSchema);
 
 export function toFoodDTO(f: FoodDoc): FoodDTO {
   return {
@@ -109,7 +109,7 @@ const MealEntrySchema = new Schema<MealEntryDoc>(
 );
 MealEntrySchema.index({ userId: 1, dateKey: 1 });
 
-export const MealEntry: Model<MealEntryDoc> = (models.MealEntry as Model<MealEntryDoc>) || model<MealEntryDoc>("MealEntry", MealEntrySchema);
+export const MealEntry: Model<MealEntryDoc> = (mongoose.models.MealEntry as Model<MealEntryDoc>) || model<MealEntryDoc>("MealEntry", MealEntrySchema);
 
 export function toMealEntryDTO(m: MealEntryDoc): MealEntryDTO {
   return {
@@ -149,7 +149,7 @@ const DietTargetSchema = new Schema<DietTargetDoc>(
   },
   { timestamps: true }
 );
-export const DietTarget: Model<DietTargetDoc> = (models.DietTarget as Model<DietTargetDoc>) || model<DietTargetDoc>("DietTarget", DietTargetSchema);
+export const DietTarget: Model<DietTargetDoc> = (mongoose.models.DietTarget as Model<DietTargetDoc>) || model<DietTargetDoc>("DietTarget", DietTargetSchema);
 
 export interface ScanDoc {
   _id: Types.ObjectId;
@@ -191,4 +191,4 @@ const ScanSchema = new Schema<ScanDoc>(
   },
   { timestamps: true }
 );
-export const Scan: Model<ScanDoc> = (models.Scan as Model<ScanDoc>) || model<ScanDoc>("Scan", ScanSchema);
+export const Scan: Model<ScanDoc> = (mongoose.models.Scan as Model<ScanDoc>) || model<ScanDoc>("Scan", ScanSchema);

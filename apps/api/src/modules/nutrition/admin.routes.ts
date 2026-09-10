@@ -6,7 +6,7 @@ import { Food, Scan, toFoodDTO, type FoodDoc, type ScanDoc } from "../../models/
 import { User } from "../../models/user";
 import { AppError } from "../../lib/errors";
 import type { AppContext } from "../../context";
-import { cacheExternalFood } from "./foods.service";
+import { cacheExternalFood, rethrowDuplicate } from "./foods.service";
 import { offSearch } from "./off";
 import { usdaSearch } from "./usda";
 import { scanImageUrl } from "./uploads";
@@ -60,11 +60,11 @@ export async function adminFoodsRoutes(app: FastifyInstance, ctx: AppContext) {
       source: "admin",
       barcode: input.barcode ?? null,
       externalId: null,
-      verified: input.verified ?? true,
+      verified: input.verified,
       popularity: 0,
       ownerUserId: null,
       brand: input.brand ?? null,
-    });
+    }).catch(rethrowDuplicate);
     return reply.status(201).send({ food: toFoodDTO(doc.toObject() as FoodDoc) });
   });
 
@@ -74,7 +74,7 @@ export async function adminFoodsRoutes(app: FastifyInstance, ctx: AppContext) {
     const input = req.body as z.infer<typeof zFoodUpdate>;
     const $set: Record<string, unknown> = { ...input };
     if (input.name) $set.searchKey = searchKey(input.name);
-    const doc = await Food.findByIdAndUpdate(id, { $set }, { returnDocument: "after" }).lean<FoodDoc>();
+    const doc = await Food.findByIdAndUpdate(id, { $set }, { returnDocument: "after" }).lean<FoodDoc>().catch(rethrowDuplicate);
     if (!doc) throw AppError.notFound("Besin");
     return { food: toFoodDTO(doc) };
   });

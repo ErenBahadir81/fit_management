@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { shiftKey } from "@fitfloow/core";
+import { shiftKey, zGoal, zGoalPreview, zGoalView } from "@fitfloow/core";
 import { asUser, createTestApp, seedBasics, type TestApp, type TestUser } from "./harness";
 import { Goal, WeeklyReportCache } from "../src/models/goal";
 import { WeighIn } from "../src/models/body";
@@ -247,5 +247,17 @@ describe("complete / abandon", () => {
   it("404s when there is nothing to close", async () => {
     const { headers } = await asUser(t);
     expect((await t.app.inject({ method: "POST", url: `${api}/goals/current/complete`, headers })).statusCode).toBe(404);
+  });
+});
+
+describe("DTO contract", () => {
+  it("goal responses validate against the shared zod schemas", async () => {
+    const { headers } = await withMeasurement();
+    const preview = await t.app.inject({ method: "POST", url: `${api}/goals/preview`, headers, payload: { targetBodyFatPct: 7 } });
+    expect(() => zGoalPreview.parse(preview.json())).not.toThrow();
+    const created = await t.app.inject({ method: "POST", url: `${api}/goals`, headers, payload: { targetBodyFatPct: 7 } });
+    expect(() => zGoal.parse(created.json().goal)).not.toThrow();
+    const view = await t.app.inject({ method: "GET", url: `${api}/goals/current`, headers });
+    expect(() => zGoalView.parse(view.json())).not.toThrow();
   });
 });

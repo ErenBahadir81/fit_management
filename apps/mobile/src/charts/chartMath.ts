@@ -66,13 +66,14 @@ export interface TrendPoint {
   raw: number | null;
   ewma: number | null;
 }
-export interface TrendRow {
+/** A type alias (not an interface) so victory-native's `Record<string, unknown>` constraint is satisfied. */
+export type TrendRow = {
   x: number;
   dateKey: string;
   raw: number | null;
   ewma: number | null;
   goal: number | null;
-}
+};
 export interface TrendSeries {
   data: TrendRow[];
   domainY: [number, number];

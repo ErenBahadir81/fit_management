@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { createSecureTokenStore } from "../../src/lib/auth";
 import { createApiClient } from "@fitfloow/api-client";
-import { setApi, onUnauthorized, emitUnauthorized } from "../../src/lib/api";
+import { setApi, onUnauthorized, emitUnauthorized, tokenStore } from "../../src/lib/api";
 import { createFakeApi, FAKE_CREDENTIALS } from "../../src/lib/fake";
 import { useSession } from "../../src/features/auth/session";
 import { getJSON, STORAGE_KEYS, storage } from "../../src/lib/storage";
@@ -51,7 +51,7 @@ describe("session store", () => {
   });
 
   test("boot() with a cached user + tokens signs in instantly (cache-first) and refreshes /auth/me", async () => {
-    const api = createFakeApi({ latencyMs: 0, signedIn: true });
+    const api = createFakeApi({ latencyMs: 0, signedIn: true, tokens: tokenStore });
     setApi(api);
     storage.set(STORAGE_KEYS.sessionUser, JSON.stringify({ ...(await api.auth.me()).user, displayName: "Eski İsim" }));
     const p = useSession.getState().boot();
@@ -63,6 +63,7 @@ describe("session store", () => {
   });
 
   test("boot() without tokens → signedOut", async () => {
+    await tokenStore.clear();
     setApi(createFakeApi({ latencyMs: 0 }));
     await useSession.getState().boot();
     expect(useSession.getState().status).toBe("signedOut");

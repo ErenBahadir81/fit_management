@@ -53,14 +53,15 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   boot: async () => {
-    await tokenStore.load();
+    // Cache-first: a cached user means a login happened (tokens are written together with it), so the
+    // tabs render instantly; the secure-store read and /auth/me refresh happen in the background.
     const cached = getJSON<UserDTO>(STORAGE_KEYS.sessionUser);
+    if (cached) set({ status: "signedIn", user: cached });
+    await tokenStore.load();
     if (!tokenStore.hasTokens()) {
-      removeKey(STORAGE_KEYS.sessionUser);
-      set({ status: "signedOut", user: null });
+      get().forceSignOut();
       return;
     }
-    if (cached) set({ status: "signedIn", user: cached });
     try {
       const { user } = await getApi().auth.me();
       get().setUser(user);

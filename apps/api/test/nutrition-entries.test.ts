@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { zDayView, zMealEntry, zWeekNutrition } from "@fitfloow/core";
 import { Food, MealEntry } from "../src/models/nutrition";
 import { WeeklyReportCache } from "../src/models/goal";
 import { seedFoods } from "../src/modules/nutrition/seed/index";
@@ -46,6 +47,7 @@ describe("POST /nutrition/entries", () => {
       totals: { kcal: 330, protein: 62, carbs: 0, fat: 7.2 },
     });
     expect(body.dayTotals).toEqual({ kcal: 330, protein: 62, carbs: 0, fat: 7.2 });
+    expect(zMealEntry.safeParse(body.entry).success).toBe(true);
   });
 
   it("accumulates the day totals across entries and meals", async () => {
@@ -173,6 +175,7 @@ describe("GET /nutrition/day", () => {
     expect(body.totals.kcal).toBe(753);
     expect(body.remaining.kcal).toBe(body.target.calories - 753);
     expect(body.target).toMatchObject({ mode: "auto", derivedFrom: "default" });
+    expect(zDayView.safeParse(body).success, JSON.stringify(zDayView.safeParse(body).error?.issues)).toBe(true);
   });
 
   it("returns an empty but well-formed day", async () => {
@@ -209,6 +212,7 @@ describe("GET /nutrition/week", () => {
     expect(a.days).toHaveLength(7);
     expect(a.days[0].dateKey).toBe("2026-09-06");
     expect(a.days[6].dateKey).toBe("2026-09-12");
+    expect(zWeekNutrition.safeParse(a).success, JSON.stringify(zWeekNutrition.safeParse(a).error?.issues)).toBe(true);
   });
 
   it("fills unlogged days with zeros and reports daysLogged", async () => {

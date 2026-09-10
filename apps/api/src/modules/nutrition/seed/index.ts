@@ -104,19 +104,15 @@ export function buildSeedFoods(): SeedFoodDoc[] {
   return out;
 }
 
-export interface SeedFoodsResult {
-  inserted: number;
-  skipped: boolean;
-}
-
 /**
  * Idempotent: inserts the curated food tables only when the collection holds no `source: "seed"`
- * documents yet. Never touches user/admin/OFF foods.
+ * documents yet, and never touches user/admin/OFF foods. Returns the number of rows inserted
+ * (0 when the catalogue is already there) — the shape `src/seed/index.ts` (B1) reports.
  */
-export async function seedFoods(): Promise<SeedFoodsResult> {
+export async function seedFoods(): Promise<number> {
   const existing = await Food.countDocuments({ source: "seed" });
-  if (existing > 0) return { inserted: 0, skipped: true };
+  if (existing > 0) return 0;
   const docs = buildSeedFoods();
   await Food.insertMany(docs, { ordered: false });
-  return { inserted: docs.length, skipped: false };
+  return docs.length;
 }

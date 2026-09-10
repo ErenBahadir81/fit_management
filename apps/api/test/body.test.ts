@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { navyBodyFat } from "@fitfloow/core";
+import { navyBodyFat, zBodyEntry, zBodySummary, zBodyTrends, zWeighIn } from "@fitfloow/core";
 import { asUser, createTestApp, seedBasics, type TestApp } from "./harness";
 import { BodyEntry, WeighIn } from "../src/models/body";
 import { WeeklyReportCache } from "../src/models/goal";
@@ -309,5 +309,19 @@ describe("GET /body/summary", () => {
       category: null,
       profile: { gender: "female", heightCm: null },
     });
+  });
+});
+
+describe("DTO contract", () => {
+  it("every body response validates against the shared zod schemas", async () => {
+    const { headers } = await asUser(t, { gender: "male", heightCm: 186 });
+    const entry = await t.app.inject({ method: "POST", url: `${url}/entries`, headers, payload: measurement });
+    expect(() => zBodyEntry.parse(entry.json().entry)).not.toThrow();
+    const weighIn = await t.app.inject({ method: "POST", url: `${url}/weighins`, headers, payload: { weightKg: 102 } });
+    expect(() => zWeighIn.parse(weighIn.json().weighIn)).not.toThrow();
+    const trends = await t.app.inject({ method: "GET", url: `${url}/trends`, headers });
+    expect(() => zBodyTrends.parse(trends.json())).not.toThrow();
+    const summary = await t.app.inject({ method: "GET", url: `${url}/summary`, headers });
+    expect(() => zBodySummary.parse(summary.json())).not.toThrow();
   });
 });

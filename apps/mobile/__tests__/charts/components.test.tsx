@@ -28,7 +28,7 @@ describe("chart components", () => {
         <Sparkline values={[1]} testID="sp-empty" />
       </>
     );
-    expect(screen.getByTestId("sp")).toBeTruthy();
+    expect(screen.getByTestId("sp", { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId("sp-empty")).toBeTruthy();
   });
 

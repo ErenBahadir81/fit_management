@@ -158,7 +158,11 @@ export function useReorderMuscles(fb: MutationFeedback = {}) {
       if (ctx?.previous) qc.setQueryData(qk.muscles, ctx.previous);
       fb.onFail?.(error);
     },
-    onSuccess: () => fb.onDone?.(),
+    // Reconcile with what the server actually stored (orders may be normalised).
+    onSuccess: (data) => {
+      qc.setQueryData(qk.muscles, data);
+      fb.onDone?.();
+    },
   });
 }
 

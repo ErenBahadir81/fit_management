@@ -9,7 +9,8 @@ import { resolveTarget, setTarget } from "./target.service";
 const zSearchQuery = z.object({
   q: z.string().default(""),
   limit: z.coerce.number().int().min(1).max(MAX_SEARCH_LIMIT).default(20),
-  remote: z.union([z.literal("1"), z.literal("0"), z.literal("true"), z.literal("false")]).optional(),
+  /** Accepts the client's `remote=1`; anything falsy or absent keeps the request local. */
+  remote: z.string().max(8).optional(),
 });
 const zDateQuery = z.object({ date: z.string().optional() });
 const zWeekQuery = z.object({ week: z.string().optional() });
@@ -23,7 +24,8 @@ export async function foodsRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.get("/nutrition/foods/search", { ...auth, schema: { querystring: zSearchQuery } }, async (req) => {
     const q = req.query as z.infer<typeof zSearchQuery>;
-    return searchFoods(ctx, req.auth.id, { q: q.q, limit: q.limit, remote: q.remote === "1" || q.remote === "true" });
+    const remote = ["1", "true", "yes", "on"].includes((q.remote ?? "").toLowerCase());
+    return searchFoods(ctx, req.auth.id, { q: q.q, limit: q.limit, remote });
   });
 
   app.get("/nutrition/foods/barcode/:code", { ...auth, schema: { params: zCodeParam } }, async (req) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useState } from "react";
+import { forwardRef, useCallback, useState } from "react";
 import { cx } from "@/lib/cx";
 
 /** Horizontal scroll container — the page body itself must never scroll sideways. */
@@ -146,6 +146,12 @@ export function InlineEdit({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value));
 
+  // Stable identity: an inline arrow ref would re-run (and re-select) on every keystroke.
+  const focusOnMount = useCallback((el: HTMLInputElement | null) => {
+    el?.focus();
+    el?.select();
+  }, []);
+
   const startEditing = () => {
     setDraft(String(value));
     setEditing(true);
@@ -160,10 +166,7 @@ export function InlineEdit({
     return (
       <input
         // A callback ref focuses on mount — no effect needed for a one-shot DOM action.
-        ref={(el) => {
-          el?.focus();
-          el?.select();
-        }}
+        ref={focusOnMount}
         aria-label={label}
         type={type}
         min={min}

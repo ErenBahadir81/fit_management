@@ -1,8 +1,18 @@
 import React from "react";
-import { render, screen } from "@testing-library/react-native";
-import Index from "../app/index";
+import { screen } from "@testing-library/react-native";
+import { renderUI } from "./helpers";
+import ProgramRoute from "../app/(tabs)/program";
+import NotFound from "../app/+not-found";
 
-test("renders the placeholder screen", async () => {
-  await render(<Index />);
-  expect(screen.getByText("FitFloow")).toBeTruthy();
+jest.mock("expo-router", () => require("./mocks/expo-router"));
+
+test("placeholder tab routes render a header and Floo", async () => {
+  await renderUI(<ProgramRoute />);
+  expect(screen.getByText("Program")).toBeTruthy();
+  expect(screen.getByText("Yakında")).toBeTruthy();
+});
+
+test("+not-found renders a way home", async () => {
+  await renderUI(<NotFound />);
+  expect(screen.getByText("Ana sayfaya dön")).toBeTruthy();
 });

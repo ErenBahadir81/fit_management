@@ -30,7 +30,7 @@ export function LineTrend({ points, goal, unit = "", height = 200, digits = 1, t
   const xLabels = useMemo(() => dateTickLabels(points.map((p) => p.dateKey), 4), [points]);
   const yTicks = useMemo(() => ticks(series.domainY[0], series.domainY[1], 3), [series.domainY]);
   const [active, setActive] = useState<number | null>(null);
-  const { state, isActive } = useChartPressState({ x: 0, y: { ewma: 0, raw: 0 } });
+  const { state, isActive } = useChartPressState({ x: 0, y: { ewma: 0, raw: 0, goal: 0 } });
 
   const onTick = useCallback((index: number) => {
     void haptic.select();

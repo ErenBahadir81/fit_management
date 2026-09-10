@@ -25,8 +25,15 @@ export function createQueryClient(): QueryClient {
   });
 }
 
+/** A `Persister` whose methods are synchronous (MMKV). Structurally compatible with TanStack's `Persister`. */
+export interface SyncPersister extends Persister {
+  persistClient(client: PersistedClient): void;
+  restoreClient(): PersistedClient | undefined;
+  removeClient(): void;
+}
+
 /** Synchronous persister over MMKV. Writes are throttled (default 1 s) since the cache changes often. */
-export function createMMKVPersister(store: MMKV, key: string, throttleMs = 1000): Persister & { restoreClient(): PersistedClient | undefined } {
+export function createMMKVPersister(store: MMKV, key: string, throttleMs = 1000): SyncPersister {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: PersistedClient | null = null;
   const write = (c: PersistedClient) => {
@@ -64,7 +71,7 @@ export function createMMKVPersister(store: MMKV, key: string, throttleMs = 1000)
 }
 
 /** Hydrate `qc` from the persisted cache synchronously — before the first render, so cached screens paint instantly. */
-export function restoreQueryCacheSync(qc: QueryClient, persister: ReturnType<typeof createMMKVPersister>, opts: { buster: string; maxAge: number }): boolean {
+export function restoreQueryCacheSync(qc: QueryClient, persister: SyncPersister, opts: { buster: string; maxAge: number }): boolean {
   const persisted = persister.restoreClient();
   if (!persisted) return false;
   if (persisted.buster !== opts.buster || Date.now() - persisted.timestamp > opts.maxAge) {
@@ -87,7 +94,7 @@ restoreQueryCacheSync(queryClient, persister, { buster: env.appVersion, maxAge: 
 export interface AppQueryProviderProps {
   children: React.ReactNode;
   client?: QueryClient;
-  persister?: ReturnType<typeof createMMKVPersister>;
+  persister?: SyncPersister;
   buster?: string;
 }
 

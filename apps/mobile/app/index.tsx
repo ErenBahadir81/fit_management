@@ -1,9 +1,8 @@
-import { Text, View } from "react-native";
+import { Redirect } from "expo-router";
+import { useSession } from "../src/features/auth/session";
 
+/** Entry: land on the tabs when signed in, otherwise on login. */
 export default function Index() {
-  return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-      <Text>FitFloow</Text>
-    </View>
-  );
+  const status = useSession((s) => s.status);
+  return <Redirect href={status === "signedIn" ? "/(tabs)" : "/(auth)/login"} />;
 }

@@ -24,7 +24,7 @@ import type { AppContext } from "../../context";
 import { AppError } from "../../lib/errors";
 import { BodyEntry, WeighIn, toBodyEntryDTO, toWeighInDTO, type BodyEntryDoc } from "../../models/body";
 import { User } from "../../models/user";
-import { dayIntakeFor, goalSettings, invalidateWeeksFor, loadUser, oid } from "./shared";
+import { goalSettings, invalidateWeeksFor, loadUser, oid } from "./shared";
 
 const TREND_HISTORY_DAYS = 180;
 
@@ -76,7 +76,7 @@ export async function createBodyEntry(ctx: AppContext, userId: string, input: Bo
     heightCm: input.heightCm,
     neckCm: input.neckCm,
     waistCm: input.waistCm,
-    hipCm: gender === "female" ? (input.hipCm ?? null) : (input.hipCm ?? null),
+    hipCm: input.hipCm ?? null,
     weightKg: input.weightKg,
     ...computed,
     notes: input.notes ?? null,
@@ -245,5 +245,3 @@ export async function bodySummary(ctx: AppContext, userId: string): Promise<Body
     profile: { gender: user.gender, heightCm: user.heightCm ?? null },
   };
 }
-
-export { dayIntakeFor };

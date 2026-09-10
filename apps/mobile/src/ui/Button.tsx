@@ -6,7 +6,7 @@ import { Icon, type IconName } from "./Icon";
 import { Pressable, type PressableProps } from "./Pressable";
 import { Text } from "./Text";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "inverse";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps extends Omit<PressableProps, "children" | "style"> {
@@ -29,8 +29,8 @@ export function Button({ label, variant = "primary", size = "md", icon, iconRigh
   const { colors, shadows } = useTheme();
   const isDisabled = Boolean(disabled) || Boolean(loading);
 
-  const bg = { primary: colors.primary, secondary: colors.primarySoft, ghost: "transparent", danger: colors.dangerSoft }[variant];
-  const fg = { primary: colors.onPrimary, secondary: colors.primary, ghost: colors.ink, danger: colors.danger }[variant];
+  const bg = { primary: colors.primary, secondary: colors.primarySoft, ghost: "transparent", danger: colors.dangerSoft, inverse: "#FFFFFF" }[variant];
+  const fg = { primary: colors.onPrimary, secondary: colors.primary, ghost: colors.ink, danger: colors.danger, inverse: "#5A4AE3" }[variant];
   const textVariant = size === "sm" ? "label" : "title";
 
   return (

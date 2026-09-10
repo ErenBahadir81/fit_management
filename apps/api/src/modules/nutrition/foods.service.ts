@@ -113,6 +113,12 @@ export async function getFood(userId: string, id: string): Promise<FoodDTO> {
   return toFoodDTO(doc);
 }
 
+/** Mongo duplicate-key (a taken barcode) reads as a conflict, not an internal error. */
+export function rethrowDuplicate(err: unknown): never {
+  if ((err as { code?: number })?.code === 11000) throw AppError.conflict("Bu barkod başka bir besine ait");
+  throw err;
+}
+
 /** A user-private food (`source: "user"`, `ownerUserId` set) — never visible to anyone else. */
 export async function createUserFood(userId: string, input: FoodInput): Promise<FoodDTO> {
   const doc = await Food.create({
@@ -131,7 +137,7 @@ export async function createUserFood(userId: string, input: FoodInput): Promise<
     popularity: 0,
     ownerUserId: new Types.ObjectId(userId),
     brand: input.brand ?? null,
-  });
+  }).catch(rethrowDuplicate);
   return toFoodDTO(doc.toObject() as FoodDoc);
 }
 
