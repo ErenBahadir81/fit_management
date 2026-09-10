@@ -1,0 +1,15 @@
+# DEV/BUILD ONLY — never installed in the runtime image (1.4 GB vs 237 MB, research §5.2).
+# Used solely by scripts/export_onnx.py to convert a torch checkpoint to ONNX once, on a dev machine.
+#
+#   python3 -m venv .venv-export
+#   .venv-export/bin/pip install -r requirements-export.txt
+#
+# torch MUST come from the CPU index: plain `pip install torch` pulls a 554 MB CUDA wheel plus ~2 GB
+# of nvidia-* packages that a CPU container will never use.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.9.1+cpu
+torchvision==0.29.0+cpu
+transformers>=5.17,<6
+optimum[onnxruntime]>=1.24
+onnx>=1.17

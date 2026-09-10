@@ -1,25 +1,319 @@
 @import "tailwindcss";
 
-@theme {
-  --color-brand: #6d5df6;
-  --color-brand-soft: #ececfd;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-}
+/* Manual theme toggle: `.dark` on <html> wins over prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------------ *
+ *  FitFloow Admin — design tokens
+ *  A calm technical instrument: neutrals carry the UI, violet #6D5DF6 is
+ *  reserved for primary actions, active state and focus. 8-pt spacing,
+ *  1-px hairlines instead of shadows (shadows only for floating layers).
+ * ------------------------------------------------------------------------ */
 
 :root {
-  --background: #f5f6fa;
-  --foreground: #0f141c;
+  color-scheme: light;
+
+  --ff-canvas: #f5f6f8;
+  --ff-surface: #ffffff;
+  --ff-surface-2: #fafbfc;
+  --ff-surface-3: #f2f4f7;
+  --ff-overlay: rgba(16, 24, 40, 0.42);
+
+  --ff-line: #e6e8ee;
+  --ff-line-strong: #d3d7e0;
+
+  --ff-text: #101828;
+  --ff-text-muted: #667085;
+  --ff-text-subtle: #98a2b3;
+  --ff-text-inverse: #ffffff;
+
+  --ff-brand: #6d5df6;
+  --ff-brand-hover: #5a49e8;
+  --ff-brand-active: #4c3cd6;
+  --ff-brand-soft: #eeecfe;
+  --ff-brand-line: #d6d1fc;
+  --ff-brand-text: #4c3cd6;
+
+  --ff-success: #0f9f68;
+  --ff-success-soft: #e4f7ef;
+  --ff-warn: #d97706;
+  --ff-warn-soft: #fdf3e3;
+  --ff-danger: #dc3b30;
+  --ff-danger-soft: #fdecea;
+  --ff-info: #2872e0;
+  --ff-info-soft: #e8f1fe;
+
+  --ff-shadow-pop: 0 12px 32px -8px rgba(16, 24, 40, 0.16), 0 2px 6px -2px rgba(16, 24, 40, 0.08);
+  --ff-shimmer: rgba(16, 24, 40, 0.06);
+  --ff-shimmer-hi: rgba(16, 24, 40, 0.11);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0b0d12;
-    --foreground: #eef0f5;
+  :root:not(.light) {
+    color-scheme: dark;
+
+    --ff-canvas: #0a0c11;
+    --ff-surface: #12151c;
+    --ff-surface-2: #171b23;
+    --ff-surface-3: #1d222c;
+    --ff-overlay: rgba(3, 5, 9, 0.66);
+
+    --ff-line: #232833;
+    --ff-line-strong: #313846;
+
+    --ff-text: #e8eaf0;
+    --ff-text-muted: #98a2b3;
+    --ff-text-subtle: #6b7484;
+    --ff-text-inverse: #0a0c11;
+
+    --ff-brand: #7f70fa;
+    --ff-brand-hover: #9285ff;
+    --ff-brand-active: #a99fff;
+    --ff-brand-soft: #1c1a35;
+    --ff-brand-line: #322d5c;
+    --ff-brand-text: #a99fff;
+
+    --ff-success: #34cd87;
+    --ff-success-soft: #0f2a1f;
+    --ff-warn: #f0a83c;
+    --ff-warn-soft: #2b2013;
+    --ff-danger: #f0705f;
+    --ff-danger-soft: #2d1614;
+    --ff-info: #5c9dfb;
+    --ff-info-soft: #101d2f;
+
+    --ff-shadow-pop: 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+    --ff-shimmer: rgba(255, 255, 255, 0.05);
+    --ff-shimmer-hi: rgba(255, 255, 255, 0.1);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+html.dark {
+  color-scheme: dark;
+
+  --ff-canvas: #0a0c11;
+  --ff-surface: #12151c;
+  --ff-surface-2: #171b23;
+  --ff-surface-3: #1d222c;
+  --ff-overlay: rgba(3, 5, 9, 0.66);
+
+  --ff-line: #232833;
+  --ff-line-strong: #313846;
+
+  --ff-text: #e8eaf0;
+  --ff-text-muted: #98a2b3;
+  --ff-text-subtle: #6b7484;
+  --ff-text-inverse: #0a0c11;
+
+  --ff-brand: #7f70fa;
+  --ff-brand-hover: #9285ff;
+  --ff-brand-active: #a99fff;
+  --ff-brand-soft: #1c1a35;
+  --ff-brand-line: #322d5c;
+  --ff-brand-text: #a99fff;
+
+  --ff-success: #34cd87;
+  --ff-success-soft: #0f2a1f;
+  --ff-warn: #f0a83c;
+  --ff-warn-soft: #2b2013;
+  --ff-danger: #f0705f;
+  --ff-danger-soft: #2d1614;
+  --ff-info: #5c9dfb;
+  --ff-info-soft: #101d2f;
+
+  --ff-shadow-pop: 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+  --ff-shimmer: rgba(255, 255, 255, 0.05);
+  --ff-shimmer-hi: rgba(255, 255, 255, 0.1);
+}
+
+html.light {
+  color-scheme: light;
+}
+
+/* `inline` keeps the indirection so a token switch re-resolves per element. */
+@theme inline {
+  --color-canvas: var(--ff-canvas);
+  --color-surface: var(--ff-surface);
+  --color-surface-2: var(--ff-surface-2);
+  --color-surface-3: var(--ff-surface-3);
+  --color-overlay: var(--ff-overlay);
+
+  --color-line: var(--ff-line);
+  --color-line-strong: var(--ff-line-strong);
+
+  --color-ink: var(--ff-text);
+  --color-muted: var(--ff-text-muted);
+  --color-subtle: var(--ff-text-subtle);
+  --color-inverse: var(--ff-text-inverse);
+
+  --color-brand: var(--ff-brand);
+  --color-brand-hover: var(--ff-brand-hover);
+  --color-brand-active: var(--ff-brand-active);
+  --color-brand-soft: var(--ff-brand-soft);
+  --color-brand-line: var(--ff-brand-line);
+  --color-brand-text: var(--ff-brand-text);
+
+  --color-success: var(--ff-success);
+  --color-success-soft: var(--ff-success-soft);
+  --color-warn: var(--ff-warn);
+  --color-warn-soft: var(--ff-warn-soft);
+  --color-danger: var(--ff-danger);
+  --color-danger-soft: var(--ff-danger-soft);
+  --color-info: var(--ff-info);
+  --color-info-soft: var(--ff-info-soft);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+
+  --shadow-pop: var(--ff-shadow-pop);
+
+  /* Display scale — tight tracking, 8-pt friendly line heights. */
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.25rem;
+  --text-display--letter-spacing: -0.028em;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--letter-spacing: -0.02em;
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1rem;
+  --text-eyebrow--letter-spacing: 0.09em;
+
+  --radius-card: 0.75rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--ff-line);
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--ff-canvas);
+    color: var(--ff-text);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05" 1, "cv11" 1, "ss01" 1;
+    font-synthesis-weight: none;
+  }
+
+  /* Data must line up: every number in the UI is tabular. */
+  .tnum,
+  table,
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ff-brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--ff-brand-soft);
+    color: var(--ff-brand-text);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--ff-line-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ff-text-subtle);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  .ff-eyebrow {
+    font-size: var(--text-eyebrow);
+    line-height: var(--text-eyebrow--line-height);
+    letter-spacing: var(--text-eyebrow--letter-spacing);
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ff-text-subtle);
+  }
+
+  .ff-card {
+    background-color: var(--ff-surface);
+    border: 1px solid var(--ff-line);
+    border-radius: var(--radius-card);
+  }
+
+  .ff-hairline {
+    border-color: var(--ff-line);
+  }
+
+  /* Skeleton shimmer — one shared animation so rows stay in phase. */
+  .ff-skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--ff-shimmer);
+    border-radius: 6px;
+  }
+  .ff-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--ff-shimmer-hi), transparent);
+    animation: ff-shimmer 1.4s ease-in-out infinite;
+  }
+
+  .ff-scroll-x {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+}
+
+@keyframes ff-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes ff-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes ff-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ff-skeleton::after {
+    display: none;
+  }
 }

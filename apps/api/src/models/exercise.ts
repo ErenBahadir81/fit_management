@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 import type { ExerciseDTO } from "@fitfloow/core";
 
 export interface ExerciseDoc {
@@ -33,7 +33,10 @@ const ExerciseSchema = new Schema<ExerciseDoc>(
   { timestamps: true }
 );
 
-export const Exercise: Model<ExerciseDoc> = (models.Exercise as Model<ExerciseDoc>) || model<ExerciseDoc>("Exercise", ExerciseSchema);
+ExerciseSchema.index({ "muscles.key": 1 });
+ExerciseSchema.index({ active: 1, name: 1 });
+
+export const Exercise: Model<ExerciseDoc> = (mongoose.models.Exercise as Model<ExerciseDoc>) || model<ExerciseDoc>("Exercise", ExerciseSchema);
 
 export function toExerciseDTO(e: ExerciseDoc): ExerciseDTO {
   return {

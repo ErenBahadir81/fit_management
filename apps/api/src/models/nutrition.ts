@@ -48,7 +48,9 @@ const FoodSchema = new Schema<FoodDoc>(
   },
   { timestamps: true }
 );
-FoodSchema.index({ barcode: 1 }, { unique: true, sparse: true });
+// Partial (not sparse): every food stores `barcode: null` explicitly, and a sparse unique index
+// would still treat those nulls as duplicates.
+FoodSchema.index({ barcode: 1 }, { unique: true, partialFilterExpression: { barcode: { $type: "string" } } });
 FoodSchema.index({ aliases: 1 });
 FoodSchema.index({ name: "text", nameEn: "text", aliases: "text" }, { default_language: "none" });
 

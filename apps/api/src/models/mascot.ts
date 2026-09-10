@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 import type { MascotTemplateDTO } from "@fitfloow/core";
 
 export interface MascotMessageDoc {
@@ -22,7 +22,7 @@ const MascotMessageSchema = new Schema<MascotMessageDoc>(
 );
 
 export const MascotMessage: Model<MascotMessageDoc> =
-  (models.MascotMessage as Model<MascotMessageDoc>) || model<MascotMessageDoc>("MascotMessage", MascotMessageSchema);
+  (mongoose.models.MascotMessage as Model<MascotMessageDoc>) || model<MascotMessageDoc>("MascotMessage", MascotMessageSchema);
 
 export function toMascotTemplateDTO(m: MascotMessageDoc): MascotTemplateDTO {
   return { id: String(m._id), key: m.key, mood: m.mood, variants: m.variants, active: m.active };

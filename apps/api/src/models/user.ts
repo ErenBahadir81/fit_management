@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 
 export interface RefreshTokenDoc {
   tokenHash: string;
@@ -59,7 +59,10 @@ const UserSchema = new Schema<UserDoc>(
   { timestamps: true }
 );
 
-export const User: Model<UserDoc> = (models.User as Model<UserDoc>) || model<UserDoc>("User", UserSchema);
+UserSchema.index({ "refreshTokens.tokenHash": 1 });
+UserSchema.index({ lastSeenAt: -1 });
+
+export const User: Model<UserDoc> = (mongoose.models.User as Model<UserDoc>) || model<UserDoc>("User", UserSchema);
 
 export function toUserDTO(u: UserDoc) {
   return {

@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model } from "mongoose";
+import mongoose, { Schema, model, type Model } from "mongoose";
 import type { MuscleDTO } from "@fitfloow/core";
 
 export interface MuscleDoc extends MuscleDTO {
@@ -23,7 +23,10 @@ const MuscleSchema = new Schema<MuscleDoc>(
   { timestamps: true }
 );
 
-export const Muscle: Model<MuscleDoc> = (models.Muscle as Model<MuscleDoc>) || model<MuscleDoc>("Muscle", MuscleSchema);
+MuscleSchema.index({ order: 1 });
+MuscleSchema.index({ active: 1, order: 1 });
+
+export const Muscle: Model<MuscleDoc> = (mongoose.models.Muscle as Model<MuscleDoc>) || model<MuscleDoc>("Muscle", MuscleSchema);
 
 export function toMuscleDTO(m: MuscleDoc): MuscleDTO {
   return {

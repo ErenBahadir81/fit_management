@@ -1,0 +1,11 @@
+# Runtime + test dependencies for the FitFloow vision microservice (CPU only, no torch).
+# Versions verified in the target container (Python 3.11, 4 vCPU) — see docs/research/food-recognition.md §5.
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.20
+pillow==12.3.0
+numpy==2.4.6  # 2.5.x requires Python >= 3.12
+onnxruntime==1.30.0
+pytest==8.4.2
+pytest-asyncio==1.2.0
+httpx==0.28.1

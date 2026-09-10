@@ -1,0 +1,69 @@
+# Whole FitFloow backend, locally:  docker compose up --build
+#   mongo   :27017   vision  :8100   api  :4000   admin :3000
+# The vision image bakes the 93 MB model in at build time, so the first build is the slow one.
+name: fitfloow
+
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    ports: ["27017:27017"]
+    volumes: ["mongo-data:/data/db"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  vision:
+    build:
+      context: ./apps/vision
+      args:
+        DOWNLOAD_MODEL: "1"   # "0" for a mock-only image (no weights, ~240 MB)
+        DOWNLOAD_CLIP: "0"    # "1" adds the open-set CLIP gate (+147 MB)
+    restart: unless-stopped
+    ports: ["8100:8100"]
+    environment:
+      MODEL_DIR: /models
+      VISION_MOCK: "${VISION_MOCK:-}"   # empty = real model if the weights are present, mock otherwise
+      TOP_K: "3"
+      MIN_CONFIDENCE: "0.15"
+      INTRA_OP_THREADS: "4"             # use 2 when CLIP_ENABLED=1 (measured: 522 ms -> 284 ms)
+      MAX_UPLOAD_MB: "6"
+      CLIP_ENABLED: "${CLIP_ENABLED:-0}"
+    volumes: ["vision-models:/models"]  # populated from the image on first run; survives rebuilds
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    ports: ["4000:4000"]
+    environment:
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/fitfloow
+      VISION_URL: http://vision:8100
+      VISION_MOCK: "0"
+      JWT_SECRET: "${JWT_SECRET:?set JWT_SECRET (min 16 chars) in your .env}"
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:8081"
+      UPLOAD_DIR: /data/uploads
+    volumes: ["api-uploads:/data/uploads"]
+    depends_on:
+      mongo: { condition: service_healthy }
+      vision: { condition: service_healthy }
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    environment:
+      API_URL: http://api:4000
+    depends_on:
+      api: { condition: service_started }
+
+volumes:
+  mongo-data:
+  vision-models:
+  api-uploads:

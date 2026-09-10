@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 import type { DayDTO, ProgramDTO, ProgramTemplateDTO } from "@fitfloow/core";
 
 const MuscleLoadSchema = new Schema({ key: { type: String, required: true }, load: { type: Number, default: 1 } }, { _id: false });
@@ -61,7 +61,7 @@ const ProgramSchema = new Schema<ProgramDoc>(
   { timestamps: true }
 );
 
-export const Program: Model<ProgramDoc> = (models.Program as Model<ProgramDoc>) || model<ProgramDoc>("Program", ProgramSchema);
+export const Program: Model<ProgramDoc> = (mongoose.models.Program as Model<ProgramDoc>) || model<ProgramDoc>("Program", ProgramSchema);
 
 export function toProgramDTO(p: ProgramDoc): ProgramDTO {
   return {
@@ -97,7 +97,7 @@ const ProgramTemplateSchema = new Schema<ProgramTemplateDoc>(
 );
 
 export const ProgramTemplate: Model<ProgramTemplateDoc> =
-  (models.ProgramTemplate as Model<ProgramTemplateDoc>) || model<ProgramTemplateDoc>("ProgramTemplate", ProgramTemplateSchema);
+  (mongoose.models.ProgramTemplate as Model<ProgramTemplateDoc>) || model<ProgramTemplateDoc>("ProgramTemplate", ProgramTemplateSchema);
 
 export function toProgramTemplateDTO(t: ProgramTemplateDoc, weeklyVolume?: Record<string, number>): ProgramTemplateDTO {
   return {

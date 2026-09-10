@@ -1,0 +1,2417 @@
+[
+ {
+  "label": "apple_pie",
+  "name": "Elmalı turta",
+  "nameEn": "Apple pie",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 237,
+   "protein": 2.4,
+   "carbs": 34.0,
+   "fat": 11.0
+  },
+  "defaultServingG": 125,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 125
+   }
+  ],
+  "aliases": [
+   "apple_pie",
+   "elmali turta",
+   "apple pie"
+  ]
+ },
+ {
+  "label": "baby_back_ribs",
+  "name": "Barbekü kaburga",
+  "nameEn": "Pork baby back ribs, barbecued",
+  "category": "et",
+  "per100g": {
+   "kcal": 292,
+   "protein": 24.0,
+   "carbs": 4.0,
+   "fat": 20.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "baby_back_ribs",
+   "barbeku kaburga",
+   "ribs",
+   "baby back ribs"
+  ]
+ },
+ {
+  "label": "baklava",
+  "name": "Baklava",
+  "nameEn": "Baklava",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 430,
+   "protein": 6.5,
+   "carbs": 47.0,
+   "fat": 24.0
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "baklava",
+   "baklava dessert"
+  ]
+ },
+ {
+  "label": "beef_carpaccio",
+  "name": "Dana karpaçyo",
+  "nameEn": "Beef carpaccio",
+  "category": "et",
+  "per100g": {
+   "kcal": 190,
+   "protein": 22.0,
+   "carbs": 1.0,
+   "fat": 11.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "beef_carpaccio",
+   "karpacyo",
+   "carpaccio"
+  ]
+ },
+ {
+  "label": "beef_tartare",
+  "name": "Dana tartar",
+  "nameEn": "Beef tartare",
+  "category": "et",
+  "per100g": {
+   "kcal": 196,
+   "protein": 20.0,
+   "carbs": 2.0,
+   "fat": 12.0
+  },
+  "defaultServingG": 120,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 120
+   }
+  ],
+  "aliases": [
+   "beef_tartare",
+   "dana tartar",
+   "tartare"
+  ]
+ },
+ {
+  "label": "beet_salad",
+  "name": "Pancar salatası",
+  "nameEn": "Beet salad",
+  "category": "sebze",
+  "per100g": {
+   "kcal": 95,
+   "protein": 2.0,
+   "carbs": 12.0,
+   "fat": 4.5
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "beet_salad",
+   "pancar salatasi",
+   "beet salad"
+  ]
+ },
+ {
+  "label": "beignets",
+  "name": "Beignet",
+  "nameEn": "Beignets, fried dough",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 380,
+   "protein": 6.0,
+   "carbs": 42.0,
+   "fat": 21.0
+  },
+  "defaultServingG": 70,
+  "servings": [
+   {
+    "label": "2 adet",
+    "grams": 70
+   }
+  ],
+  "aliases": [
+   "beignets",
+   "beignet"
+  ]
+ },
+ {
+  "label": "bibimbap",
+  "name": "Bibimbap",
+  "nameEn": "Bibimbap",
+  "category": "yemek",
+  "per100g": {
+   "kcal": 135,
+   "protein": 6.5,
+   "carbs": 18.0,
+   "fat": 4.0
+  },
+  "defaultServingG": 350,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 350
+   }
+  ],
+  "aliases": [
+   "bibimbap"
+  ]
+ },
+ {
+  "label": "bread_pudding",
+  "name": "Ekmek pudingi",
+  "nameEn": "Bread pudding",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 240,
+   "protein": 6.0,
+   "carbs": 33.0,
+   "fat": 9.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "bread_pudding",
+   "ekmek pudingi",
+   "bread pudding"
+  ]
+ },
+ {
+  "label": "breakfast_burrito",
+  "name": "Kahvaltı burrito",
+  "nameEn": "Breakfast burrito",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 210,
+   "protein": 10.0,
+   "carbs": 21.0,
+   "fat": 9.5
+  },
+  "defaultServingG": 220,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 220
+   }
+  ],
+  "aliases": [
+   "breakfast_burrito",
+   "burrito",
+   "kahvalti burrito"
+  ]
+ },
+ {
+  "label": "bruschetta",
+  "name": "Bruschetta",
+  "nameEn": "Bruschetta",
+  "category": "atıştırmalık",
+  "per100g": {
+   "kcal": 200,
+   "protein": 5.5,
+   "carbs": 27.0,
+   "fat": 8.0
+  },
+  "defaultServingG": 80,
+  "servings": [
+   {
+    "label": "2 dilim",
+    "grams": 80
+   }
+  ],
+  "aliases": [
+   "bruschetta",
+   "brusketta"
+  ]
+ },
+ {
+  "label": "caesar_salad",
+  "name": "Sezar salata",
+  "nameEn": "Caesar salad",
+  "category": "sebze",
+  "per100g": {
+   "kcal": 190,
+   "protein": 8.0,
+   "carbs": 8.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 200,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 200
+   }
+  ],
+  "aliases": [
+   "caesar_salad",
+   "sezar salata",
+   "caesar salad",
+   "sezar salatasi"
+  ]
+ },
+ {
+  "label": "cannoli",
+  "name": "Cannoli",
+  "nameEn": "Cannoli",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 380,
+   "protein": 8.0,
+   "carbs": 40.0,
+   "fat": 21.0
+  },
+  "defaultServingG": 90,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 90
+   }
+  ],
+  "aliases": [
+   "cannoli"
+  ]
+ },
+ {
+  "label": "caprese_salad",
+  "name": "Caprese salata",
+  "nameEn": "Caprese salad",
+  "category": "sebze",
+  "per100g": {
+   "kcal": 180,
+   "protein": 11.0,
+   "carbs": 4.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "caprese_salad",
+   "caprese",
+   "caprese salata"
+  ]
+ },
+ {
+  "label": "carrot_cake",
+  "name": "Havuçlu kek",
+  "nameEn": "Carrot cake",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 415,
+   "protein": 4.0,
+   "carbs": 52.0,
+   "fat": 21.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "carrot_cake",
+   "havuclu kek",
+   "carrot cake"
+  ]
+ },
+ {
+  "label": "ceviche",
+  "name": "Ceviche",
+  "nameEn": "Ceviche",
+  "category": "balık",
+  "per100g": {
+   "kcal": 105,
+   "protein": 17.0,
+   "carbs": 5.0,
+   "fat": 1.8
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "ceviche"
+  ]
+ },
+ {
+  "label": "cheesecake",
+  "name": "Cheesecake",
+  "nameEn": "Cheesecake",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 321,
+   "protein": 5.5,
+   "carbs": 26.0,
+   "fat": 22.0
+  },
+  "defaultServingG": 110,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 110
+   }
+  ],
+  "aliases": [
+   "cheesecake",
+   "peynirli pasta"
+  ]
+ },
+ {
+  "label": "cheese_plate",
+  "name": "Peynir tabağı",
+  "nameEn": "Cheese plate",
+  "category": "peynir",
+  "per100g": {
+   "kcal": 370,
+   "protein": 23.0,
+   "carbs": 3.0,
+   "fat": 30.0
+  },
+  "defaultServingG": 80,
+  "servings": [
+   {
+    "label": "1 tabak",
+    "grams": 80
+   }
+  ],
+  "aliases": [
+   "cheese_plate",
+   "peynir tabagi",
+   "cheese plate"
+  ]
+ },
+ {
+  "label": "chicken_curry",
+  "name": "Köri soslu tavuk",
+  "nameEn": "Chicken curry",
+  "category": "tavuk",
+  "per100g": {
+   "kcal": 150,
+   "protein": 13.0,
+   "carbs": 6.0,
+   "fat": 8.5
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "chicken_curry",
+   "kori tavuk",
+   "chicken curry",
+   "curry"
+  ]
+ },
+ {
+  "label": "chicken_quesadilla",
+  "name": "Tavuklu quesadilla",
+  "nameEn": "Chicken quesadilla",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 280,
+   "protein": 15.0,
+   "carbs": 24.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 180,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 180
+   }
+  ],
+  "aliases": [
+   "chicken_quesadilla",
+   "quesadilla",
+   "kesadiya"
+  ]
+ },
+ {
+  "label": "chicken_wings",
+  "name": "Tavuk kanadı",
+  "nameEn": "Chicken wings, roasted",
+  "category": "tavuk",
+  "per100g": {
+   "kcal": 290,
+   "protein": 27.0,
+   "carbs": 0.0,
+   "fat": 20.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "3 adet",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "chicken_wings",
+   "tavuk kanadi",
+   "chicken wings",
+   "kanat"
+  ]
+ },
+ {
+  "label": "chocolate_cake",
+  "name": "Çikolatalı kek",
+  "nameEn": "Chocolate cake",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 371,
+   "protein": 5.1,
+   "carbs": 51.0,
+   "fat": 17.0
+  },
+  "defaultServingG": 80,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 80
+   }
+  ],
+  "aliases": [
+   "chocolate_cake",
+   "cikolatali kek",
+   "chocolate cake",
+   "cikolatali pasta"
+  ]
+ },
+ {
+  "label": "chocolate_mousse",
+  "name": "Çikolatalı mus",
+  "nameEn": "Chocolate mousse",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 225,
+   "protein": 4.0,
+   "carbs": 22.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "chocolate_mousse",
+   "cikolatali mus",
+   "mousse"
+  ]
+ },
+ {
+  "label": "churros",
+  "name": "Churros",
+  "nameEn": "Churros",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 356,
+   "protein": 4.5,
+   "carbs": 43.0,
+   "fat": 19.0
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "2 adet",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "churros",
+   "cures"
+  ]
+ },
+ {
+  "label": "clam_chowder",
+  "name": "Deniz tarağı çorbası",
+  "nameEn": "Clam chowder",
+  "category": "çorba",
+  "per100g": {
+   "kcal": 82,
+   "protein": 4.5,
+   "carbs": 8.0,
+   "fat": 3.5
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "clam_chowder",
+   "deniz taragi corbasi",
+   "clam chowder"
+  ]
+ },
+ {
+  "label": "club_sandwich",
+  "name": "Club sandviç",
+  "nameEn": "Club sandwich",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 240,
+   "protein": 14.0,
+   "carbs": 22.0,
+   "fat": 10.0
+  },
+  "defaultServingG": 220,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 220
+   }
+  ],
+  "aliases": [
+   "club_sandwich",
+   "club sandvic",
+   "club sandwich",
+   "kulup sandvic"
+  ]
+ },
+ {
+  "label": "crab_cakes",
+  "name": "Yengeç köftesi",
+  "nameEn": "Crab cakes",
+  "category": "balık",
+  "per100g": {
+   "kcal": 220,
+   "protein": 15.0,
+   "carbs": 10.0,
+   "fat": 13.0
+  },
+  "defaultServingG": 90,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 90
+   }
+  ],
+  "aliases": [
+   "crab_cakes",
+   "yengec koftesi",
+   "crab cake"
+  ]
+ },
+ {
+  "label": "creme_brulee",
+  "name": "Crème brûlée",
+  "nameEn": "Crème brûlée",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 305,
+   "protein": 4.0,
+   "carbs": 25.0,
+   "fat": 21.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "creme_brulee",
+   "creme brulee",
+   "krem brule"
+  ]
+ },
+ {
+  "label": "croque_madame",
+  "name": "Croque madame",
+  "nameEn": "Croque madame",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 265,
+   "protein": 15.0,
+   "carbs": 20.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 200,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 200
+   }
+  ],
+  "aliases": [
+   "croque_madame",
+   "croque madame",
+   "krok madam"
+  ]
+ },
+ {
+  "label": "cup_cakes",
+  "name": "Cupcake",
+  "nameEn": "Cupcakes",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 375,
+   "protein": 4.0,
+   "carbs": 53.0,
+   "fat": 16.0
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "cup_cakes",
+   "cupcake",
+   "kapkek"
+  ]
+ },
+ {
+  "label": "deviled_eggs",
+  "name": "Dolgulu yumurta",
+  "nameEn": "Deviled eggs",
+  "category": "yumurta",
+  "per100g": {
+   "kcal": 210,
+   "protein": 10.0,
+   "carbs": 1.5,
+   "fat": 18.0
+  },
+  "defaultServingG": 50,
+  "servings": [
+   {
+    "label": "2 yarım",
+    "grams": 50
+   }
+  ],
+  "aliases": [
+   "deviled_eggs",
+   "dolgulu yumurta",
+   "deviled eggs"
+  ]
+ },
+ {
+  "label": "donuts",
+  "name": "Donut",
+  "nameEn": "Doughnut, glazed",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 421,
+   "protein": 4.9,
+   "carbs": 51.0,
+   "fat": 22.0
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "donuts",
+   "donut",
+   "donat",
+   "doughnut",
+   "halka tatli"
+  ]
+ },
+ {
+  "label": "dumplings",
+  "name": "Dumpling",
+  "nameEn": "Steamed dumplings",
+  "category": "yemek",
+  "per100g": {
+   "kcal": 195,
+   "protein": 8.0,
+   "carbs": 24.0,
+   "fat": 7.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "5 adet",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "dumplings",
+   "dumpling",
+   "buharda manti"
+  ]
+ },
+ {
+  "label": "edamame",
+  "name": "Edamame",
+  "nameEn": "Edamame, cooked",
+  "category": "baklagil",
+  "per100g": {
+   "kcal": 121,
+   "protein": 12.0,
+   "carbs": 9.0,
+   "fat": 5.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "edamame",
+   "soya baklasi"
+  ]
+ },
+ {
+  "label": "eggs_benedict",
+  "name": "Benedict yumurta",
+  "nameEn": "Eggs benedict",
+  "category": "yumurta",
+  "per100g": {
+   "kcal": 220,
+   "protein": 12.0,
+   "carbs": 12.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 180,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 180
+   }
+  ],
+  "aliases": [
+   "eggs_benedict",
+   "eggs benedict",
+   "benedict yumurta"
+  ]
+ },
+ {
+  "label": "escargots",
+  "name": "Salyangoz",
+  "nameEn": "Escargots in garlic butter",
+  "category": "balık",
+  "per100g": {
+   "kcal": 175,
+   "protein": 16.0,
+   "carbs": 2.0,
+   "fat": 11.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "escargots",
+   "salyangoz",
+   "escargot"
+  ]
+ },
+ {
+  "label": "falafel",
+  "name": "Falafel",
+  "nameEn": "Falafel, fried",
+  "category": "baklagil",
+  "per100g": {
+   "kcal": 333,
+   "protein": 13.3,
+   "carbs": 31.8,
+   "fat": 17.8
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "3 adet",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "falafel",
+   "felafel"
+  ]
+ },
+ {
+  "label": "filet_mignon",
+  "name": "Bonfile",
+  "nameEn": "Beef tenderloin, grilled",
+  "category": "et",
+  "per100g": {
+   "kcal": 218,
+   "protein": 30.0,
+   "carbs": 0.0,
+   "fat": 10.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "filet_mignon",
+   "bonfile",
+   "filet mignon",
+   "fileminyon",
+   "dana bonfile"
+  ]
+ },
+ {
+  "label": "fish_and_chips",
+  "name": "Balık ve patates kızartması",
+  "nameEn": "Fish and chips",
+  "category": "balık",
+  "per100g": {
+   "kcal": 232,
+   "protein": 12.0,
+   "carbs": 22.0,
+   "fat": 11.0
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "fish_and_chips",
+   "fish and chips",
+   "balikli patates"
+  ]
+ },
+ {
+  "label": "foie_gras",
+  "name": "Kaz ciğeri ezmesi",
+  "nameEn": "Foie gras",
+  "category": "et",
+  "per100g": {
+   "kcal": 462,
+   "protein": 11.4,
+   "carbs": 4.7,
+   "fat": 43.8
+  },
+  "defaultServingG": 40,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 40
+   }
+  ],
+  "aliases": [
+   "foie_gras",
+   "foie gras",
+   "kaz cigeri"
+  ]
+ },
+ {
+  "label": "french_fries",
+  "name": "Patates kızartması",
+  "nameEn": "Potatoes, french fried",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 312,
+   "protein": 3.4,
+   "carbs": 41.0,
+   "fat": 15.0
+  },
+  "defaultServingG": 120,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 120
+   }
+  ],
+  "aliases": [
+   "french_fries",
+   "patates kizartmasi",
+   "french fries",
+   "fries",
+   "patates tava"
+  ]
+ },
+ {
+  "label": "french_onion_soup",
+  "name": "Fransız soğan çorbası",
+  "nameEn": "French onion soup",
+  "category": "çorba",
+  "per100g": {
+   "kcal": 65,
+   "protein": 3.0,
+   "carbs": 6.5,
+   "fat": 3.0
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "french_onion_soup",
+   "sogan corbasi",
+   "french onion soup"
+  ]
+ },
+ {
+  "label": "french_toast",
+  "name": "Fransız tostu",
+  "nameEn": "French toast",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 229,
+   "protein": 7.7,
+   "carbs": 25.0,
+   "fat": 10.8
+  },
+  "defaultServingG": 130,
+  "servings": [
+   {
+    "label": "2 dilim",
+    "grams": 130
+   }
+  ],
+  "aliases": [
+   "french_toast",
+   "fransiz tostu",
+   "french toast"
+  ]
+ },
+ {
+  "label": "fried_calamari",
+  "name": "Kalamar tava",
+  "nameEn": "Squid, floured and fried",
+  "category": "balık",
+  "per100g": {
+   "kcal": 175,
+   "protein": 15.0,
+   "carbs": 8.0,
+   "fat": 8.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "fried_calamari",
+   "kalamar",
+   "kalamar tava",
+   "calamari"
+  ]
+ },
+ {
+  "label": "fried_rice",
+  "name": "Kızarmış pilav",
+  "nameEn": "Fried rice",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 163,
+   "protein": 4.5,
+   "carbs": 24.0,
+   "fat": 5.5
+  },
+  "defaultServingG": 200,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 200
+   }
+  ],
+  "aliases": [
+   "fried_rice",
+   "kizarmis pilav",
+   "fried rice"
+  ]
+ },
+ {
+  "label": "frozen_yogurt",
+  "name": "Donmuş yoğurt",
+  "nameEn": "Frozen yogurt",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 159,
+   "protein": 4.0,
+   "carbs": 24.0,
+   "fat": 5.6
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "frozen_yogurt",
+   "donmus yogurt",
+   "frozen yogurt",
+   "froyo"
+  ]
+ },
+ {
+  "label": "garlic_bread",
+  "name": "Sarımsaklı ekmek",
+  "nameEn": "Garlic bread",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 350,
+   "protein": 8.0,
+   "carbs": 44.0,
+   "fat": 15.0
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "2 dilim",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "garlic_bread",
+   "sarimsakli ekmek",
+   "garlic bread"
+  ]
+ },
+ {
+  "label": "gnocchi",
+  "name": "Gnocchi",
+  "nameEn": "Gnocchi",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 165,
+   "protein": 4.0,
+   "carbs": 32.0,
+   "fat": 2.0
+  },
+  "defaultServingG": 200,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 200
+   }
+  ],
+  "aliases": [
+   "gnocchi",
+   "nokki"
+  ]
+ },
+ {
+  "label": "greek_salad",
+  "name": "Yunan salatası",
+  "nameEn": "Greek salad",
+  "category": "sebze",
+  "per100g": {
+   "kcal": 92,
+   "protein": 2.4,
+   "carbs": 5.5,
+   "fat": 6.9
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "greek_salad",
+   "yunan salatasi",
+   "greek salad"
+  ]
+ },
+ {
+  "label": "grilled_cheese_sandwich",
+  "name": "Kaşarlı tost",
+  "nameEn": "Grilled cheese sandwich",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 290,
+   "protein": 13.0,
+   "carbs": 30.0,
+   "fat": 13.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "grilled_cheese_sandwich",
+   "kasarli tost",
+   "grilled cheese",
+   "peynirli tost"
+  ]
+ },
+ {
+  "label": "grilled_salmon",
+  "name": "Izgara somon",
+  "nameEn": "Salmon, grilled",
+  "category": "balık",
+  "per100g": {
+   "kcal": 208,
+   "protein": 22.0,
+   "carbs": 0.0,
+   "fat": 13.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "grilled_salmon",
+   "somon",
+   "izgara somon",
+   "salmon"
+  ]
+ },
+ {
+  "label": "guacamole",
+  "name": "Guacamole",
+  "nameEn": "Guacamole",
+  "category": "sebze",
+  "per100g": {
+   "kcal": 155,
+   "protein": 2.0,
+   "carbs": 8.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "guacamole",
+   "guakamole",
+   "avokado ezmesi"
+  ]
+ },
+ {
+  "label": "gyoza",
+  "name": "Gyoza",
+  "nameEn": "Gyoza dumplings",
+  "category": "yemek",
+  "per100g": {
+   "kcal": 195,
+   "protein": 8.5,
+   "carbs": 22.0,
+   "fat": 8.0
+  },
+  "defaultServingG": 120,
+  "servings": [
+   {
+    "label": "5 adet",
+    "grams": 120
+   }
+  ],
+  "aliases": [
+   "gyoza"
+  ]
+ },
+ {
+  "label": "hamburger",
+  "name": "Hamburger",
+  "nameEn": "Hamburger, plain",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 254,
+   "protein": 12.5,
+   "carbs": 30.0,
+   "fat": 9.5
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "hamburger",
+   "burger",
+   "kofte burger"
+  ]
+ },
+ {
+  "label": "hot_and_sour_soup",
+  "name": "Acı ekşi çorba",
+  "nameEn": "Hot and sour soup",
+  "category": "çorba",
+  "per100g": {
+   "kcal": 45,
+   "protein": 3.0,
+   "carbs": 5.0,
+   "fat": 1.5
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "hot_and_sour_soup",
+   "aci eksi corba",
+   "hot and sour soup"
+  ]
+ },
+ {
+  "label": "hot_dog",
+  "name": "Sosisli sandviç",
+  "nameEn": "Hot dog",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 290,
+   "protein": 11.0,
+   "carbs": 25.0,
+   "fat": 17.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "hot_dog",
+   "sosisli",
+   "hot dog",
+   "sosisli sandvic"
+  ]
+ },
+ {
+  "label": "huevos_rancheros",
+  "name": "Meksika usulü yumurta",
+  "nameEn": "Huevos rancheros",
+  "category": "yumurta",
+  "per100g": {
+   "kcal": 155,
+   "protein": 8.0,
+   "carbs": 12.0,
+   "fat": 8.5
+  },
+  "defaultServingG": 220,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 220
+   }
+  ],
+  "aliases": [
+   "huevos_rancheros",
+   "huevos rancheros"
+  ]
+ },
+ {
+  "label": "hummus",
+  "name": "Humus",
+  "nameEn": "Hummus",
+  "category": "baklagil",
+  "per100g": {
+   "kcal": 166,
+   "protein": 7.9,
+   "carbs": 14.3,
+   "fat": 9.6
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "hummus",
+   "humus",
+   "nohut ezmesi"
+  ]
+ },
+ {
+  "label": "ice_cream",
+  "name": "Dondurma",
+  "nameEn": "Ice cream, vanilla",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 207,
+   "protein": 3.5,
+   "carbs": 24.0,
+   "fat": 11.0
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "1 top",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "ice_cream",
+   "dondurma",
+   "ice cream",
+   "maras dondurmasi"
+  ]
+ },
+ {
+  "label": "lasagna",
+  "name": "Lazanya",
+  "nameEn": "Lasagna with meat sauce",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 135,
+   "protein": 8.0,
+   "carbs": 12.0,
+   "fat": 5.5
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "lasagna",
+   "lazanya",
+   "lasagne"
+  ]
+ },
+ {
+  "label": "lobster_bisque",
+  "name": "Istakoz çorbası",
+  "nameEn": "Lobster bisque",
+  "category": "çorba",
+  "per100g": {
+   "kcal": 105,
+   "protein": 5.0,
+   "carbs": 7.0,
+   "fat": 6.0
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "lobster_bisque",
+   "istakoz corbasi",
+   "lobster bisque"
+  ]
+ },
+ {
+  "label": "lobster_roll_sandwich",
+  "name": "Istakozlu sandviç",
+  "nameEn": "Lobster roll sandwich",
+  "category": "balık",
+  "per100g": {
+   "kcal": 210,
+   "protein": 12.0,
+   "carbs": 20.0,
+   "fat": 9.0
+  },
+  "defaultServingG": 180,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 180
+   }
+  ],
+  "aliases": [
+   "lobster_roll_sandwich",
+   "istakozlu sandvic",
+   "lobster roll"
+  ]
+ },
+ {
+  "label": "macaroni_and_cheese",
+  "name": "Peynirli makarna",
+  "nameEn": "Macaroni and cheese",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 164,
+   "protein": 6.5,
+   "carbs": 20.0,
+   "fat": 6.0
+  },
+  "defaultServingG": 220,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 220
+   }
+  ],
+  "aliases": [
+   "macaroni_and_cheese",
+   "peynirli makarna",
+   "mac and cheese"
+  ]
+ },
+ {
+  "label": "macarons",
+  "name": "Makaron",
+  "nameEn": "Macarons",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 404,
+   "protein": 7.0,
+   "carbs": 60.0,
+   "fat": 15.0
+  },
+  "defaultServingG": 20,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 20
+   }
+  ],
+  "aliases": [
+   "macarons",
+   "makaron",
+   "macaron"
+  ]
+ },
+ {
+  "label": "miso_soup",
+  "name": "Miso çorbası",
+  "nameEn": "Miso soup",
+  "category": "çorba",
+  "per100g": {
+   "kcal": 40,
+   "protein": 3.0,
+   "carbs": 4.0,
+   "fat": 1.4
+  },
+  "defaultServingG": 220,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 220
+   }
+  ],
+  "aliases": [
+   "miso_soup",
+   "miso corbasi",
+   "miso soup"
+  ]
+ },
+ {
+  "label": "mussels",
+  "name": "Midye",
+  "nameEn": "Mussels, cooked",
+  "category": "balık",
+  "per100g": {
+   "kcal": 172,
+   "protein": 24.0,
+   "carbs": 7.4,
+   "fat": 4.5
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "mussels",
+   "midye"
+  ]
+ },
+ {
+  "label": "nachos",
+  "name": "Nachos",
+  "nameEn": "Nachos with cheese",
+  "category": "atıştırmalık",
+  "per100g": {
+   "kcal": 480,
+   "protein": 7.0,
+   "carbs": 55.0,
+   "fat": 25.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "nachos",
+   "nacos"
+  ]
+ },
+ {
+  "label": "omelette",
+  "name": "Omlet",
+  "nameEn": "Omelette, plain",
+  "category": "yumurta",
+  "per100g": {
+   "kcal": 154,
+   "protein": 11.0,
+   "carbs": 1.0,
+   "fat": 12.0
+  },
+  "defaultServingG": 120,
+  "servings": [
+   {
+    "label": "2 yumurta",
+    "grams": 120
+   }
+  ],
+  "aliases": [
+   "omelette",
+   "omlet",
+   "omelet",
+   "sade omlet"
+  ]
+ },
+ {
+  "label": "onion_rings",
+  "name": "Soğan halkası",
+  "nameEn": "Onion rings, fried",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 411,
+   "protein": 5.4,
+   "carbs": 47.0,
+   "fat": 22.0
+  },
+  "defaultServingG": 80,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 80
+   }
+  ],
+  "aliases": [
+   "onion_rings",
+   "sogan halkasi",
+   "onion rings"
+  ]
+ },
+ {
+  "label": "oysters",
+  "name": "İstiridye",
+  "nameEn": "Oysters, raw",
+  "category": "balık",
+  "per100g": {
+   "kcal": 68,
+   "protein": 7.0,
+   "carbs": 4.0,
+   "fat": 2.5
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "oysters",
+   "istiridye",
+   "oyster"
+  ]
+ },
+ {
+  "label": "pad_thai",
+  "name": "Pad thai",
+  "nameEn": "Pad thai",
+  "category": "yemek",
+  "per100g": {
+   "kcal": 175,
+   "protein": 8.0,
+   "carbs": 22.0,
+   "fat": 6.0
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "pad_thai",
+   "pad thai",
+   "padthai"
+  ]
+ },
+ {
+  "label": "paella",
+  "name": "Paella",
+  "nameEn": "Paella",
+  "category": "yemek",
+  "per100g": {
+   "kcal": 158,
+   "protein": 9.0,
+   "carbs": 18.0,
+   "fat": 5.0
+  },
+  "defaultServingG": 300,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 300
+   }
+  ],
+  "aliases": [
+   "paella",
+   "paelya"
+  ]
+ },
+ {
+  "label": "pancakes",
+  "name": "Pankek",
+  "nameEn": "Pancakes, plain",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 227,
+   "protein": 6.4,
+   "carbs": 28.0,
+   "fat": 9.7
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "2 adet",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "pancakes",
+   "pankek",
+   "pancake",
+   "krep"
+  ]
+ },
+ {
+  "label": "panna_cotta",
+  "name": "Panna cotta",
+  "nameEn": "Panna cotta",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 260,
+   "protein": 3.5,
+   "carbs": 22.0,
+   "fat": 18.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "panna_cotta",
+   "panna cotta",
+   "pannacotta"
+  ]
+ },
+ {
+  "label": "peking_duck",
+  "name": "Pekin ördeği",
+  "nameEn": "Peking duck",
+  "category": "et",
+  "per100g": {
+   "kcal": 337,
+   "protein": 19.0,
+   "carbs": 5.0,
+   "fat": 27.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "peking_duck",
+   "pekin ordegi",
+   "peking duck",
+   "ordek"
+  ]
+ },
+ {
+  "label": "pho",
+  "name": "Pho",
+  "nameEn": "Pho noodle soup",
+  "category": "çorba",
+  "per100g": {
+   "kcal": 65,
+   "protein": 5.0,
+   "carbs": 8.0,
+   "fat": 1.5
+  },
+  "defaultServingG": 400,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 400
+   }
+  ],
+  "aliases": [
+   "pho"
+  ]
+ },
+ {
+  "label": "pizza",
+  "name": "Pizza",
+  "nameEn": "Pizza, cheese, regular crust",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 266,
+   "protein": 11.0,
+   "carbs": 33.0,
+   "fat": 10.0
+  },
+  "defaultServingG": 107,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 107
+   }
+  ],
+  "aliases": [
+   "pizza",
+   "pitsa",
+   "margarita pizza"
+  ]
+ },
+ {
+  "label": "pork_chop",
+  "name": "Domuz pirzolası",
+  "nameEn": "Pork chop, cooked",
+  "category": "et",
+  "per100g": {
+   "kcal": 231,
+   "protein": 26.0,
+   "carbs": 0.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 150,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 150
+   }
+  ],
+  "aliases": [
+   "pork_chop",
+   "domuz pirzolasi",
+   "pork chop"
+  ]
+ },
+ {
+  "label": "poutine",
+  "name": "Poutine",
+  "nameEn": "Poutine",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 230,
+   "protein": 7.0,
+   "carbs": 24.0,
+   "fat": 12.0
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "poutine"
+  ]
+ },
+ {
+  "label": "prime_rib",
+  "name": "Kaburga rosto",
+  "nameEn": "Prime rib, roasted",
+  "category": "et",
+  "per100g": {
+   "kcal": 340,
+   "protein": 24.0,
+   "carbs": 0.0,
+   "fat": 27.0
+  },
+  "defaultServingG": 200,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 200
+   }
+  ],
+  "aliases": [
+   "prime_rib",
+   "kaburga rosto",
+   "prime rib",
+   "rosto"
+  ]
+ },
+ {
+  "label": "pulled_pork_sandwich",
+  "name": "Didilmiş et sandviçi",
+  "nameEn": "Pulled pork sandwich",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 250,
+   "protein": 15.0,
+   "carbs": 25.0,
+   "fat": 10.0
+  },
+  "defaultServingG": 200,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 200
+   }
+  ],
+  "aliases": [
+   "pulled_pork_sandwich",
+   "pulled pork",
+   "didilmis et sandvici"
+  ]
+ },
+ {
+  "label": "ramen",
+  "name": "Ramen",
+  "nameEn": "Ramen noodle soup",
+  "category": "çorba",
+  "per100g": {
+   "kcal": 110,
+   "protein": 5.0,
+   "carbs": 14.0,
+   "fat": 3.5
+  },
+  "defaultServingG": 400,
+  "servings": [
+   {
+    "label": "1 kase",
+    "grams": 400
+   }
+  ],
+  "aliases": [
+   "ramen"
+  ]
+ },
+ {
+  "label": "ravioli",
+  "name": "Ravioli",
+  "nameEn": "Ravioli with sauce",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 165,
+   "protein": 7.0,
+   "carbs": 22.0,
+   "fat": 5.0
+  },
+  "defaultServingG": 220,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 220
+   }
+  ],
+  "aliases": [
+   "ravioli"
+  ]
+ },
+ {
+  "label": "red_velvet_cake",
+  "name": "Red velvet kek",
+  "nameEn": "Red velvet cake",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 395,
+   "protein": 4.0,
+   "carbs": 53.0,
+   "fat": 19.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "red_velvet_cake",
+   "red velvet",
+   "red velvet kek"
+  ]
+ },
+ {
+  "label": "risotto",
+  "name": "Risotto",
+  "nameEn": "Risotto",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 145,
+   "protein": 4.0,
+   "carbs": 20.0,
+   "fat": 5.0
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "risotto",
+   "rizotto"
+  ]
+ },
+ {
+  "label": "samosa",
+  "name": "Samosa",
+  "nameEn": "Samosa, fried",
+  "category": "atıştırmalık",
+  "per100g": {
+   "kcal": 308,
+   "protein": 5.0,
+   "carbs": 32.0,
+   "fat": 18.0
+  },
+  "defaultServingG": 60,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 60
+   }
+  ],
+  "aliases": [
+   "samosa"
+  ]
+ },
+ {
+  "label": "sashimi",
+  "name": "Sashimi",
+  "nameEn": "Sashimi",
+  "category": "balık",
+  "per100g": {
+   "kcal": 130,
+   "protein": 22.0,
+   "carbs": 0.0,
+   "fat": 4.5
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "sashimi",
+   "sasimi"
+  ]
+ },
+ {
+  "label": "scallops",
+  "name": "Deniz tarağı",
+  "nameEn": "Scallops, cooked",
+  "category": "balık",
+  "per100g": {
+   "kcal": 111,
+   "protein": 20.5,
+   "carbs": 5.0,
+   "fat": 0.8
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "scallops",
+   "deniz taragi",
+   "tarak"
+  ]
+ },
+ {
+  "label": "seaweed_salad",
+  "name": "Deniz yosunu salatası",
+  "nameEn": "Seaweed salad",
+  "category": "sebze",
+  "per100g": {
+   "kcal": 70,
+   "protein": 1.5,
+   "carbs": 8.0,
+   "fat": 3.5
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "seaweed_salad",
+   "deniz yosunu salatasi",
+   "seaweed salad",
+   "yosun salatasi"
+  ]
+ },
+ {
+  "label": "shrimp_and_grits",
+  "name": "Karidesli mısır lapası",
+  "nameEn": "Shrimp and grits",
+  "category": "balık",
+  "per100g": {
+   "kcal": 140,
+   "protein": 9.0,
+   "carbs": 13.0,
+   "fat": 5.5
+  },
+  "defaultServingG": 250,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 250
+   }
+  ],
+  "aliases": [
+   "shrimp_and_grits",
+   "shrimp and grits",
+   "karidesli misir lapasi"
+  ]
+ },
+ {
+  "label": "spaghetti_bolognese",
+  "name": "Bolonez soslu spagetti",
+  "nameEn": "Spaghetti bolognese",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 155,
+   "protein": 8.0,
+   "carbs": 18.0,
+   "fat": 5.5
+  },
+  "defaultServingG": 300,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 300
+   }
+  ],
+  "aliases": [
+   "spaghetti_bolognese",
+   "bolonez",
+   "spaghetti bolognese",
+   "bolonez makarna"
+  ]
+ },
+ {
+  "label": "spaghetti_carbonara",
+  "name": "Karbonara spagetti",
+  "nameEn": "Spaghetti carbonara",
+  "category": "tahıl",
+  "per100g": {
+   "kcal": 200,
+   "protein": 9.0,
+   "carbs": 20.0,
+   "fat": 9.0
+  },
+  "defaultServingG": 300,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 300
+   }
+  ],
+  "aliases": [
+   "spaghetti_carbonara",
+   "karbonara",
+   "carbonara",
+   "spaghetti carbonara"
+  ]
+ },
+ {
+  "label": "spring_rolls",
+  "name": "Bahar rulosu",
+  "nameEn": "Spring rolls, fried",
+  "category": "atıştırmalık",
+  "per100g": {
+   "kcal": 190,
+   "protein": 5.0,
+   "carbs": 24.0,
+   "fat": 8.0
+  },
+  "defaultServingG": 80,
+  "servings": [
+   {
+    "label": "2 adet",
+    "grams": 80
+   }
+  ],
+  "aliases": [
+   "spring_rolls",
+   "bahar rulosu",
+   "spring roll",
+   "sprink rulo"
+  ]
+ },
+ {
+  "label": "steak",
+  "name": "Biftek",
+  "nameEn": "Beef steak, grilled",
+  "category": "et",
+  "per100g": {
+   "kcal": 271,
+   "protein": 26.0,
+   "carbs": 0.0,
+   "fat": 18.0
+  },
+  "defaultServingG": 200,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 200
+   }
+  ],
+  "aliases": [
+   "steak",
+   "biftek",
+   "dana biftek",
+   "antrikot"
+  ]
+ },
+ {
+  "label": "strawberry_shortcake",
+  "name": "Çilekli pasta",
+  "nameEn": "Strawberry shortcake",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 290,
+   "protein": 4.0,
+   "carbs": 40.0,
+   "fat": 13.0
+  },
+  "defaultServingG": 120,
+  "servings": [
+   {
+    "label": "1 dilim",
+    "grams": 120
+   }
+  ],
+  "aliases": [
+   "strawberry_shortcake",
+   "cilekli pasta",
+   "strawberry shortcake"
+  ]
+ },
+ {
+  "label": "sushi",
+  "name": "Suşi",
+  "nameEn": "Sushi rolls",
+  "category": "balık",
+  "per100g": {
+   "kcal": 145,
+   "protein": 6.0,
+   "carbs": 26.0,
+   "fat": 1.5
+  },
+  "defaultServingG": 180,
+  "servings": [
+   {
+    "label": "8 parça",
+    "grams": 180
+   }
+  ],
+  "aliases": [
+   "sushi",
+   "susi",
+   "maki"
+  ]
+ },
+ {
+  "label": "tacos",
+  "name": "Tako",
+  "nameEn": "Tacos, beef",
+  "category": "fast food",
+  "per100g": {
+   "kcal": 215,
+   "protein": 10.0,
+   "carbs": 20.0,
+   "fat": 10.5
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "tacos",
+   "tako",
+   "taco"
+  ]
+ },
+ {
+  "label": "takoyaki",
+  "name": "Takoyaki",
+  "nameEn": "Takoyaki",
+  "category": "atıştırmalık",
+  "per100g": {
+   "kcal": 190,
+   "protein": 7.0,
+   "carbs": 22.0,
+   "fat": 8.0
+  },
+  "defaultServingG": 120,
+  "servings": [
+   {
+    "label": "4 adet",
+    "grams": 120
+   }
+  ],
+  "aliases": [
+   "takoyaki"
+  ]
+ },
+ {
+  "label": "tiramisu",
+  "name": "Tiramisu",
+  "nameEn": "Tiramisu",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 283,
+   "protein": 4.5,
+   "carbs": 27.0,
+   "fat": 17.0
+  },
+  "defaultServingG": 100,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 100
+   }
+  ],
+  "aliases": [
+   "tiramisu"
+  ]
+ },
+ {
+  "label": "tuna_tartare",
+  "name": "Ton balığı tartar",
+  "nameEn": "Tuna tartare",
+  "category": "balık",
+  "per100g": {
+   "kcal": 160,
+   "protein": 20.0,
+   "carbs": 2.0,
+   "fat": 8.0
+  },
+  "defaultServingG": 120,
+  "servings": [
+   {
+    "label": "1 porsiyon",
+    "grams": 120
+   }
+  ],
+  "aliases": [
+   "tuna_tartare",
+   "ton baligi tartar",
+   "tuna tartare"
+  ]
+ },
+ {
+  "label": "waffles",
+  "name": "Waffle",
+  "nameEn": "Waffles, plain",
+  "category": "tatlı",
+  "per100g": {
+   "kcal": 291,
+   "protein": 7.9,
+   "carbs": 33.0,
+   "fat": 14.0
+  },
+  "defaultServingG": 80,
+  "servings": [
+   {
+    "label": "1 adet",
+    "grams": 80
+   }
+  ],
+  "aliases": [
+   "waffles",
+   "waffle",
+   "wafle"
+  ]
+ }
+]

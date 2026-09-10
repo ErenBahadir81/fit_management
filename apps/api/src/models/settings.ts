@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model } from "mongoose";
+import mongoose, { Schema, model, type Model } from "mongoose";
 import { DEFAULT_SETTINGS, zSettings, type SettingsDTO } from "@fitfloow/core";
 
 export interface SettingsDoc {
@@ -13,7 +13,7 @@ const SettingsSchema = new Schema<SettingsDoc>(
   { timestamps: true, minimize: false }
 );
 
-export const Settings: Model<SettingsDoc> = (models.Settings as Model<SettingsDoc>) || model<SettingsDoc>("Settings", SettingsSchema);
+export const Settings: Model<SettingsDoc> = (mongoose.models.Settings as Model<SettingsDoc>) || model<SettingsDoc>("Settings", SettingsSchema);
 
 /** Read (and lazily create) the global settings singleton, always validated against the schema defaults. */
 export async function getSettings(): Promise<SettingsDTO> {
