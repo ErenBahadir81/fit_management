@@ -1,11 +1,12 @@
 /**
  * Weekly volume matrix for the program-template builder.
  *
- * `@fitfloow/core/training` is still a stub while B2 builds it, so the matrix is computed
- * here: Σ (targetSets × muscle load) per muscle over the cycle, normalised to seven days so
- * it can be compared with the per-week targets admins set on /muscles.
+ * The cycle totals come from `templateWeeklyVolume` in `@fitfloow/core/training` — the same
+ * function the API uses for `ProgramTemplateDTO.weeklyVolume`, so the matrix and the stored
+ * value can never disagree. The per-day breakdown and the target comparison are the admin's
+ * own view on top of it.
  */
-import { round, type DayDTO, type MuscleDTO } from "@fitfloow/core";
+import { round, templateWeeklyVolume, type DayDTO, type MuscleDTO } from "@fitfloow/core";
 
 export type VolumeStatus = "under" | "in" | "over" | "none";
 
@@ -36,13 +37,13 @@ export function volumeStatus(weeklySets: number, target: MuscleDTO["weeklyTarget
 
 export function templateVolume(days: DayDTO[], muscles: MuscleDTO[]): VolumeRow[] {
   const cycleLength = days.length;
-  const index = new Map<string, number[]>();
-  for (const m of muscles) index.set(m.key, new Array<number>(cycleLength).fill(0));
-
+  const totals = templateWeeklyVolume(days);
+  // Per-day split for the matrix columns; the row total still comes from core.
+  const perDay = new Map<string, number[]>(muscles.map((m) => [m.key, new Array<number>(cycleLength).fill(0)]));
   days.forEach((day, dayIdx) => {
     for (const ex of day.exercises) {
       for (const load of ex.muscles ?? []) {
-        const row = index.get(load.key);
+        const row = perDay.get(load.key);
         if (!row) continue; // muscle removed from the catalog since the template was written
         row[dayIdx] += ex.targetSets * load.load;
       }
@@ -50,11 +51,8 @@ export function templateVolume(days: DayDTO[], muscles: MuscleDTO[]): VolumeRow[
   });
 
   return muscles.map((m) => {
-    const byDay = (index.get(m.key) ?? []).map((n) => round(n, 2));
-    const cycleSets = round(
-      byDay.reduce((a, b) => a + b, 0),
-      2
-    );
+    const byDay = (perDay.get(m.key) ?? []).map((n) => round(n, 2));
+    const cycleSets = round(totals[m.key] ?? 0, 2);
     const weeklySets = cycleLength > 0 ? round((cycleSets * 7) / cycleLength, 2) : 0;
     return {
       key: m.key,

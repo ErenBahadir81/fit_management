@@ -1,24 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { zLoginInput } from "@fitfloow/core";
-import { api, USE_FAKE_API } from "@/lib/api";
+import { api } from "@/lib/api";
 import { errorMessage } from "@/lib/queries";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 import { Callout } from "@/components/ui/States";
+
+/** Read the inlined literal here (not via an imported binding) so it folds away in real builds. */
+const DEMO_MODE = process.env.NEXT_PUBLIC_API_FAKE === "1";
 
 interface FieldErrors {
   username?: string;
   password?: string;
 }
 
-export function LoginForm() {
+export function LoginForm({ next = "/" }: { next?: string }) {
   const router = useRouter();
-  const params = useSearchParams();
-  const next = params.get("next") ?? "/";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +46,7 @@ export function LoginForm() {
     setPending(true);
     try {
       await api.auth.login(parsed.data.username, parsed.data.password);
-      router.push(next.startsWith("/") ? next : "/");
+      router.push(next.startsWith("/") && !next.startsWith("//") ? next : "/");
       router.refresh();
     } catch (error) {
       setFormError(errorMessage(error));
@@ -88,7 +89,7 @@ export function LoginForm() {
         {pending ? "Giriş yapılıyor…" : "Giriş yap"}
       </Button>
 
-      {USE_FAKE_API && (
+      {DEMO_MODE && (
         <p className="text-center text-xs leading-relaxed text-subtle">
           Demo modu açık — <span className="font-medium text-muted">eren</span> / <span className="font-medium text-muted">fitfloow</span>
         </p>

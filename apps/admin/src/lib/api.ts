@@ -6,8 +6,6 @@ import { createApiClient, type ApiClient } from "@fitfloow/api-client";
  * inside the dead branch, which keeps its seed data in a separate chunk that the default
  * (real-client) build never references — a plain static import was not being shaken out.
  */
-export const USE_FAKE_API = process.env.NEXT_PUBLIC_API_FAKE === "1";
-
 let client: ApiClient | null = null;
 
 function createRealClient(): ApiClient {

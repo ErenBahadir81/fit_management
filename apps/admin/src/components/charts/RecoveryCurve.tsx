@@ -2,20 +2,18 @@
 
 import { useId, useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { recoveredFraction } from "@fitfloow/core";
 import { num } from "@/lib/format";
 import { usePrefersReducedMotion } from "@/lib/theme";
 import { CHART, ChartTooltip, axisProps } from "./chart-kit";
 
 /**
  * Recovery curve preview: 0 % right after training, 70 % at half the full-recovery time,
- * 100 % at full recovery (docs/plan/00 §2.1). Piecewise-linear, mirroring the engine spec.
+ * 100 % at full recovery. The shape comes from core's `recoveredFraction`, the same curve
+ * the mobile readiness rings use.
  */
 export function recoveryAt(hoursSince: number, fullRecoveryHours: number): number {
-  if (fullRecoveryHours <= 0) return 100;
-  const half = fullRecoveryHours / 2;
-  if (hoursSince <= 0) return 0;
-  if (hoursSince >= fullRecoveryHours) return 100;
-  return hoursSince <= half ? (hoursSince / half) * 70 : 70 + ((hoursSince - half) / half) * 30;
+  return recoveredFraction(hoursSince, fullRecoveryHours) * 100;
 }
 
 export function RecoveryCurve({ fullRecoveryHours, color = CHART.brand, height = 120 }: { fullRecoveryHours: number; color?: string; height?: number }) {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { Activity, ArrowUpRight, Camera, Database, Dumbbell, RefreshCw, Server, Target, Users, Utensils } from "lucide-react";
-import { WEEKDAYS_TR, trDateKey } from "@fitfloow/core";
+import { WEEKDAYS_TR, keyWeekday, trDateKey } from "@fitfloow/core";
 import { listEnter } from "@/lib/motion";
 import { date, int, num, relative } from "@/lib/format";
 import { useDashboard, useHealth } from "@/lib/queries";
@@ -29,7 +29,7 @@ export default function DashboardPage() {
       <PageHeader
         eyebrow="Genel bakış"
         title="Panel"
-        description={`${WEEKDAYS_TR[new Date().getDay()]}, ${date(todayKey)} · Son 14 günün aktivitesi ve sistem durumu.`}
+        description={`${WEEKDAYS_TR[keyWeekday(todayKey)]}, ${date(todayKey)} · Son 14 günün aktivitesi ve sistem durumu.`}
         actions={
           <Button
             size="sm"

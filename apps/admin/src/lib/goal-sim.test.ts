@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_GOAL_SETTINGS, type GoalSettings } from "@fitfloow/core";
+import { DEFAULT_GOAL_SETTINGS, shiftKey, type GoalSettings } from "@fitfloow/core";
 import { computeGoalPlan, rateForState, type GoalSimInput } from "./goal-sim";
+
+/* These cases pin the contract the admin simulator depends on; the maths itself now lives
+   in @fitfloow/core (goal engine), so a change there fails here first. */
 
 const base: GoalSimInput = {
   sex: "male",
@@ -116,10 +119,12 @@ describe("computeGoalPlan — roadmap", () => {
 
   it("keeps week keys 7 days apart and derives the target date", () => {
     const plan = computeGoalPlan(base);
+    // A week covers startKey … startKey + 6 inclusive, so the next week starts a day later.
     expect(plan.roadmap[0].startKey).toBe("2026-09-10");
-    expect(plan.roadmap[0].endKey).toBe("2026-09-17");
+    expect(plan.roadmap[0].endKey).toBe("2026-09-16");
     expect(plan.roadmap[1].startKey).toBe("2026-09-17");
-    expect(plan.targetDate).toBe(plan.roadmap[plan.roadmap.length - 1].endKey);
+    // targetDate = startDate + 7 × weeks (the day after the last week ends).
+    expect(plan.targetDate).toBe(shiftKey(base.startKey, 7 * plan.estimatedWeeks));
   });
 
   it("accumulates the deficit across weeks", () => {

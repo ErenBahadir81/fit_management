@@ -104,7 +104,7 @@ export default function MusclesPage() {
             <span className="w-16">Sıra</span>
             <span className="flex-1">Kas</span>
             <span className="w-24">Bölge</span>
-            <span className="w-20 text-right">Boyut</span>
+            <span className="w-28 text-right">Boyut</span>
             <span className="w-24 text-right">Yenilenme</span>
             <span className="w-32 text-right">Haftalık hedef</span>
             <span className="w-28 text-right">Durum</span>
@@ -227,15 +227,15 @@ function MuscleRow({
             <Badge tone="neutral">{REGION_TR[muscle.region]}</Badge>
           </div>
 
-          <div className="w-20 shrink-0 text-right">
+          <div className="w-28 shrink-0 text-right">
             <Segmented
               size="sm"
               label={`${muscle.name} boyutu`}
               value={muscle.size}
               onChange={(v) => onPatch({ size: v })}
               options={[
-                { value: "large", label: "B" },
-                { value: "small", label: "K" },
+                { value: "large", label: "Büyük" },
+                { value: "small", label: "Küçük" },
               ]}
             />
           </div>

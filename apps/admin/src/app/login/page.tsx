@@ -1,12 +1,18 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Floo } from "@/components/floo/Floo";
-import { Skeleton } from "@/components/ui/States";
+import { Callout } from "@/components/ui/States";
 import { LoginForm } from "./LoginForm";
 
 export const metadata: Metadata = { title: "Giriş" };
 
-export default function LoginPage() {
+/**
+ * The redirect target and the "forbidden" notice come from the server so the form is part
+ * of the first paint — reading them with `useSearchParams` would push it behind Suspense.
+ */
+export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const nextParam = typeof params.next === "string" ? params.next : "/";
+  const forbidden = params.forbidden === "1";
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       {/* Brand side — calm, one statement, Floo watching. */}
@@ -76,21 +82,17 @@ export default function LoginPage() {
           <h2 className="text-title font-semibold text-ink">Tekrar hoş geldin</h2>
           <p className="mb-7 mt-1.5 text-[13px] leading-relaxed text-muted">Devam etmek için yönetici hesabınla giriş yap.</p>
 
-          <Suspense fallback={<LoginFormSkeleton />}>
-            <LoginForm />
-          </Suspense>
+          {forbidden && (
+            <div className="mb-4">
+              <Callout tone="warn" title="Yetki yok">
+                Bu hesap yönetim paneline erişemiyor. Yönetici hesabıyla giriş yap.
+              </Callout>
+            </div>
+          )}
+
+          <LoginForm next={nextParam} />
         </div>
       </section>
-    </div>
-  );
-}
-
-function LoginFormSkeleton() {
-  return (
-    <div className="flex flex-col gap-4">
-      <Skeleton className="h-[3.75rem]" />
-      <Skeleton className="h-[3.75rem]" />
-      <Skeleton className="h-11" />
     </div>
   );
 }

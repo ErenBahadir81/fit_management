@@ -7,13 +7,11 @@ const refresh = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, refresh, replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
-  useSearchParams: () => new URLSearchParams("next=/muscles"),
   usePathname: () => "/login",
 }));
 
 const login = vi.fn();
 vi.mock("@/lib/api", () => ({
-  USE_FAKE_API: false,
   api: { auth: { login: (...args: unknown[]) => login(...args) } },
   getApi: () => ({ auth: { login } }),
   __setApiClient: vi.fn(),
@@ -31,7 +29,7 @@ describe("LoginForm", () => {
 
   it("validates with the core schema before hitting the network", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
+    renderWithProviders(<LoginForm next="/muscles" />);
 
     await user.type(screen.getByLabelText(/kullanıcı adı/i), "ab");
     await user.click(screen.getByRole("button", { name: /giriş yap/i }));
@@ -44,7 +42,7 @@ describe("LoginForm", () => {
   it("sends lowercased credentials and navigates to ?next on success", async () => {
     login.mockResolvedValue({ accessToken: "a", refreshToken: "r", user: { id: "1" } });
     const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
+    renderWithProviders(<LoginForm next="/muscles" />);
 
     await user.type(screen.getByLabelText(/kullanıcı adı/i), "Eren");
     await user.type(screen.getByLabelText(/parola/i), "fitfloow");
@@ -58,7 +56,7 @@ describe("LoginForm", () => {
   it("shows the API error message and stays on the form", async () => {
     login.mockRejectedValue(new Error("Kullanıcı adı veya parola hatalı"));
     const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
+    renderWithProviders(<LoginForm next="/muscles" />);
 
     await user.type(screen.getByLabelText(/kullanıcı adı/i), "eren");
     await user.type(screen.getByLabelText(/parola/i), "yanlis");
@@ -73,7 +71,7 @@ describe("LoginForm", () => {
     let resolve: (v: unknown) => void = () => {};
     login.mockImplementation(() => new Promise((r) => (resolve = r)));
     const user = userEvent.setup();
-    renderWithProviders(<LoginForm />);
+    renderWithProviders(<LoginForm next="/muscles" />);
 
     await user.type(screen.getByLabelText(/kullanıcı adı/i), "eren");
     await user.type(screen.getByLabelText(/parola/i), "fitfloow");

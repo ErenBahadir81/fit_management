@@ -146,19 +146,19 @@ export default function UsersPage() {
                     <TD align="right">
                       <div className="flex items-center justify-end gap-0.5">
                         <IconButton
-                          label="Düzenle"
+                          label={`${u.displayName} düzenle`}
                           size="sm"
                           onClick={() => setDrawer((d) => ({ open: true, user: u, seq: d.seq + 1 }))}
                         >
                           <Pencil className="size-3.5" aria-hidden />
                         </IconButton>
-                        <IconButton label="Parola sıfırla" size="sm" onClick={() => setToReset(u)}>
+                        <IconButton label={`${u.displayName} parolasını sıfırla`} size="sm" onClick={() => setToReset(u)}>
                           <KeyRound className="size-3.5" aria-hidden />
                         </IconButton>
-                        <IconButton label="Program ata" size="sm" onClick={() => setToAssign(u)}>
+                        <IconButton label={`${u.displayName} için program ata`} size="sm" onClick={() => setToAssign(u)}>
                           <CalendarDays className="size-3.5" aria-hidden />
                         </IconButton>
-                        <IconButton label="Sil" size="sm" variant="danger" onClick={() => setToDelete(u)}>
+                        <IconButton label={`${u.displayName} sil`} size="sm" variant="danger" onClick={() => setToDelete(u)}>
                           <Trash2 className="size-3.5" aria-hidden />
                         </IconButton>
                       </div>

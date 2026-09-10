@@ -26,6 +26,7 @@ import {
   type DietTargetDTO,
 } from "@fitfloow/core";
 import * as fx from "./fixtures";
+import * as domain from "./domain";
 
 export const FAKE_BASE_URL = "http://fake.local/api/v1";
 export const FAKE_CREDENTIALS = { username: "eren", password: "eren123" } as const;
@@ -62,14 +63,15 @@ export interface FakeState {
 export function createFakeState(today = trDateKey()): FakeState {
   const weighIns = fx.makeWeighIns(today);
   const bodyEntries = fx.makeBodyEntries(today, weighIns);
+  const user = fx.makeUser();
   return {
-    user: fx.makeUser(),
+    user,
     password: FAKE_CREDENTIALS.password,
     program: fx.makeProgram(today),
     logs: fx.makeHistory(today),
     weighIns,
     bodyEntries,
-    goal: fx.makeGoal(today, bodyEntries),
+    goal: domain.goalFor(today, user, bodyEntries),
     mealEntries: fx.makeMealEntries(today),
     target: { ...fx.DEFAULT_TARGET },
     foods: [...fx.FOODS],
@@ -128,7 +130,7 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   const programView = () => fx.makeProgramView(today(), state.program, state.logs, md());
   const recovery = () => fx.makeRecovery(today(), state.logs, md());
   const trends = (days: number) => fx.makeTrends(state.weighIns, state.bodyEntries, days, today());
-  const progress = () => (state.goal && state.goal.status === "active" ? fx.makeProgress(today(), state.goal, trends(120)) : null);
+  const progress = () => (state.goal && state.goal.status === "active" ? domain.progressFor(today(), state.goal, state.weighIns, state.bodyEntries, state.mealEntries) : null);
   const dayView = (key: string) => fx.makeDayView(key, state.mealEntries, state.target);
   const homeMascot = (): MascotMessage => {
     const pv = programView();
@@ -138,22 +140,20 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
     if (dv.remaining.kcal < 0) return mascotFor("home.caloriesOver", { kcal: Math.abs(dv.remaining.kcal) });
     return mascotFor("home.workoutDue", { day: pv.current.day.title });
   };
-  const report = (weekKey: string) => {
-    const p = progress();
-    return fx.makeWeeklyReport({
+  // Reports run the real core builder (highlights, score, Floo's line) over the fake state.
+  const report = (weekKey: string) =>
+    domain.reportFor({
       today: today(),
       weekKey,
       measurementDay: md(),
-      entries: state.mealEntries,
-      target: state.target,
-      logs: state.logs,
+      user: state.user,
+      goal: state.goal,
       weighIns: state.weighIns,
       bodyEntries: state.bodyEntries,
-      goal: state.goal,
-      progress: p,
-      mascot: p ? mascotFor(p.onTrack === "ahead" ? "report.ahead" : p.onTrack === "behind" ? "report.behind" : p.onTrack === "stalled" ? "report.stalled" : "report.onTrack", { kg: 0.4, kcal: 3200 }) : mascotFor("report.empty"),
+      logs: state.logs,
+      meals: state.mealEntries,
+      program: state.program,
     });
-  };
   const bodyEntryFrom = (b: Record<string, unknown>, id?: string): BodyEntryDTO => {
     const dateKey = typeof b.date === "string" ? trDateKey(new Date(b.date)) : today();
     const e = fx.makeBodyEntry({
@@ -329,43 +329,29 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   on("POST", "/goals/preview", ({ body }) => {
     const start = state.bodyEntries[state.bodyEntries.length - 1];
     if (!start) return err(409, "NO_BODY_ENTRY", "Önce bir vücut ölçümü gir");
-    const plan = fx.makePlan(start, Number(body.targetBodyFatPct), (body.profile as GoalDTO["profile"]) ?? "optimal", today());
-    const warnings = [...plan.warnings, ...(Number(body.targetBodyFatPct) >= start.bodyFatPct ? ["TARGET_ABOVE_CURRENT" as const] : [])];
-    return ok({ plan, warnings });
+    const plan = domain.planFor(state.user, start, Number(body.targetBodyFatPct), (body.profile as GoalDTO["profile"]) ?? "optimal", today());
+    return ok({ plan, warnings: plan.warnings });
   });
   on("POST", "/goals", ({ body }) => {
     if (state.goal?.status === "active") return err(409, "GOAL_EXISTS", "Zaten aktif bir hedefin var");
     const start = state.bodyEntries[state.bodyEntries.length - 1];
     if (!start) return err(409, "NO_BODY_ENTRY", "Önce bir vücut ölçümü gir");
-    const profile = (body.profile as GoalDTO["profile"]) ?? "optimal";
-    const now = new Date().toISOString();
-    state.goal = {
-      id: fx.nextId("goal"),
-      status: "active",
-      targetBodyFatPct: Number(body.targetBodyFatPct),
-      profile,
-      start: { dateKey: today(), weightKg: start.weightKg, bodyFatPct: start.bodyFatPct, leanMassKg: start.leanMassKg, fatMassKg: start.fatMassKg, bodyEntryId: start.id },
-      plan: fx.makePlan(start, Number(body.targetBodyFatPct), profile, today()),
-      tdeeOverride: null,
-      createdAt: now,
-      updatedAt: now,
-      completedAt: null,
-    };
+    state.goal = domain.goalCreate(today(), state.user, start, Number(body.targetBodyFatPct), (body.profile as GoalDTO["profile"]) ?? "optimal");
     return ok({ goal: state.goal });
   });
   on("PATCH", "/goals/current", ({ body }) => {
-    if (!state.goal) return err(404, "NOT_FOUND", "Aktif hedef yok");
-    const start = state.bodyEntries[state.bodyEntries.length - 1];
-    const target = Number(body.targetBodyFatPct ?? state.goal.targetBodyFatPct);
-    const profile = (body.profile as GoalDTO["profile"]) ?? state.goal.profile;
-    state.goal = { ...state.goal, targetBodyFatPct: target, profile, plan: fx.makePlan(start, target, profile, state.goal.start.dateKey), updatedAt: new Date().toISOString() };
+    if (!state.goal || state.goal.status !== "active") return err(404, "NOT_FOUND", "Aktif hedef yok");
+    state.goal = domain.goalUpdate(today(), state.user, state.goal, state.weighIns, {
+      targetBodyFatPct: body.targetBodyFatPct == null ? undefined : Number(body.targetBodyFatPct),
+      profile: body.profile as GoalDTO["profile"] | undefined,
+    });
     return ok({ goal: state.goal });
   });
   on("POST", "/goals/current/recalibrate", () => {
-    if (!state.goal) return err(404, "NOT_FOUND", "Aktif hedef yok");
-    const tdeeObserved = state.goal.plan.tdee - 60;
-    state.goal = { ...state.goal, tdeeOverride: tdeeObserved, updatedAt: new Date().toISOString() };
-    return ok({ goal: state.goal, recalibration: { tdeeFormula: state.goal.plan.tdeeFormula, tdeeObserved, tdeeUsed: tdeeObserved, daysUsed: 21, avgIntake: 2080, weightDeltaKg: -1.1, applied: true, reason: null } });
+    if (!state.goal || state.goal.status !== "active") return err(404, "NOT_FOUND", "Aktif hedef yok");
+    const res = domain.recalibrationFor(today(), state.user, state.goal, state.weighIns, state.mealEntries);
+    state.goal = res.goal;
+    return ok(res);
   });
   on("POST", "/goals/current/complete", () => {
     if (!state.goal) return err(404, "NOT_FOUND", "Aktif hedef yok");
@@ -401,7 +387,7 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   on("GET", "/reports/weekly/history", ({ query }) => {
     const wk = weekKeyFor(today(), md());
     const n = Number(query.limit ?? 12);
-    return ok({ weeks: Array.from({ length: n }, (_, i) => fx.summarizeReport(report(shiftKey(wk, -7 * (i + 1))))) });
+    return ok({ weeks: Array.from({ length: n }, (_, i) => domain.summaryFor(report(shiftKey(wk, -7 * (i + 1))))) });
   });
 
   // mascot

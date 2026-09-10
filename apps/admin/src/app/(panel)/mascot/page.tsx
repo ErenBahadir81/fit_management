@@ -228,7 +228,7 @@ function MessageEditor({ message, onDeleted }: { message: MascotTemplateDTO; onD
         />
 
         <CardBody className="space-y-5">
-          <div className="rounded-xl border border-line bg-surface-2 p-5">
+          <div data-testid="mascot-preview" className="rounded-xl border border-line bg-surface-2 p-5">
             <p className="ff-eyebrow mb-3">Önizleme</p>
             <div className="flex items-end gap-4">
               <Floo mood={mood} size={68} />
