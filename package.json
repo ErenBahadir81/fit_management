@@ -1,36 +1,28 @@
 {
   "name": "fitfloow",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": { "node": ">=22" },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "seed": "tsx scripts/seed.ts",
-    "reset": "tsx scripts/reset.ts"
-  },
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
-    "lucide-react": "^0.460.0",
-    "mongoose": "^8.8.3",
-    "next": "14.2.18",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "recharts": "^2.13.3",
-    "swr": "^2.2.5"
+    "test": "pnpm -r --workspace-concurrency=1 run test",
+    "test:core": "pnpm --filter @fitfloow/core test",
+    "test:api": "pnpm --filter @fitfloow/api test",
+    "test:client": "pnpm --filter @fitfloow/api-client test",
+    "test:admin": "pnpm --filter @fitfloow/admin test",
+    "test:mobile": "pnpm --filter @fitfloow/mobile test",
+    "test:vision": "bash scripts/test-vision.sh",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "pnpm -r run lint",
+    "check": "pnpm typecheck && pnpm test",
+    "dev:api": "pnpm --filter @fitfloow/api dev",
+    "dev:admin": "pnpm --filter @fitfloow/admin dev",
+    "dev:mobile": "pnpm --filter @fitfloow/mobile start",
+    "dev:vision": "bash scripts/dev-vision.sh",
+    "seed": "pnpm --filter @fitfloow/api seed",
+    "legacy": "bash scripts/legacy.sh"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^20.17.6",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.15",
-    "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "typescript": "5.9.3"
   }
 }

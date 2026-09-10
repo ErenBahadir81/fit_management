@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "FitFloow",
+    "slug": "fitfloow",
+    "scheme": "fitfloow",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "web": { "bundler": "metro", "output": "single", "favicon": "./assets/icon.png" },
+    "ios": { "supportsTablet": false, "bundleIdentifier": "net.floow.fitfloow" },
+    "android": {
+      "package": "net.floow.fitfloow",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#6D5DF6" }
+    },
+    "plugins": [
+      "expo-router",
+      ["expo-camera", { "cameraPermission": "FitFloow yemeklerini tanımak için kameranı kullanır." }],
+      ["expo-image-picker", { "photosPermission": "FitFloow yemek fotoğraflarını seçmek için galerine erişir." }],
+      ["expo-splash-screen", { "backgroundColor": "#0B0D12", "image": "./assets/splash-icon.png", "imageWidth": 160, "resizeMode": "contain" }],
+      "expo-secure-store"
+    ],
+    "experiments": { "typedRoutes": true }
+  }
+}

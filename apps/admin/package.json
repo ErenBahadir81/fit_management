@@ -1,0 +1,42 @@
+{
+  "name": "@fitfloow/admin",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fitfloow/api-client": "workspace:*",
+    "@fitfloow/core": "workspace:*",
+    "@tanstack/react-query": "5.102.8",
+    "lucide-react": "1.44.0",
+    "motion": "13.2.0",
+    "next": "16.3.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "3.10.1",
+    "zod": "4.6.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/node": "22.20.2",
+    "@types/react": "19.2.4",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "jsdom": "30.0.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}
