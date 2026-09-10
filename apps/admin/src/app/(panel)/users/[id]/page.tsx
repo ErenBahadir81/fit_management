@@ -1,7 +1,6 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { ArrowLeft, CalendarDays, Dumbbell, Ruler, Target, TrendingDown } from "lucide-react";
 import { ACTIVITY_TR, BODY_FAT_CATEGORY_TR, WEEKDAYS_TR, bodyFatCategory } from "@fitfloow/core";
 import { date, dateShort, int, kcal, kg, num, pct, relative } from "@/lib/format";
@@ -9,7 +8,7 @@ import { useUserOverview } from "@/lib/queries";
 import { PageHeader } from "@/components/layout/PanelShell";
 import { RoadmapChart } from "@/components/charts/RoadmapChart";
 import { Badge, DeltaChip } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { LinkButton } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { DataRow, MeterBar, StatTile } from "@/components/ui/Stat";
 import { CardSkeleton, EmptyState, ErrorState, Skeleton } from "@/components/ui/States";
@@ -44,9 +43,9 @@ export default function UserDetailPage() {
             : undefined
         }
         actions={
-          <Button href="/users" as="span" size="sm" icon={<ArrowLeft className="size-3.5" />} onClick={undefined} asChild={false}>
-            <Link href="/users">Listeye dön</Link>
-          </Button>
+          <LinkButton href="/users" size="sm" icon={<ArrowLeft className="size-3.5" />}>
+            Listeye dön
+          </LinkButton>
         }
       />
 

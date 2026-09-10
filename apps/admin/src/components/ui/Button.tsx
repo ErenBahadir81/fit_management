@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 
@@ -83,3 +84,33 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     </button>
   );
 });
+
+export interface LinkButtonProps {
+  href: string;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  icon?: React.ReactNode;
+  iconRight?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}
+
+/** A Link that looks exactly like a Button — navigation must stay a real anchor. */
+export function LinkButton({ href, variant = "secondary", size = "md", icon, iconRight, className, children }: LinkButtonProps) {
+  return (
+    <Link
+      href={href}
+      className={cx(
+        "inline-flex items-center justify-center font-medium whitespace-nowrap select-none",
+        "transition-[background-color,border-color,color] duration-[140ms] ease-out",
+        VARIANTS[variant],
+        SIZES[size],
+        className
+      )}
+    >
+      {icon}
+      {children}
+      {iconRight}
+    </Link>
+  );
+}
