@@ -1,11 +1,10 @@
 import { createApiClient, type ApiClient } from "@fitfloow/api-client";
-import { createFakeApiClient } from "./fake/client";
 
 /**
- * `process.env.NEXT_PUBLIC_API_FAKE` is inlined by Next at build time. Both branches below
- * test the inlined literal directly (not a captured variable) so the comparison folds to a
- * constant and the unused branch — plus the side-effect-free `./fake/client` module it
- * references — is dropped from the default (real-client) bundle.
+ * `process.env.NEXT_PUBLIC_API_FAKE` is inlined by Next at build time, so the branch below
+ * folds to a constant. The in-memory fake is reached only through a dynamic `import()`
+ * inside the dead branch, which keeps its seed data in a separate chunk that the default
+ * (real-client) build never references — a plain static import was not being shaken out.
  */
 export const USE_FAKE_API = process.env.NEXT_PUBLIC_API_FAKE === "1";
 
@@ -26,10 +25,37 @@ function createRealClient(): ApiClient {
   });
 }
 
+type Leaf = (...args: unknown[]) => Promise<unknown>;
+
+/**
+ * Every `ApiClient` method returns a promise, so a namespace proxy can defer loading the
+ * fake until the first call: `api.admin.users()` resolves the module, walks to the method
+ * and forwards the arguments.
+ */
+function createLazyFakeClient(): ApiClient {
+  let loading: Promise<ApiClient> | null = null;
+  const load = () => {
+    loading ??= import("./fake/client").then((m) => m.createFakeApiClient({ latencyMs: 320, signedIn: true }));
+    return loading;
+  };
+
+  const node = (path: string[]): unknown =>
+    new Proxy(function noop() {} as object, {
+      get: (_target, prop) => (typeof prop === "string" ? node([...path, prop]) : undefined),
+      apply: async (_target, _thisArg, args: unknown[]) => {
+        const fake = await load();
+        let cursor: unknown = fake;
+        for (const key of path) cursor = (cursor as Record<string, unknown>)[key];
+        return (cursor as Leaf)(...args);
+      },
+    });
+
+  return node([]) as ApiClient;
+}
+
 export function getApi(): ApiClient {
   if (client) return client;
-  client =
-    process.env.NEXT_PUBLIC_API_FAKE === "1" ? createFakeApiClient({ latencyMs: 320, signedIn: true }) : createRealClient();
+  client = process.env.NEXT_PUBLIC_API_FAKE === "1" ? createLazyFakeClient() : createRealClient();
   return client;
 }
 
