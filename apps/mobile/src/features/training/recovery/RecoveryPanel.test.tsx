@@ -7,7 +7,7 @@ import { createFakeApi } from "../../../lib/fake";
 import { trainingKeys } from "../queries";
 import { RecoveryPanel } from "./RecoveryPanel";
 
-jest.mock("expo-router", () => require("../../../../__tests__/mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../../../__tests__/mocks/expo-router"));
 
 async function mount(latencyMs = 0) {
   const api = createFakeApi({ latencyMs, signedIn: true });

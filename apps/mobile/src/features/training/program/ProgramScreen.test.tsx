@@ -9,7 +9,7 @@ import { trainingState, withCompletedToday, withEmptyHistory, withRestDay, witho
 import { trainingKeys } from "../queries";
 import { ProgramScreen } from "./ProgramScreen";
 
-jest.mock("expo-router", () => require("../../../../__tests__/mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../../../__tests__/mocks/expo-router"));
 
 async function signIn(api: ReturnType<typeof createFakeApi>) {
   useSession.setState({ status: "signedIn", user: (await api.auth.me()).user });

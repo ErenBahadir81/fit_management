@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useRouter } from "expo-router";
@@ -41,10 +41,10 @@ export function WeeklyReportScreen({ initialWeek }: WeeklyReportScreenProps) {
   const history = useReportHistory();
   const { prev, next } = adjacentWeeks(weekKey, today, measurementDay);
 
-  const select = useCallback((key: string) => setWeek(key === currentKey ? CURRENT_WEEK : key), [currentKey]);
-  const goPrev = useCallback(() => select(prev), [select, prev]);
-  const goNext = useMemo(() => (next ? () => select(next) : null), [next, select]);
-  const goGoal = useCallback(() => router.push(q.data?.goal ? "/(modals)/goal/roadmap" : "/(modals)/goal/setup"), [router, q.data?.goal]);
+  const select = (key: string) => setWeek(key === currentKey ? CURRENT_WEEK : key);
+  const goPrev = () => select(prev);
+  const goNext = next ? () => select(next) : null;
+  const goGoal = () => router.push(q.data?.goal ? "/(modals)/goal/roadmap" : "/(modals)/goal/setup");
 
   // Switching weeks keeps the previous page visible, dimmed, until the new one lands (no skeleton flash).
   const dim = useSharedValue(1);

@@ -99,7 +99,7 @@ function detection(state: FakeState, id: string, confidence: number, grams: numb
 
 /** Deterministic scan answers for the demo: a full plate, one dish, or "this isn't food". */
 export function fakeScanResult(state: FakeState, scenario: ScanScenario = "plate", seq = 1): ScanResultDTO {
-  const picks: Array<[string, number, number]> =
+  const picks: [string, number, number][] =
     scenario === "single" ? [["f_iskender", 0.91, 250]] : scenario === "notFood" ? [] : [
       ["f_tavuk", 0.86, 150],
       ["f_pilav", 0.63, 150],

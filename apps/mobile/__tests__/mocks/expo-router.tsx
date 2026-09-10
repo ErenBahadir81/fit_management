@@ -1,4 +1,4 @@
-/* Minimal expo-router mock for screen tests: `jest.mock("expo-router", () => require("../mocks/expo-router"))`. */
+/* Minimal expo-router mock for screen tests: `jest.mock("expo-router", () => jest.requireActual("../mocks/expo-router"))`. */
 import React from "react";
 import { View } from "react-native";
 

@@ -25,7 +25,6 @@ import { useInvalidateHome } from "../home/useHome";
 import { REPORT_KEYS } from "../reports/useReport";
 import { getApi } from "../../lib/api";
 import { todayKey } from "../../lib/dates";
-import { FAKE_API } from "../../lib/env";
 import { describeError } from "../../lib/errors";
 import { useToast } from "../../ui/Toast";
 import { addEntryToDay, makeOptimisticEntry, removeEntryFromDay, replaceEntryInDay, updateEntryInDay, type DraftEntry } from "./model/day";
@@ -51,7 +50,8 @@ type NutritionFakeModule = typeof import("../../lib/fake/nutritionFake");
 type FakeStateOf = Parameters<NutritionFakeModule["findByBarcode"]>[0];
 
 function nutritionFake(): { mod: NutritionFakeModule; state: FakeStateOf } | null {
-  if (!FAKE_API) return null;
+  // Inlined per file by Metro (see lib/api.ts) so the fixtures are stripped from production bundles.
+  if (process.env.EXPO_PUBLIC_API_FAKE !== "1") return null;
   const state = (getApi() as { fake?: FakeStateOf }).fake;
   if (!state) return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports

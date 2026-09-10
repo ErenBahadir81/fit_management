@@ -1,5 +1,6 @@
 import React from "react";
-import { Ionicons } from "@expo/vector-icons";
+// The family file, not the package index: the index pulls every glyph map (~15 families) into the bundle.
+import Ionicons from "@expo/vector-icons/Ionicons";
 import type { ThemeColors } from "../theme/tokens";
 import { useTheme } from "../theme/ThemeProvider";
 

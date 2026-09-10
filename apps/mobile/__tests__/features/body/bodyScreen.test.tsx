@@ -9,12 +9,14 @@ import { BODY_KEYS } from "../../../src/features/body/useBody";
 import { weighInDefault } from "../../../src/features/body/bodyMath";
 import { useSession } from "../../../src/features/auth/session";
 import { setApi } from "../../../src/lib/api";
+import { todayKey } from "../../../src/lib/dates";
 import { createFakeApi } from "../../../src/lib/fake";
 import { fmtNumber, fmtPct } from "../../../src/lib/format";
 
-jest.mock("expo-router", () => require("../../mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../mocks/expo-router"));
 
-const TODAY = "2026-09-10";
+// The screens read the real Türkiye clock, so the fake must run on it too (pinning a date breaks at midnight).
+const TODAY = todayKey();
 const makeApi = (latencyMs = 0) => createFakeApi({ latencyMs, signedIn: true, today: () => TODAY });
 
 describe("BodyScreen", () => {

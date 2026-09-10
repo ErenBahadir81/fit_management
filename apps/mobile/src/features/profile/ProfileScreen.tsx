@@ -35,7 +35,7 @@ export function ProfileScreen() {
   const signOut = useSession((s) => s.signOut);
   const { colors, mode, setMode } = useTheme();
   const update = useUpdateMe();
-  const birth = useSheet();
+  const { ref: birthRef, present: openBirth, dismiss: closeBirth } = useSheet();
   const [birthDraft, setBirthDraft] = useState("");
   const [birthError, setBirthError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -53,7 +53,7 @@ export function ProfileScreen() {
     if (!isDateKey(v)) return setBirthError("YYYY-AA-GG biçiminde gir (örn. 1996-04-12).");
     setBirthError(null);
     update.mutate({ birthDate: v });
-    birth.dismiss();
+    closeBirth();
   };
 
   return (
@@ -125,7 +125,7 @@ export function ProfileScreen() {
             onPress={() => {
               setBirthDraft(user.birthDate ?? "");
               setBirthError(null);
-              birth.present();
+              openBirth();
             }}
             testID="birth-row"
           />
@@ -160,10 +160,10 @@ export function ProfileScreen() {
         {env.fakeApi ? " · demo modu" : ""}
       </Text>
 
-      <Sheet ref={birth.ref} title="Doğum tarihi">
+      <Sheet ref={birthRef} title="Doğum tarihi">
         <TextField label="Tarih" value={birthDraft} onChangeText={setBirthDraft} placeholder="1996-04-12" keyboardType="numbers-and-punctuation" error={birthError} hint="Yaş, bazal metabolizma hesabında kullanılır." testID="birth-input" />
         <SheetActions>
-          <Button label="Vazgeç" variant="ghost" onPress={birth.dismiss} style={styles.flex} />
+          <Button label="Vazgeç" variant="ghost" onPress={closeBirth} style={styles.flex} />
           <Button label="Kaydet" onPress={saveBirth} style={styles.flex} />
         </SheetActions>
       </Sheet>

@@ -46,7 +46,7 @@ export function BodyScreen() {
   const goalQ = useGoalView();
   const reportQ = useWeeklyReport(CURRENT_WEEK);
   const del = useDeleteBodyEntry();
-  const sheet = useSheet();
+  const { ref: measureRef, present: openMeasure } = useSheet();
   const tabSpace = useTabBarSpace();
 
   const rows = useMemo<Row[]>(() => {
@@ -93,10 +93,10 @@ export function BodyScreen() {
             data={rows}
             keyExtractor={keyOf}
             renderItem={renderItem}
-            ListHeaderComponent={<BodyHeader summary={summary} trendsData={trendsQ.data} goal={goalQ.data} report={reportQ.data} entries={entriesQ.data} onAdd={sheet.present} onGoal={goGoal} onReport={goReport} />}
+            ListHeaderComponent={<BodyHeader summary={summary} trendsData={trendsQ.data} goal={goalQ.data} report={reportQ.data} entries={entriesQ.data} onAdd={openMeasure} onGoal={goGoal} onReport={goReport} />}
             ListEmptyComponent={
               entriesQ.data ? (
-                <EmptyState compact illustration={<Floo mood="sleepy" size="s" />} title="Henüz ölçüm yok" body="Boyun ve bel ölçüsüyle yağ oranını hesaplayalım." action={{ label: "Ölçüm ekle", onPress: sheet.present, icon: "add" }} />
+                <EmptyState compact illustration={<Floo mood="sleepy" size="s" />} title="Henüz ölçüm yok" body="Boyun ve bel ölçüsüyle yağ oranını hesaplayalım." action={{ label: "Ölçüm ekle", onPress: openMeasure, icon: "add" }} />
               ) : null
             }
             contentContainerStyle={contentStyle}
@@ -106,7 +106,7 @@ export function BodyScreen() {
           />
         ) : null}
       </Reveal>
-      <MeasureSheet ref={sheet.ref} profile={profile} defaults={{ weightKg: weighInDefault(summary), neckCm: latest?.neckCm ?? null, waistCm: latest?.waistCm ?? null, hipCm: latest?.hipCm ?? null }} />
+      <MeasureSheet ref={measureRef} profile={profile} defaults={{ weightKg: weighInDefault(summary), neckCm: latest?.neckCm ?? null, waistCm: latest?.waistCm ?? null, hipCm: latest?.hipCm ?? null }} />
     </Screen>
   );
 }

@@ -20,8 +20,9 @@ import { LineTrend, RingChart, BarWeek, Sparkline } from "@/charts";
 2. **Staggered entry.** Wrap each card in `<Entry index={i}>` (30 ms stagger, capped at 6, reduced-motion aware).
 3. **One primary action per screen** (`<Button variant="primary">`). Everything else is `secondary` / `ghost`.
 4. **Every number is `tabular`.** `<Text tabular>` + format via `src/lib/format.ts` (`fmtKg`, `fmtPct`, `fmtKcal`, `fmtDate`, `fmtDelta`, `fmtDuration`).
-5. **Feedback is immediate.** `Pressable` already scales 0.97 + light haptic; mutations are optimistic (`onMutate` → rollback in `onError` + `useToast().show({kind:"error"})`); success = `haptic.success()` (+ `<SuccessCheck/>` for big moments). Never `Alert`.
-6. **Pull-to-refresh** on every data screen (`<Screen onRefresh>`), FlashList for long lists (`<Screen scroll={false}>` + `FlashList`), expo-image with `cachePolicy="memory-disk"`.
+5. **Feedback is immediate.** `Pressable` already scales 0.97 + light haptic; mutations are optimistic (`onMutate` → rollback in `onError` + `useToast().show({ message: describeError(e, "…"), kind: "error" })` so offline gets its own sentence). Haptic vocabulary: `tap` press-in · `select` for choices (chips, tabs, pickers) · `medium` for confirmations (a completed set, a swipe-delete) · `success`/`warning`/`error` notifications. A big moment shows `<SuccessCheck/>`, which fires the success buzz itself — don't add a second one in the mutation. Never `Alert`.
+6. **Pull-to-refresh** on every data screen (`<Screen onRefresh>`; FlashList screens pass `refreshControl={<ListRefreshControl …/>}`), FlashList for long lists (`<Screen scroll={false}>` + `FlashList`, `memo` rows, `useCallback` renderItem, no inline style objects), expo-image with `cachePolicy="memory-disk"`.
+8. **Destructive = swipe + undo.** Rows wrap in `SwipeToDelete` (short swipe reveals a tappable "Sil", long swipe commits); the screen keeps a 5 s `UndoBar` through `useUndoWindow` (`src/lib`). Every row also exposes a `delete` accessibility action.
 7. **Turkish copy, short and warm.** Sentence case, no exclamation spam, Floo's voice comes from the API.
 
 ## Theme (`src/theme`)
@@ -29,7 +30,7 @@ import { LineTrend, RingChart, BarWeek, Sparkline } from "@/charts";
 |---|---|
 | `useTheme()` | `{ colors, scheme, isDark, mode, setMode, spacing, radii, type, shadows }`. Throws outside `ThemeProvider` (root layout provides it). |
 | `useThemedStyles(t => ({...}))` | memoised style factory on the current scheme. |
-| `colors.*` | semantic only: `bg surface surfaceElevated surfaceMuted ink inkMuted inkSubtle inkInverse primary primaryStrong primarySoft onPrimary gradient success/successSoft warning/warningSoft danger/dangerSoft border borderStrong overlay skeleton skeletonHighlight ringTrack chartGrid tabBar` |
+| `colors.*` | semantic only: `bg surface surfaceElevated surfaceMuted ink inkMuted inkSubtle inkInverse primary primaryStrong primarySoft onPrimary onPrimaryMuted onPrimaryBorder gradient success/successSoft warning/warningSoft danger/dangerSoft border borderStrong overlay skeleton skeletonHighlight ringTrack chartGrid tabBar`. On a `Card variant="primary"` use `<Text color="onPrimary">` / `"onPrimaryMuted"` — never a raw white. |
 | `spacing` | 4-pt grid `xxs 2 · xs 4 · sm 8 · md 12 · lg 16 · xl 20 · xxl 24 · xxxl 32 · huge 48`, `gutter 20`, `cardPad 20`, `touch 44` |
 | `radii` | `xs 6 · sm 10 · control 14 · md 18 · card 24 · sheet 28 · pill 999` |
 | `type` | `caption 11 · label 13 · body 15 · bodyStrong 15 · title 17 · heading 22 · display 28 · hero 40` |
@@ -78,9 +79,11 @@ Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`ti
 - **`Skeleton`** `{ width, height, radius=8, circle }`, **`SkeletonText`** `{ lines, lineHeight, lastWidth }`, **`SkeletonGroup`** — 1.2 s diagonal shimmer, hidden from screen readers (query with `includeHiddenElements: true` in tests).
 
 ### Sheets & navigation
-- **`Sheet`** (gorhom v5) `{ title?, padded=true, ...BottomSheetModalProps }` + `useSheet()` → `{ ref, present, dismiss }`; **`SheetActions`** button row. Dynamic sizing, dimmed backdrop, drag handle, keyboard-aware (`interactive`). Inside a sheet use `BottomSheetTextInput` from gorhom for inputs that must stay above the keyboard, or our `TextField` for simple forms. Full-screen flows (camera, workout logger) are **routes** under `app/(modals)/` instead: `router.push("/(modals)/scan")`.
+- **`Sheet`** (gorhom v5) `{ title?, padded=true, open?, ...BottomSheetModalProps }` + `useSheet()` → `{ ref, present, dismiss }`; **`SheetActions`** button row. Dynamic sizing, dimmed backdrop, drag handle, keyboard-aware (`interactive`), one `gentle` spring for every sheet. Two ways to drive it: imperative (`useSheet` — **destructure** it, `const { ref: birthRef, present: openBirth } = useSheet()`, when the ref feeds a JSX `ref`; the React Compiler lint flags `<Sheet ref={sheet.ref}>`), or declarative for sheets that mount on demand (`<Sheet open onDismiss={unmount}>`, presents on mount). Inside a sheet use `BottomSheetTextInput` from gorhom for inputs that must stay above the keyboard, or our `TextField` for simple forms. Full-screen flows (camera, workout logger) are **routes** under `app/(modals)/` instead: `router.push("/(modals)/scan")`.
+- **`SwipeToDelete`** `{ onDelete, deleteTestID?, deleteLabel?, radius?, enabled? }` — the one swipe-to-delete (UI-thread pan; short swipe snaps open on a tappable "Sil", long swipe / fling commits; the action stays in the a11y tree).
+- **`UndoBar`** `{ message, onUndo, bottom }` — "Silindi · Geri al" bar above the tab bar; pair with `useUndoWindow(onCommit)` from `src/lib` (5 s window, commits on expiry / replacement / unmount, never on undo).
+- **`ListRefreshControl`** `{ refreshing, onRefresh }` — themed pull-to-refresh for FlashList / ScrollView screens.
 - **`TabBar`** / **`RouterTabBar`** — floating pill bar, spring indicator, selection haptic. `TAB_ITEMS` defines the 5 tabs; `useTabBarSpace()` gives the bottom clearance for custom scroll containers.
-- **`PlaceholderScreen`** — temporary; replace the route file's default export with your screen.
 
 ## Mascot (`src/mascot`)
 - **`Floo`** `{ mood: "happy"|"cheer"|"think"|"sleepy"|"flex"|"worried", size: "s"(56)|"m"(96)|"l"(160)|number, animate=true }` — SVG flame-drop; idle breathing, random blink (3–5 s), flame-tip sway; mood = spring pose transition (`MOOD_POSE`). Set `animate={false}` in lists.
@@ -99,18 +102,20 @@ Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`ti
 - **`queryClient`** — 30 s stale, 7 d gc, offline-first, MMKV-persisted (`AppQueryProvider`). Key convention: `["home"]`, `["program"]`, `["nutrition","day",dateKey]`… After a mutation call `useInvalidateHome()` (in `features/home/useHome.ts`) so the home composite refreshes.
 - **`useSession()`** (zustand) — `status`, `user`, `signIn`, `setUser`, `signOut`, `boot`. `useSession(s => s.user)` for the profile.
 - **`haptic`** — `tap / select / medium / success / warning / error` (no-ops on web, never throw).
-- **`storage`** (MMKV) + `getJSON/setJSON`; **`STORAGE_KEYS`** — register new keys there.
+- **`storage`** (MMKV) + `getJSON/setJSON`; **`STORAGE_KEYS`** — register new keys there (theme, session user, query cache, web tokens, workout draft).
+- **`describeError(e, fallback)`** (`src/lib/errors.ts`) — the toast sentence for a failed write: offline / 429 / 503 get their own copy.
 - **`format.ts`**, **`dates.ts`** (`todayKey`, `greetingFor`, `relativeDayLabel`, `weekdayName/Short`).
 
 ## Testing recipes (`__tests__/helpers.tsx`, `__tests__/mocks/expo-router.tsx`)
 ```tsx
 import { renderUI, makeQueryClient } from "../helpers";          // Theme + Query + Toast providers
-jest.mock("expo-router", () => require("../mocks/expo-router")); // mockRouter.push/replace spies
+jest.mock("expo-router", () => jest.requireActual("../mocks/expo-router")); // mockRouter.push/replace spies
 setApi(createFakeApi({ latencyMs: 0, signedIn: true }));          // deterministic data, no network
 await renderUI(<MyScreen />, { queryClient: makeQueryClient() }); // ALL RNTL calls are async — await fireEvent too
 ```
 Fake timers + `jest.advanceTimersByTime()` inside `act` drive reanimated springs; assert with `toHaveAnimatedStyle`.
 Skeletons/sparklines are a11y-hidden → `getByTestId(id, { includeHiddenElements: true })`.
+FlashList, expo-camera and expo-image are mocked globally in `jest.setup.js` (lists render eagerly); screens read the real Türkiye clock, so fixtures use `todayKey()` — never a pinned date.
 
 ## Do / Don't
 - Do reuse `Card` + `Text` + `Chip` combos; the home cards (`features/home/components/*`) are reference implementations.

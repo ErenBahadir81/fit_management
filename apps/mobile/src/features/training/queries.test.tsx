@@ -17,7 +17,7 @@ import {
   useWorkouts,
 } from "./queries";
 
-jest.mock("expo-router", () => require("../../../__tests__/mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../../__tests__/mocks/expo-router"));
 
 function api() {
   const client = createFakeApi({ latencyMs: 0, signedIn: true });

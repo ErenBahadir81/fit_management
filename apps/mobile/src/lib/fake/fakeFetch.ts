@@ -108,9 +108,10 @@ export interface FakeFetchOptions {
 }
 
 export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { state: FakeState } {
-  const state = opts.state ?? createFakeState();
-  const latency = opts.latencyMs ?? 350;
   const today = opts.today ?? (() => trDateKey());
+  // Fixtures are built for the same "today" the routes answer with, so an injected clock is coherent.
+  const state = opts.state ?? createFakeState(today());
+  const latency = opts.latencyMs ?? 350;
   let tokenSeq = 1;
 
   const issueTokens = () => {
@@ -179,7 +180,7 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   };
 
   /* ------------------------------ routes ------------------------------ */
-  const routes: Array<{ method: string; pattern: string[]; auth: boolean; handler: Handler }> = [];
+  const routes: { method: string; pattern: string[]; auth: boolean; handler: Handler }[] = [];
   const on = (method: string, path: string, handler: Handler, auth = true) => routes.push({ method, pattern: path.split("/").filter(Boolean), auth, handler });
 
   // auth

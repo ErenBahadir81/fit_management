@@ -11,7 +11,7 @@ import { createLoggerState, loggerReducer, type LoggerState } from "../lib/logge
 import { WORKOUT_DRAFT_KEY } from "./useWorkoutSession";
 import { WorkoutScreen } from "./WorkoutScreen";
 
-jest.mock("expo-router", () => require("../../../../__tests__/mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../../../__tests__/mocks/expo-router"));
 
 async function mount(state?: ReturnType<typeof trainingState>) {
   const api = createFakeApi({ latencyMs: 0, signedIn: true, state });

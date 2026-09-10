@@ -17,20 +17,22 @@ export interface RevealProps extends ViewProps {
 export function Reveal({ ready, skeleton, children, style, ...rest }: RevealProps) {
   // Fixed on first render: whether this mount ever painted the skeleton (drives the crossfade).
   const [showedSkeleton] = useState(!ready);
-  const [overlay, setOverlay] = useState(false);
+  // Flips once the skeleton overlay has faded out (set from the animation callback, never in render).
+  const [faded, setFaded] = useState(false);
   const opacity = useSharedValue(1);
+  const overlay = showedSkeleton && ready && !faded;
 
   useEffect(() => {
-    if (ready && showedSkeleton) {
-      setOverlay(true);
-      opacity.value = 1;
-      opacity.value = withTiming(0, { duration: durations.base, easing: easeOut }, (finished) => {
-        if (finished) runOnJS(setOverlay)(false);
-      });
-    }
-  }, [ready, opacity, showedSkeleton]);
+    if (!overlay) return;
+    opacity.set(1);
+    opacity.set(
+      withTiming(0, { duration: durations.base, easing: easeOut }, (finished) => {
+        if (finished) runOnJS(setFaded)(true);
+      })
+    );
+  }, [overlay, opacity]);
 
-  const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.get() }));
 
   if (!ready) {
     return (

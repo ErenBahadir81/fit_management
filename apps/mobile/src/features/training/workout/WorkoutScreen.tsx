@@ -40,6 +40,9 @@ import { FinishSheet } from "./FinishSheet";
 import { RestTimer, mmss } from "./RestTimer";
 import { clearDraft, useWorkoutSession } from "./useWorkoutSession";
 
+/** How long the "Antrenman kaydedildi" moment stays before the modal closes itself. */
+const SAVED_MS = 1400;
+
 /** Full-screen set-by-set logger. Route: `/(modals)/workout`. */
 export function WorkoutScreen() {
   const router = useRouter();
@@ -56,10 +59,12 @@ export function WorkoutScreen() {
 
   const finishSheet = useSheet();
   const addSheet = useSheet();
-  const leaveSheet = useSheet();
+  const { ref: leaveRef, present: presentLeave, dismiss: dismissLeave } = useSheet();
   const pager = useRef<ScrollView>(null);
   const [saved, setSaved] = useState(false);
   const noticed = useRef(false);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => void (leaveTimer.current && clearTimeout(leaveTimer.current)), []);
 
   useEffect(() => {
     if (restored && !noticed.current) {
@@ -113,19 +118,19 @@ export function WorkoutScreen() {
         clearDraft();
         finishSheet.dismiss();
         setSaved(true);
-        setTimeout(() => router.back(), 1400);
+        leaveTimer.current = setTimeout(() => router.back(), SAVED_MS);
       },
     });
   }, [complete, finishSheet, router, state]);
 
   const leave = useCallback(() => {
     if (state && hasAnything(state)) {
-      leaveSheet.present();
+      presentLeave();
       return;
     }
     clearDraft();
     router.back();
-  }, [leaveSheet, router, state]);
+  }, [presentLeave, router, state]);
 
   if (saved) return <SavedState />;
 
@@ -276,7 +281,7 @@ export function WorkoutScreen() {
         onCancel={finishSheet.dismiss}
       />
       <AddExerciseSheet sheetRef={addSheet.ref} onPick={addExercise} />
-      <Sheet ref={leaveSheet.ref} title="Antrenmandan çık">
+      <Sheet ref={leaveRef} title="Antrenmandan çık">
         <Text variant="body" color="inkMuted" testID="leave-sheet">
           Kaydettiğin setler cihazında saklanır; geri döndüğünde kaldığın yerden devam edersin.
         </Text>
@@ -286,7 +291,7 @@ export function WorkoutScreen() {
             variant="danger"
             onPress={() => {
               clearDraft();
-              leaveSheet.dismiss();
+              dismissLeave();
               router.back();
             }}
             style={styles.grow}
@@ -296,7 +301,7 @@ export function WorkoutScreen() {
             label="Sakla ve çık"
             variant="secondary"
             onPress={() => {
-              leaveSheet.dismiss();
+              dismissLeave();
               router.back();
             }}
             style={styles.grow}

@@ -1,6 +1,6 @@
 import React from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
-import { shiftKey } from "@fitfloow/core";
+import { shiftKey, weekKeyFor } from "@fitfloow/core";
 import { makeQueryClient, renderUI } from "../../helpers";
 import { mockRouter } from "../../mocks/expo-router";
 import { WeeklyReportScreen } from "../../../src/features/reports/WeeklyReportScreen";
@@ -8,13 +8,15 @@ import { REPORT_KEYS } from "../../../src/features/reports/useReport";
 import { deficitSentence, weekLabel } from "../../../src/features/reports/reportMath";
 import { useSession } from "../../../src/features/auth/session";
 import { setApi } from "../../../src/lib/api";
+import { todayKey } from "../../../src/lib/dates";
 import { createFakeApi } from "../../../src/lib/fake";
 import { fmtKcal, fmtKg } from "../../../src/lib/format";
 
-jest.mock("expo-router", () => require("../../mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../mocks/expo-router"));
 
-const TODAY = "2026-09-10";
-const CURRENT = "2026-09-06";
+// Real Türkiye clock (the screen uses it for the week switcher); the demo user's week starts on Sunday.
+const TODAY = todayKey();
+const CURRENT = weekKeyFor(TODAY, 0);
 const makeApi = () => createFakeApi({ latencyMs: 0, signedIn: true, today: () => TODAY });
 
 describe("WeeklyReportScreen", () => {

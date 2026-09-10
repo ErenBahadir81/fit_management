@@ -1,6 +1,7 @@
 import React from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as Haptics from "expo-haptics";
+import { shiftKey } from "@fitfloow/core";
 import { makeQueryClient, renderUI } from "../../helpers";
 import { mockRouter } from "../../mocks/expo-router";
 import { GoalSetupScreen } from "../../../src/features/goals/GoalSetupScreen";
@@ -8,12 +9,14 @@ import { RoadmapScreen } from "../../../src/features/goals/RoadmapScreen";
 import { defaultTarget, instantPlan } from "../../../src/features/goals/goalMath";
 import { useSession } from "../../../src/features/auth/session";
 import { setApi } from "../../../src/lib/api";
+import { todayKey } from "../../../src/lib/dates";
 import { createFakeApi } from "../../../src/lib/fake";
 import { fmtPct } from "../../../src/lib/format";
 
-jest.mock("expo-router", () => require("../../mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../mocks/expo-router"));
 
-const TODAY = "2026-09-10";
+// Real Türkiye clock: the screens use it for "today", so a pinned date would drift at midnight.
+const TODAY = todayKey();
 const makeApi = () => createFakeApi({ latencyMs: 0, signedIn: true, today: () => TODAY });
 const a11y = (el: ReturnType<typeof screen.getByTestId>, actionName: string) => fireEvent(el, "accessibilityAction", { nativeEvent: { actionName } });
 
@@ -73,7 +76,7 @@ describe("GoalSetupScreen", () => {
     await a11y(screen.getByTestId("goal-slider"), "decrement");
     await fireEvent.press(screen.getByText("Hedefi güncelle"));
     await waitFor(() => expect(api.fake.goal?.targetBodyFatPct).toBe(14.5));
-    expect(api.fake.goal?.start.dateKey).toBe("2026-08-13"); // start preserved
+    expect(api.fake.goal?.start.dateKey).toBe(shiftKey(TODAY, -28)); // start preserved (seeded 4 weeks ago)
     await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
   });
 

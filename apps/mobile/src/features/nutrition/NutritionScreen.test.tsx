@@ -10,13 +10,13 @@ import { createNutritionFakeApi } from "../../lib/fake/nutritionFake";
 import { NutritionScreen } from "./NutritionScreen";
 import { nutritionDayKey } from "./useNutrition";
 
-jest.mock("expo-router", () => require("../../../__tests__/mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../../__tests__/mocks/expo-router"));
 
 /** Barcode reading needs the native camera: stand in for it and keep the last props to drive scans. */
 let cameraProps: { onBarcodeScanned?: (r: { data: string; type: string }) => void } = {};
 jest.mock("expo-camera", () => {
-  const React2 = require("react");
-  const { View } = require("react-native");
+  const React2 = jest.requireActual("react");
+  const { View } = jest.requireActual("react-native");
   return {
     CameraView: (props: Record<string, unknown>) => {
       cameraProps = props as typeof cameraProps;

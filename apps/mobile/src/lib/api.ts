@@ -1,6 +1,6 @@
 import { createApiClient, type ApiClient, type FetchLike } from "@fitfloow/api-client";
 import { createSecureTokenStore } from "./auth";
-import { FAKE_API, env } from "./env";
+import { env } from "./env";
 
 /** The app-wide token store (secure). Also used by the FakeApi in demo mode so logins persist. */
 export const tokenStore = createSecureTokenStore();
@@ -32,8 +32,9 @@ let client: ApiClient | null = null;
 /** The client every feature uses. Lazily created; `EXPO_PUBLIC_API_FAKE=1` swaps in the in-memory FakeApi. */
 export function getApi(): ApiClient {
   if (!client) {
-    if (FAKE_API) {
-      // Required lazily behind the inlined flag so the fake never reaches a production bundle.
+    // `process.env.EXPO_PUBLIC_*` is inlined by Metro *per file*; testing it here (not via `env`) lets
+    // the minifier drop this branch — and the whole in-memory FakeApi — from production bundles.
+    if (process.env.EXPO_PUBLIC_API_FAKE === "1") {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { createFakeApi } = require("./fake") as typeof import("./fake");
       client = createFakeApi({ tokens: tokenStore });

@@ -7,7 +7,7 @@ import { setApi } from "../../src/lib/api";
 import { createFakeApi } from "../../src/lib/fake";
 import { storage } from "../../src/lib/storage";
 
-jest.mock("expo-router", () => require("../mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../mocks/expo-router"));
 
 describe("ProfileScreen", () => {
   let api: ReturnType<typeof createFakeApi>;

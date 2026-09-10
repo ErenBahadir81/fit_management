@@ -9,11 +9,11 @@ import { createNutritionFakeApi, type NutritionFakeOptions } from "../../../lib/
 import { MIN_ANALYZE_MS, STATUS_STEP_MS } from "../model/scanMachine";
 import { ScanScreen } from "./ScanScreen";
 
-jest.mock("expo-router", () => require("../../../../__tests__/mocks/expo-router"));
+jest.mock("expo-router", () => jest.requireActual("../../../../__tests__/mocks/expo-router"));
 
 jest.mock("expo-camera", () => {
-  const React2 = require("react");
-  const { View } = require("react-native");
+  const React2 = jest.requireActual("react");
+  const { View } = jest.requireActual("react-native");
   const CameraView = React2.forwardRef(function CameraView(props: Record<string, unknown>, ref: React.Ref<unknown>) {
     React2.useImperativeHandle(ref, () => ({
       takePictureAsync: async () => ({ uri: "file://photo.jpg", width: 800, height: 600, format: "jpg" }),
@@ -28,8 +28,8 @@ jest.mock("expo-image-picker", () => ({
 }));
 
 jest.mock("expo-image", () => {
-  const React2 = require("react");
-  const { View } = require("react-native");
+  const React2 = jest.requireActual("react");
+  const { View } = jest.requireActual("react-native");
   return { Image: (props: Record<string, unknown>) => React2.createElement(View, props) };
 });
 
@@ -38,7 +38,7 @@ jest.mock("expo-image", () => {
  * Stand in for the RN implementation so `api.nutrition.scan()` behaves the way it does on device.
  */
 class RNFormData {
-  readonly parts: Array<[string, unknown, string | undefined]> = [];
+  readonly parts: [string, unknown, string | undefined][] = [];
   append(name: string, value: unknown, filename?: string) {
     this.parts.push([name, value, filename]);
   }

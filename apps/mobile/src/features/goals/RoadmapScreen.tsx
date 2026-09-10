@@ -42,8 +42,8 @@ export function RoadmapScreen() {
   const recal = useRecalibrateGoal();
   const abandon = useAbandonGoal();
   const complete = useCompleteGoal();
-  const recalSheet = useSheet();
-  const menu = useSheet();
+  const { ref: recalRef, present: presentRecal, dismiss: dismissRecal } = useSheet();
+  const { ref: menuRef, present: presentMenu, dismiss: dismissMenu } = useSheet();
   const [recalResult, setRecalResult] = useState<Recalibration | null>(null);
   const today = todayKey();
 
@@ -56,14 +56,14 @@ export function RoadmapScreen() {
     recal.mutate(undefined, {
       onSuccess: ({ recalibration }) => {
         setRecalResult(recalibration);
-        recalSheet.present();
+        presentRecal();
       },
     });
-  }, [recal, recalSheet]);
+  }, [presentRecal, recal]);
   const onEdit = useCallback(() => {
-    menu.dismiss();
+    dismissMenu();
     router.push({ pathname: "/(modals)/goal/setup", params: { mode: "edit" } });
-  }, [menu, router]);
+  }, [dismissMenu, router]);
   const onComplete = useCallback(() => complete.mutate(undefined, { onSuccess: () => router.back() }), [complete, router]);
   const onAbandon = useCallback(() => abandon.mutate(undefined, { onSuccess: () => router.back() }), [abandon, router]);
 
@@ -87,7 +87,7 @@ export function RoadmapScreen() {
   return (
     <Screen scroll={false} tabBar={false}>
       <View style={styles.headerWrap}>
-        <Header title="Yol haritası" compact left={{ icon: "close", label: "Kapat", onPress: () => router.back() }} right={{ icon: "ellipsis-horizontal", label: "Daha fazla", onPress: menu.present, testID: "roadmap-menu" }} />
+        <Header title="Yol haritası" compact left={{ icon: "close", label: "Kapat", onPress: () => router.back() }} right={{ icon: "ellipsis-horizontal", label: "Daha fazla", onPress: presentMenu, testID: "roadmap-menu" }} />
       </View>
       <Reveal ready={Boolean(goal)} skeleton={<RoadmapSkeleton />} style={styles.flex}>
         {goal ? (
@@ -107,8 +107,8 @@ export function RoadmapScreen() {
           />
         ) : null}
       </Reveal>
-      <RecalibrateSheet ref={recalSheet.ref} result={recalResult} onClose={recalSheet.dismiss} />
-      <RoadmapMenuSheet ref={menu.ref} onEdit={onEdit} onComplete={onComplete} onAbandon={onAbandon} busy={abandon.isPending || complete.isPending} />
+      <RecalibrateSheet ref={recalRef} result={recalResult} onClose={dismissRecal} />
+      <RoadmapMenuSheet ref={menuRef} onEdit={onEdit} onComplete={onComplete} onAbandon={onAbandon} busy={abandon.isPending || complete.isPending} />
     </Screen>
   );
 }

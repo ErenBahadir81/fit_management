@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
+import Animated, { Easing, cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { spacing } from "../../../theme/tokens";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { Icon } from "../../../ui/Icon";
@@ -27,13 +27,14 @@ export function RestTimer({ remaining, total, onSkip }: RestTimerProps) {
 
   useEffect(() => {
     if (reduce) return;
-    pulse.value = withRepeat(withTiming(1.06, { duration: 900, easing: Easing.inOut(Easing.quad) }), -1, true);
+    pulse.set(withRepeat(withTiming(1.06, { duration: 900, easing: Easing.inOut(Easing.quad) }), -1, true));
     return () => {
-      pulse.value = 1;
+      cancelAnimation(pulse);
+      pulse.set(1);
     };
   }, [pulse, reduce]);
 
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: pulse.get() }] }));
 
   return (
     <Animated.View style={style}>
