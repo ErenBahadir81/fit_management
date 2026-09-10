@@ -27,7 +27,7 @@ export default function ScansPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useScans(40);
   const [filter, setFilter] = useState<Filter>("all");
 
-  const scans = data?.scans ?? [];
+  const scans = useMemo(() => data?.scans ?? [], [data?.scans]);
 
   const stats = useMemo(() => {
     const all = scans.flatMap((s) => s.detections);

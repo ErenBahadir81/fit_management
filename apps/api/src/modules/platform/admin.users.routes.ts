@@ -22,6 +22,8 @@ import { Goal, toGoalDTO } from "../../models/goal";
 import { AppError } from "../../lib/errors";
 import type { AppContext } from "../../context";
 import { hashPassword } from "./auth.service";
+import type { WeeklyReportDTO } from "@fitfloow/core";
+import { buildWeeklyReportForUser } from "../body/reports.service";
 import {
   assignTemplate,
   deleteUserCascade,
@@ -51,16 +53,10 @@ const zUpdateUser = z.object({
   measurementDay: zWeekday.optional(),
 });
 
-/**
- * The weekly report belongs to B3 (`modules/body/reports.service.ts`). It may not exist yet, so it is
- * resolved lazily through a non-literal specifier: missing module or missing export → `null`.
- */
-async function tryWeeklyReport(userId: string, weekKey: string): Promise<unknown | null> {
-  const spec = "../body/reports.service.js";
+/** Weekly report for the admin overview (B3's service); any failure degrades to `null` rather than breaking the overview. */
+async function tryWeeklyReport(userId: string, weekKey: string, now: Date): Promise<WeeklyReportDTO | null> {
   try {
-    const mod = (await import(/* @vite-ignore */ spec)) as { buildWeeklyReport?: (u: string, w: string) => Promise<unknown> };
-    if (typeof mod.buildWeeklyReport !== "function") return null;
-    return (await mod.buildWeeklyReport(userId, weekKey)) ?? null;
+    return await buildWeeklyReportForUser(userId, weekKey, now);
   } catch {
     return null;
   }
@@ -161,7 +157,7 @@ export async function adminUsersRoutes(app: FastifyInstance, opts: { ctx: AppCon
       latestBody: latestBody ? toBodyEntryDTO(latestBody) : null,
       goal: goal ? toGoalDTO(goal) : null,
       lastWorkouts: lastWorkouts.map(toWorkoutLogDTO),
-      weekReport: await tryWeeklyReport(String(user._id), weekKey),
+      weekReport: await tryWeeklyReport(String(user._id), weekKey, ctx.now()),
     };
   });
 }

@@ -47,7 +47,7 @@ export default function MascotPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
 
-  const messages = data?.messages ?? [];
+  const messages = useMemo(() => data?.messages ?? [], [data?.messages]);
   const selected = messages.find((m) => m.id === selectedId) ?? messages[0] ?? null;
 
   const grouped = useMemo(() => {
