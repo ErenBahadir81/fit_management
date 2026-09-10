@@ -33,6 +33,9 @@ export function DayPager({ days, selected, onSelect, loggedKeys, testID = "nutri
   const today = todayKey();
   const index = Math.max(0, days.indexOf(selected));
   const settling = useRef(false);
+  // Start scrolled to the selected day (usually today) instead of a month ago — `contentOffset`
+  // positions the strip on the very first frame, no post-layout jump.
+  const initial = useRef(index);
 
   const sidePad = width > 0 ? Math.max(spacing.gutter, (width - ITEM_W) / 2) : spacing.gutter;
 
@@ -83,8 +86,10 @@ export function DayPager({ days, selected, onSelect, loggedKeys, testID = "nutri
         showsHorizontalScrollIndicator={false}
         snapToInterval={STEP}
         decelerationRate="fast"
-        initialScrollIndex={undefined}
+        contentOffset={{ x: initial.current * STEP, y: 0 }}
         getItemLayout={(_, i) => ({ length: STEP, offset: STEP * i, index: i })}
+        initialNumToRender={days.length}
+        removeClippedSubviews={false}
         onScrollBeginDrag={() => {
           settling.current = true;
         }}

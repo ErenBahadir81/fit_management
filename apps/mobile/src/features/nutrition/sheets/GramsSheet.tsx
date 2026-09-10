@@ -30,11 +30,24 @@ export function GramsSheet({ entry, onSave, onDelete, onClose, saving }: GramsSh
           initialGrams={entry.grams}
           meal={meal}
           onMealChange={setMeal}
-          onAdd={(grams) => onSave({ grams, meal })}
+          onAdd={(grams) => {
+            sheet.dismiss();
+            onSave({ grams, meal });
+          }}
           submitLabel="Kaydet"
           adding={saving}
         />
-        <Button testID="grams-sheet-delete" label="Sil" variant="danger" icon="trash-outline" onPress={onDelete} full />
+        <Button
+          testID="grams-sheet-delete"
+          label="Sil"
+          variant="danger"
+          icon="trash-outline"
+          onPress={() => {
+            sheet.dismiss();
+            onDelete();
+          }}
+          full
+        />
       </View>
     </Sheet>
   );

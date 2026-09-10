@@ -34,7 +34,17 @@ export function AddSheet({ meal, onPick, onClose }: AddSheetProps) {
         <Text variant="heading">{MEAL_LABEL[meal]} için ekle</Text>
         <View>
           {ACTIONS.map((a) => (
-            <ListRow key={a.action} testID={`add-${a.action}`} label={a.label} hint={a.hint} icon={a.icon} onPress={() => onPick(a.action)} />
+            <ListRow
+              key={a.action}
+              testID={`add-${a.action}`}
+              label={a.label}
+              hint={a.hint}
+              icon={a.icon}
+              onPress={() => {
+                sheet.dismiss(); // start the exit animation; the parent then swaps in the next sheet
+                onPick(a.action);
+              }}
+            />
           ))}
         </View>
       </View>

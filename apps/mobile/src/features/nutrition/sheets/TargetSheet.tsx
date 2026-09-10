@@ -89,13 +89,14 @@ export function TargetSheet({ target, onSave, onClose, saving }: TargetSheetProp
           full
           loading={saving}
           disabled={invalid}
-          onPress={() =>
+          onPress={() => {
+            sheet.dismiss();
             onSave(
               mode === "auto"
                 ? { mode: "auto" }
                 : { mode: "manual", calories: parsed.calories ?? undefined, protein: parsed.protein ?? undefined, carbs: parsed.carbs ?? undefined, fat: parsed.fat ?? undefined }
-            )
-          }
+            );
+          }}
         />
       </View>
     </Sheet>

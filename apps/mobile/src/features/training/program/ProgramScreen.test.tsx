@@ -16,23 +16,37 @@ jest.mock("expo-router", () => require("../../../../__tests__/mocks/expo-router"
  * shrinks (the undo-delete case below). This mock renders the same tree without virtualization.
  * TODO(F4c): hoist into jest.setup.js — F3's lists will need it too.
  */
+interface MockListProps {
+  data?: unknown[];
+  renderItem: (info: { item: unknown; index: number; target: string }) => React.ReactNode;
+  keyExtractor?: (item: unknown, index: number) => string;
+  ListHeaderComponent?: React.ReactNode | (() => React.ReactNode);
+  ListEmptyComponent?: React.ReactNode | (() => React.ReactNode);
+  ListFooterComponent?: React.ReactNode | (() => React.ReactNode);
+  contentContainerStyle?: unknown;
+  testID?: string;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}
+
 jest.mock("@shopify/flash-list", () => {
-  const ReactMock = require("react");
-  const { RefreshControl, ScrollView, View } = require("react-native");
-  const node = (C: unknown) => (ReactMock.isValidElement(C) ? C : typeof C === "function" ? ReactMock.createElement(C as never) : null);
+  const ReactMock = require("react") as typeof import("react");
+  const { RefreshControl, ScrollView, View } = require("react-native") as typeof import("react-native");
+  const node = (C: MockListProps["ListHeaderComponent"]) =>
+    ReactMock.isValidElement(C) ? C : typeof C === "function" ? ReactMock.createElement(C as React.FC) : null;
   return {
-    FlashList: ({ data = [], renderItem, keyExtractor, ListHeaderComponent, ListEmptyComponent, ListFooterComponent, contentContainerStyle, testID, refreshing, onRefresh }: never) =>
+    FlashList: ({ data = [], renderItem, keyExtractor, ListHeaderComponent, ListEmptyComponent, ListFooterComponent, contentContainerStyle, testID, refreshing, onRefresh }: MockListProps) =>
       ReactMock.createElement(
         ScrollView,
         {
           testID,
-          contentContainerStyle,
+          contentContainerStyle: contentContainerStyle as never,
           refreshControl: onRefresh ? ReactMock.createElement(RefreshControl, { refreshing: Boolean(refreshing), onRefresh }) : undefined,
         },
         node(ListHeaderComponent),
-        (data as unknown[]).length === 0
+        data.length === 0
           ? node(ListEmptyComponent)
-          : (data as unknown[]).map((item, index) =>
+          : data.map((item, index) =>
               ReactMock.createElement(View, { key: keyExtractor ? keyExtractor(item, index) : String(index) }, renderItem({ item, index, target: "Cell" }))
             ),
         node(ListFooterComponent)

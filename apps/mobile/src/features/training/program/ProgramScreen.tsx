@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeOut } from "react-native-reanimated";
+import Animated, { FadeOut, useReducedMotion } from "react-native-reanimated";
 import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import type { MuscleDTO, ScheduleEntry, Weekday, WorkoutLogDTO } from "@fitfloow/core";
@@ -81,6 +81,7 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   const toast = useToast();
   const { colors } = useTheme();
   const tabSpace = useTabBarSpace();
+  const reduceMotion = useReducedMotion();
   const measurementDay = useSession((s) => (s.user?.measurementDay ?? 0) as Weekday);
 
   const program = useProgram();
@@ -317,8 +318,8 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
       {/* Undo lives outside the list: a header that changes height re-triggers FlashList's layout pass. */}
       {pending ? (
         <Animated.View
-          entering={enterCard(0, false)}
-          exiting={FadeOut.duration(160)}
+          entering={enterCard(0, reduceMotion)}
+          exiting={FadeOut.duration(reduceMotion ? 100 : 160)}
           style={[styles.undoBar, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, bottom: tabSpace + spacing.md }]}
           testID="undo-bar"
         >

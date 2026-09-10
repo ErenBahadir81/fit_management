@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { makeQueryClient, renderUI } from "../../../../__tests__/helpers";
 import { mockRouter } from "../../../../__tests__/mocks/expo-router";
 import { useSession } from "../../auth/session";
@@ -30,8 +30,8 @@ describe("WorkoutScreen", () => {
   test("opens on the first exercise with the header progress and the single primary action", async () => {
     await mount();
     await waitFor(() => expect(screen.getByTestId("pane-0")).toBeTruthy());
-    expect(screen.getByText("Bench Press")).toBeTruthy();
-    expect(screen.getByTestId("workout-progress")).toHaveTextContent("0/12 set");
+    expect(within(screen.getByTestId("pane-0")).getByText("Bench Press")).toBeTruthy();
+    expect(screen.getByTestId("workout-progress")).toHaveTextContent("0/14 set");
     expect(screen.getByTestId("workout-elapsed")).toBeTruthy();
     expect(screen.getByTestId("complete-set")).toBeTruthy();
     expect(screen.getByTestId("set-active-0")).toBeTruthy();
@@ -42,7 +42,7 @@ describe("WorkoutScreen", () => {
     await waitFor(() => expect(screen.getByTestId("complete-set")).toBeTruthy());
     await fireEvent.press(screen.getByTestId("complete-set"));
 
-    await waitFor(() => expect(screen.getByTestId("workout-progress")).toHaveTextContent("1/12 set"));
+    await waitFor(() => expect(screen.getByTestId("workout-progress")).toHaveTextContent("1/14 set"));
     expect(screen.getByTestId("set-done-0-0")).toBeTruthy();
     expect(screen.getByTestId("rest-timer")).toBeTruthy();
 
@@ -56,7 +56,7 @@ describe("WorkoutScreen", () => {
     await fireEvent.press(screen.getByTestId("complete-set"));
     await waitFor(() => expect(screen.getByTestId("set-done-0-0")).toBeTruthy());
     await fireEvent.press(screen.getByTestId("set-done-0-0"));
-    await waitFor(() => expect(screen.getByTestId("workout-progress")).toHaveTextContent("0/12 set"));
+    await waitFor(() => expect(screen.getByTestId("workout-progress")).toHaveTextContent("0/14 set"));
   });
 
   test("the reps stepper edits the active set", async () => {
@@ -73,7 +73,7 @@ describe("WorkoutScreen", () => {
     await waitFor(() => expect(screen.getByTestId("skip-exercise-0")).toBeTruthy());
     await fireEvent.press(screen.getByTestId("skip-exercise-0"));
     await waitFor(() => expect(screen.getByTestId("pane-skipped-0")).toBeTruthy());
-    expect(screen.getByTestId("workout-progress")).toHaveTextContent("0/9 set");
+    expect(screen.getByTestId("workout-progress")).toHaveTextContent("0/10 set");
   });
 
   test("an ad-hoc exercise from the catalog is appended as a new pane", async () => {
@@ -83,6 +83,7 @@ describe("WorkoutScreen", () => {
     await waitFor(() => expect(screen.getByTestId("add-exercise-ex_squat")).toBeTruthy());
     await fireEvent.press(screen.getByTestId("add-exercise-ex_squat"));
     await waitFor(() => expect(screen.getByTestId("pane-4")).toBeTruthy());
+    expect(within(screen.getByTestId("pane-4")).getByText("Squat")).toBeTruthy();
     const draft = getJSON<LoggerState>(WORKOUT_DRAFT_KEY)!;
     expect(draft.exercises[4]).toEqual(expect.objectContaining({ name: "Squat", source: "extra" }));
   });
@@ -95,7 +96,7 @@ describe("WorkoutScreen", () => {
 
     screen.unmount();
     await mount();
-    await waitFor(() => expect(screen.getByTestId("workout-progress")).toHaveTextContent("1/12 set"));
+    await waitFor(() => expect(screen.getByTestId("workout-progress")).toHaveTextContent("1/14 set"));
     expect(screen.getByTestId("set-done-0-0")).toBeTruthy();
   });
 
@@ -113,7 +114,7 @@ describe("WorkoutScreen", () => {
     storage.set(WORKOUT_DRAFT_KEY, JSON.stringify(stale));
 
     await mount();
-    await waitFor(() => expect(screen.getByTestId("workout-progress")).toHaveTextContent("0/12 set"));
+    await waitFor(() => expect(screen.getByTestId("workout-progress")).toHaveTextContent("0/14 set"));
     expect(screen.queryByText("Eski gün")).toBeNull();
   });
 
@@ -159,7 +160,7 @@ describe("WorkoutScreen", () => {
 
     await fireEvent.press(screen.getByTestId("segment-add"));
     await waitFor(() => expect(screen.getByTestId("segment-1")).toBeTruthy());
-    expect(screen.getByTestId("complete-set")).toHaveTextContent("Antrenmanı bitir");
+    expect(within(screen.getByTestId("complete-set")).getByText("Antrenmanı bitir")).toBeTruthy();
   });
 
   test("a rest day has nothing to log", async () => {

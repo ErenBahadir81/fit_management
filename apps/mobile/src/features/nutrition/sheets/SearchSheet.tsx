@@ -63,7 +63,15 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
   const items = showRecents ? recents.data ?? [] : [...search.foods, ...search.remote];
 
   const openDetail = useCallback((food: FoodDTO) => setMode({ kind: "detail", food }), []);
-  const quickAdd = useCallback((food: FoodDTO, grams: number) => onAdd({ food, grams, meal }), [meal, onAdd]);
+  /** Every add closes the sheet first, so the day (or the scan sheet) is what springs back. */
+  const submit = useCallback(
+    (input: SearchAddInput) => {
+      sheet.dismiss();
+      onAdd(input);
+    },
+    [onAdd, sheet]
+  );
+  const quickAdd = useCallback((food: FoodDTO, grams: number) => submit({ food, grams, meal }), [meal, submit]);
 
   const listEmpty = useMemo(() => {
     if (showRecents) {
@@ -93,7 +101,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
           initialGrams={mode.food.defaultServingG}
           meal={meal}
           onMealChange={setMeal}
-          onAdd={(grams) => onAdd({ food: mode.food, grams, meal })}
+          onAdd={(grams) => submit({ food: mode.food, grams, meal })}
           onBack={() => setMode({ kind: "list" })}
           adding={adding}
         />
@@ -105,7 +113,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
           initialGrams={100}
           meal={meal}
           onMealChange={setMeal}
-          onAdd={(grams) => onAdd({ custom: { name: mode.name, per100g: mode.per100g }, grams, meal })}
+          onAdd={(grams) => submit({ custom: { name: mode.name, per100g: mode.per100g }, grams, meal })}
           onBack={() => setMode({ kind: "custom" })}
           adding={adding}
         />
