@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, KeyRound, MoreHorizontal, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { CalendarDays, KeyRound, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import type { AdminUserDTO } from "@fitfloow/core";
 import { useDebounced } from "@/hooks/useDebounced";
 import { relative } from "@/lib/format";
@@ -213,10 +213,6 @@ export default function UsersPage() {
 
       <ResetPasswordDialog user={toReset} onClose={() => setToReset(null)} />
       <AssignProgramDialog user={toAssign} onClose={() => setToAssign(null)} />
-
-      <div className="sr-only" aria-hidden>
-        <MoreHorizontal />
-      </div>
     </>
   );
 }

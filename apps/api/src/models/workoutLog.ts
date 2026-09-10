@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 import type { CardioEntryDTO, StrengthEntryDTO, WorkoutLogDTO } from "@fitfloow/core";
 
 const SetEntrySchema = new Schema({ reps: { type: Number, required: true }, rir: { type: Number, default: null } }, { _id: false });
@@ -77,7 +77,7 @@ const WorkoutLogSchema = new Schema<WorkoutLogDoc>(
 WorkoutLogSchema.index({ userId: 1, date: -1 });
 WorkoutLogSchema.index({ userId: 1, dateKey: 1 });
 
-export const WorkoutLog: Model<WorkoutLogDoc> = (models.WorkoutLog as Model<WorkoutLogDoc>) || model<WorkoutLogDoc>("WorkoutLog", WorkoutLogSchema);
+export const WorkoutLog: Model<WorkoutLogDoc> = (mongoose.models.WorkoutLog as Model<WorkoutLogDoc>) || model<WorkoutLogDoc>("WorkoutLog", WorkoutLogSchema);
 
 export function toWorkoutLogDTO(l: WorkoutLogDoc): WorkoutLogDTO {
   return {
