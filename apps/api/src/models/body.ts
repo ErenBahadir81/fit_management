@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 import type { BodyEntryDTO, WeighInDTO } from "@fitfloow/core";
 
 export interface BodyEntryDoc {
@@ -40,7 +40,7 @@ const BodyEntrySchema = new Schema<BodyEntryDoc>(
 );
 BodyEntrySchema.index({ userId: 1, date: -1 });
 
-export const BodyEntry: Model<BodyEntryDoc> = (models.BodyEntry as Model<BodyEntryDoc>) || model<BodyEntryDoc>("BodyEntry", BodyEntrySchema);
+export const BodyEntry: Model<BodyEntryDoc> = (mongoose.models.BodyEntry as Model<BodyEntryDoc>) || model<BodyEntryDoc>("BodyEntry", BodyEntrySchema);
 
 export function toBodyEntryDTO(e: BodyEntryDoc): BodyEntryDTO {
   return {
@@ -81,7 +81,7 @@ const WeighInSchema = new Schema<WeighInDoc>(
 );
 WeighInSchema.index({ userId: 1, dateKey: 1 }, { unique: true });
 
-export const WeighIn: Model<WeighInDoc> = (models.WeighIn as Model<WeighInDoc>) || model<WeighInDoc>("WeighIn", WeighInSchema);
+export const WeighIn: Model<WeighInDoc> = (mongoose.models.WeighIn as Model<WeighInDoc>) || model<WeighInDoc>("WeighIn", WeighInSchema);
 
 export function toWeighInDTO(w: WeighInDoc): WeighInDTO {
   return { id: String(w._id), dateKey: w.dateKey, weightKg: w.weightKg, source: w.source, createdAt: w.createdAt.toISOString() };

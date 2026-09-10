@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type Types } from "mongoose";
+import mongoose, { Schema, model, type Model, type Types } from "mongoose";
 import type { GoalDTO, GoalPlan, GoalProfile } from "@fitfloow/core";
 
 export interface GoalDoc {
@@ -40,7 +40,7 @@ const GoalSchema = new Schema<GoalDoc>(
 // only one active goal per user
 GoalSchema.index({ userId: 1, status: 1 }, { unique: true, partialFilterExpression: { status: "active" } });
 
-export const Goal: Model<GoalDoc> = (models.Goal as Model<GoalDoc>) || model<GoalDoc>("Goal", GoalSchema);
+export const Goal: Model<GoalDoc> = (mongoose.models.Goal as Model<GoalDoc>) || model<GoalDoc>("Goal", GoalSchema);
 
 export function toGoalDTO(g: GoalDoc): GoalDTO {
   return {
@@ -75,7 +75,7 @@ const WeeklyReportCacheSchema = new Schema<WeeklyReportCacheDoc>(
 );
 WeeklyReportCacheSchema.index({ userId: 1, weekKey: 1 }, { unique: true });
 export const WeeklyReportCache: Model<WeeklyReportCacheDoc> =
-  (models.WeeklyReportCache as Model<WeeklyReportCacheDoc>) || model<WeeklyReportCacheDoc>("WeeklyReportCache", WeeklyReportCacheSchema);
+  (mongoose.models.WeeklyReportCache as Model<WeeklyReportCacheDoc>) || model<WeeklyReportCacheDoc>("WeeklyReportCache", WeeklyReportCacheSchema);
 
 /** Any module that writes data inside a week must call this (B3 exposes a helper; others may call directly). */
 export async function invalidateWeeklyReports(userId: Types.ObjectId | string, weekKeys: string[]): Promise<void> {
