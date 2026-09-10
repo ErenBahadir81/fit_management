@@ -41,8 +41,8 @@ export function TargetSlider({ value, bounds, onChange, testID }: TargetSliderPr
 
   useEffect(() => {
     const target = ((value - min) / range) * usable;
-    x.value = reduce ? withTiming(target, timing.reduced) : withSpring(target, springs.snappy);
-    last.value = value;
+    x.set(reduce ? withTiming(target, timing.reduced) : withSpring(target, springs.snappy));
+    last.set(value);
   }, [value, min, range, usable, reduce, x, last]);
 
   const tick = useCallback(
@@ -57,35 +57,35 @@ export function TargetSlider({ value, bounds, onChange, testID }: TargetSliderPr
     .enabled(!disabled)
     .minDistance(0)
     .onBegin((e) => {
-      active.value = withSpring(1, springs.snappy);
+      active.set(withSpring(1, springs.snappy));
       const px = Math.min(Math.max(e.x - THUMB / 2, 0), usable);
-      x.value = px;
+      x.set(px);
       const raw = min + (px / usable) * range;
       const v = Math.min(Math.max(Math.round(raw / TARGET_STEP) * TARGET_STEP, min), max);
-      if (v !== last.value) {
-        last.value = v;
+      if (v !== last.get()) {
+        last.set(v);
         runOnJS(tick)(v);
       }
     })
     .onUpdate((e) => {
       const px = Math.min(Math.max(e.x - THUMB / 2, 0), usable);
-      x.value = px;
+      x.set(px);
       const raw = min + (px / usable) * range;
       const v = Math.min(Math.max(Math.round(raw / TARGET_STEP) * TARGET_STEP, min), max);
-      if (v !== last.value) {
-        last.value = v;
+      if (v !== last.get()) {
+        last.set(v);
         runOnJS(tick)(v);
       }
     })
     .onFinalize(() => {
-      active.value = withSpring(0, springs.snappy);
-      const target = ((last.value - min) / range) * usable;
-      x.value = reduce ? withTiming(target, timing.reduced) : withSpring(target, springs.snappy);
+      active.set(withSpring(0, springs.snappy));
+      const target = ((last.get() - min) / range) * usable;
+      x.set(reduce ? withTiming(target, timing.reduced) : withSpring(target, springs.snappy));
     });
 
-  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { scale: 1 + active.value * 0.18 }] }));
-  const fill = useAnimatedStyle(() => ({ width: x.value + THUMB / 2 }));
-  const label = useAnimatedStyle(() => ({ transform: [{ translateX: x.value + THUMB / 2 }, { translateY: -active.value * 6 }], opacity: 0.6 + active.value * 0.4 }));
+  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }, { scale: 1 + active.get() * 0.18 }] }));
+  const fill = useAnimatedStyle(() => ({ width: x.get() + THUMB / 2 }));
+  const label = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() + THUMB / 2 }, { translateY: -active.get() * 6 }], opacity: 0.6 + active.get() * 0.4 }));
 
   const onAction = (e: AccessibilityActionEvent) => {
     const dir = e.nativeEvent.actionName === "increment" ? 1 : e.nativeEvent.actionName === "decrement" ? -1 : 0;

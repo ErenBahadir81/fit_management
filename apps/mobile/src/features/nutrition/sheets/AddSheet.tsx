@@ -1,9 +1,9 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { StyleSheet, View } from "react-native";
 import type { Meal } from "@fitfloow/core";
 import { spacing } from "../../../theme/tokens";
 import { ListRow } from "../../../ui/ListRow";
-import { Sheet, useSheet } from "../../../ui/Sheet";
+import { Sheet } from "../../../ui/Sheet";
 import { Text } from "../../../ui/Text";
 import { MEAL_LABEL } from "../model/meals";
 
@@ -25,11 +25,8 @@ const ACTIONS: { action: AddAction; label: string; hint: string; icon: "camera" 
 
 /** The FAB / per-meal "+" menu. One tap, five ways in. */
 export function AddSheet({ meal, onPick, onClose }: AddSheetProps) {
-  const sheet = useSheet();
-  useEffect(() => sheet.present(), [sheet]);
-
   return (
-    <Sheet ref={sheet.ref} onDismiss={onClose}>
+    <Sheet open onDismiss={onClose}>
       <View style={styles.stack}>
         <Text variant="heading">{MEAL_LABEL[meal]} için ekle</Text>
         <View>
@@ -40,10 +37,7 @@ export function AddSheet({ meal, onPick, onClose }: AddSheetProps) {
               label={a.label}
               hint={a.hint}
               icon={a.icon}
-              onPress={() => {
-                sheet.dismiss(); // start the exit animation; the parent then swaps in the next sheet
-                onPick(a.action);
-              }}
+              onPress={() => onPick(a.action)} // the parent swaps in the next sheet (this one unmounts)
             />
           ))}
         </View>

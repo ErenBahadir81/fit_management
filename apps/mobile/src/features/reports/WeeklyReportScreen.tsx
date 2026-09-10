@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useRouter } from "expo-router";
@@ -43,15 +43,15 @@ export function WeeklyReportScreen({ initialWeek }: WeeklyReportScreenProps) {
 
   const select = useCallback((key: string) => setWeek(key === currentKey ? CURRENT_WEEK : key), [currentKey]);
   const goPrev = useCallback(() => select(prev), [select, prev]);
-  const goNext = next ? () => select(next) : null;
+  const goNext = useMemo(() => (next ? () => select(next) : null), [next, select]);
   const goGoal = useCallback(() => router.push(q.data?.goal ? "/(modals)/goal/roadmap" : "/(modals)/goal/setup"), [router, q.data?.goal]);
 
   // Switching weeks keeps the previous page visible, dimmed, until the new one lands (no skeleton flash).
   const dim = useSharedValue(1);
   useEffect(() => {
-    dim.value = withTiming(q.isPlaceholderData ? 0.45 : 1, timing.base);
+    dim.set(withTiming(q.isPlaceholderData ? 0.45 : 1, timing.base));
   }, [q.isPlaceholderData, dim]);
-  const dimStyle = useAnimatedStyle(() => ({ opacity: dim.value }));
+  const dimStyle = useAnimatedStyle(() => ({ opacity: dim.get() }));
 
   return (
     <Screen tabBar={false} edges={["top", "bottom"]} refreshing={q.isRefetching && !q.isPending && !q.isPlaceholderData} onRefresh={() => void q.refetch()}>

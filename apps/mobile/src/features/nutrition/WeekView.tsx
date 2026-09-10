@@ -4,11 +4,11 @@ import { WEEKDAYS_TR_SHORT, keyWeekday, type WeekNutrition } from "@fitfloow/cor
 import { BarWeek } from "../../charts/BarWeek";
 import { fmtInt, fmtPct } from "../../lib/format";
 import { todayKey } from "../../lib/dates";
-import { spacing } from "../../theme/tokens";
+import { radii, spacing } from "../../theme/tokens";
 import { Card } from "../../ui/Card";
 import { Chip } from "../../ui/Chip";
 import { Entry } from "../../ui/Entry";
-import { Skeleton } from "../../ui/Skeleton";
+import { Skeleton, SkeletonGroup } from "../../ui/Skeleton";
 import { StatTile } from "../../ui/StatTile";
 import { Text } from "../../ui/Text";
 
@@ -61,14 +61,14 @@ export function WeekView({ week }: { week: WeekNutrition }) {
 
 export function WeekSkeleton() {
   return (
-    <View style={styles.stack} testID="nutrition-week-skeleton">
-      <Skeleton height={232} radius={24} />
+    <SkeletonGroup style={styles.stack} testID="nutrition-week-skeleton">
+      <Skeleton height={232} radius={radii.card} />
       <View style={styles.tiles}>
-        <Skeleton height={92} radius={18} style={styles.grow} />
-        <Skeleton height={92} radius={18} style={styles.grow} />
+        <Skeleton height={92} radius={radii.md} style={styles.grow} />
+        <Skeleton height={92} radius={radii.md} style={styles.grow} />
       </View>
-      <Skeleton height={92} radius={24} />
-    </View>
+      <Skeleton height={92} radius={radii.card} />
+    </SkeletonGroup>
   );
 }
 

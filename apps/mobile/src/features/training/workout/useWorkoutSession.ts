@@ -3,18 +3,15 @@
  * MMKV draft so a crash or relaunch resumes exactly where the user was, and ticks the clock for the
  * elapsed / rest timers.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 import type { ProgramView } from "@fitfloow/core";
 import { todayKey } from "../../../lib/dates";
-import { getJSON, removeKey, setJSON } from "../../../lib/storage";
+import { STORAGE_KEYS, getJSON, removeKey, setJSON } from "../../../lib/storage";
 import { createLoggerState, loggerReducer, restoreDraft, type LoggerAction, type LoggerState } from "../lib/logger";
 
-/**
- * In-progress workout. Not in `STORAGE_KEYS` because that file belongs to the foundation agent —
- * TODO(F4c): move this key there when the storage catalogue is next touched.
- */
-export const WORKOUT_DRAFT_KEY = "training.workout.draft.v1";
+/** In-progress workout (see `STORAGE_KEYS`). */
+export const WORKOUT_DRAFT_KEY = STORAGE_KEYS.workoutDraft;
 
 export function readDraft(): unknown {
   return getJSON(WORKOUT_DRAFT_KEY);
@@ -34,36 +31,35 @@ export interface WorkoutSession {
   finish: () => void;
 }
 
+type Session = { state: LoggerState; restored: boolean } | null;
+
+/** Seed the session from the persisted draft (same day, same date) or a fresh logger state. */
+function seedSession(view: ProgramView): Session {
+  const day = view.current?.day;
+  if (!day) return null;
+  const dateKey = todayKey();
+  const draft = restoreDraft(readDraft(), { dayOrder: day.order, dateKey });
+  if (draft) return { state: draft, restored: true };
+  return {
+    state: createLoggerState({ day, dayIndex: view.current.index, programId: view.program.id, weekNumber: view.program.weekNumber, dateKey, startedAt: Date.now() }),
+    restored: false,
+  };
+}
+
 export function useWorkoutSession(view: ProgramView | null): WorkoutSession {
-  const [state, setState] = useState<LoggerState | null>(null);
-  const [restored, setRestored] = useState(false);
+  // Seeded lazily once the program is known; a session never re-seeds while the modal is open.
+  const [session, setSession] = useState<Session>(() => (view ? seedSession(view) : null));
+  if (session === null && view && view.current?.day) {
+    // The program arrived after mount (cold cache): adopt it during render, the React-sanctioned
+    // way to derive state from a prop change without an extra effect pass.
+    const seeded = seedSession(view);
+    if (seeded) setSession(seeded);
+  }
+  const state = session?.state ?? null;
+  const restored = session?.restored ?? false;
   const now = useTicker(state !== null);
-  const started = useRef(false);
 
-  const dispatch = useCallback((action: LoggerAction) => setState((s) => (s ? loggerReducer(s, action) : s)), []);
-
-  const day = view?.current?.day ?? null;
-  useEffect(() => {
-    if (started.current || !day || !view) return;
-    started.current = true;
-    const dateKey = todayKey();
-    const draft = restoreDraft(readDraft(), { dayOrder: day.order, dateKey });
-    if (draft) {
-      setState(draft);
-      setRestored(true);
-      return;
-    }
-    setState(
-      createLoggerState({
-        day,
-        dayIndex: view.current.index,
-        programId: view.program.id,
-        weekNumber: view.program.weekNumber,
-        dateKey,
-        startedAt: Date.now(),
-      })
-    );
-  }, [day, view]);
+  const dispatch = useCallback((action: LoggerAction) => setSession((s) => (s ? { ...s, state: loggerReducer(s.state, action) } : s)), []);
 
   // Persist every change (MMKV writes are synchronous and cheap) and once more on background.
   useEffect(() => {
@@ -78,14 +74,11 @@ export function useWorkoutSession(view: ProgramView | null): WorkoutSession {
 
   const reset = useCallback(() => {
     clearDraft();
-    started.current = false;
-    setState(null);
-    setRestored(false);
+    setSession(null);
   }, []);
 
   const finish = useCallback(() => {
     clearDraft();
-    setState((s) => s);
   }, []);
 
   return useMemo(() => ({ state, dispatch, restored, now, reset, finish }), [dispatch, finish, now, reset, restored, state]);
@@ -96,7 +89,6 @@ export function useTicker(active: boolean, intervalMs = 1000): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;
-    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), intervalMs);
     return () => clearInterval(id);
   }, [active, intervalMs]);

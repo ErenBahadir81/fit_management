@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { BODY_FAT_CATEGORY_TR, MIN_SAFE_BODY_FAT, type GoalDTO, type GoalProfile } from "@fitfloow/core";
@@ -56,13 +56,15 @@ export function GoalSetupScreen({ mode = "create" }: GoalSetupScreenProps) {
   const existing = mode === "edit" && goalQ.data?.goal?.status === "active" ? goalQ.data.goal : null;
   const editLoading = mode === "edit" && !goalQ.data;
 
-  const [target, setTarget] = useState<number | null>(null);
-  const [profile, setProfile] = useState<GoalProfile>("optimal");
-  useEffect(() => {
-    if (target !== null || currentBf === null || editLoading) return;
-    setTarget(existing ? snapTarget(existing.targetBodyFatPct, bounds) : defaultTarget(sex, currentBf));
-    if (existing) setProfile(existing.profile);
-  }, [target, currentBf, editLoading, existing, bounds, sex]);
+  // The user's choices override the data-derived defaults; nothing is copied into state in an effect.
+  const [chosenTarget, setTarget] = useState<number | null>(null);
+  const [chosenProfile, setProfile] = useState<GoalProfile | null>(null);
+  const initialTarget = useMemo(() => {
+    if (currentBf === null || editLoading) return null;
+    return existing ? snapTarget(existing.targetBodyFatPct, bounds) : defaultTarget(sex, currentBf);
+  }, [bounds, currentBf, editLoading, existing, sex]);
+  const target = chosenTarget ?? initialTarget;
+  const profile: GoalProfile = chosenProfile ?? existing?.profile ?? "optimal";
 
   const today = todayKey();
   const instant = useMemo(

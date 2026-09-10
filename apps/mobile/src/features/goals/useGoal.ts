@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GoalDTO, GoalInput, GoalPreview, GoalProfile, GoalView, Recalibration } from "@fitfloow/core";
 import { getApi } from "../../lib/api";
+import { describeError } from "../../lib/errors";
 import { haptic } from "../../lib/haptics";
 import { useToast } from "../../ui/Toast";
 import { HOME_QUERY_KEY } from "../home/useHome";
+import { REPORT_KEYS } from "../reports/useReport";
 
 export const GOAL_KEY = ["goal"] as const;
 export const GOAL_PREVIEW_KEY = (target: number, profile: GoalProfile) => ["goal", "preview", target, profile] as const;
@@ -60,8 +62,12 @@ function useGoalMutationEffects() {
     if (goal) qc.setQueryData<GoalView>(GOAL_KEY, (prev) => ({ goal, progress: prev?.goal?.id === goal.id ? (prev.progress ?? null) : null }));
     void qc.invalidateQueries({ queryKey: GOAL_KEY });
     void qc.invalidateQueries({ queryKey: HOME_QUERY_KEY });
-    void qc.invalidateQueries({ queryKey: ["report"] });
+    void qc.invalidateQueries({ queryKey: REPORT_KEYS.all });
     void qc.invalidateQueries({ queryKey: ["mascot"] });
+    // The daily calorie target derives from the goal plan; the day/week views embed it.
+    void qc.invalidateQueries({ queryKey: ["nutrition-target"] });
+    void qc.invalidateQueries({ queryKey: ["nutrition-day"] });
+    void qc.invalidateQueries({ queryKey: ["nutrition-week"] });
   };
 }
 
@@ -70,11 +76,9 @@ export function useCreateGoal() {
   const after = useGoalMutationEffects();
   return useMutation<GoalDTO, unknown, GoalInput>({
     mutationFn: async (input) => (await getApi().goals.create(input)).goal,
-    onSuccess: (goal) => {
-      void haptic.success();
-      after(goal);
-    },
-    onError: () => toast.show({ message: "Hedef oluşturulamadı. Tekrar dene.", kind: "error" }),
+    // The success haptic comes from the SuccessCheck on the "Yola çıktık" view.
+    onSuccess: (goal) => after(goal),
+    onError: (e) => toast.show({ message: describeError(e, "Hedef oluşturulamadı. Tekrar dene."), kind: "error" }),
   });
 }
 
@@ -87,7 +91,7 @@ export function useUpdateGoal() {
       void haptic.success();
       after(goal);
     },
-    onError: () => toast.show({ message: "Hedef güncellenemedi. Tekrar dene.", kind: "error" }),
+    onError: (e) => toast.show({ message: describeError(e, "Hedef güncellenemedi. Tekrar dene."), kind: "error" }),
   });
 }
 
@@ -101,7 +105,7 @@ export function useRecalibrateGoal() {
       else void haptic.warning();
       after(goal);
     },
-    onError: () => toast.show({ message: "Kalibrasyon yapılamadı. Tekrar dene.", kind: "error" }),
+    onError: (e) => toast.show({ message: describeError(e, "Kalibrasyon yapılamadı. Tekrar dene."), kind: "error" }),
   });
 }
 
@@ -116,7 +120,7 @@ export function useAbandonGoal() {
       after(null);
       void haptic.select();
     },
-    onError: () => toast.show({ message: "Hedef bırakılamadı. Tekrar dene.", kind: "error" }),
+    onError: (e) => toast.show({ message: describeError(e, "Hedef bırakılamadı. Tekrar dene."), kind: "error" }),
   });
 }
 
@@ -131,6 +135,6 @@ export function useCompleteGoal() {
       after(null);
       void haptic.success();
     },
-    onError: () => toast.show({ message: "İşlem yapılamadı. Tekrar dene.", kind: "error" }),
+    onError: (e) => toast.show({ message: describeError(e, "İşlem yapılamadı. Tekrar dene."), kind: "error" }),
   });
 }

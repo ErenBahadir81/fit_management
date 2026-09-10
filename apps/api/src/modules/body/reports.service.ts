@@ -40,6 +40,8 @@ import { dayIntakeFor, goalSettings, loadUser, mascotCatalog, mascotFor, planned
 /** Weigh-in history kept before the window so the EWMA does not restart at the week boundary. */
 const EWMA_LOOKBACK_DAYS = 120;
 export const MAX_HISTORY_WEEKS = 26;
+/** How many of the user's most recent goals to consider when picking the one a report belongs to. */
+const GOAL_CANDIDATES = 10;
 
 interface ReportBundle {
   user: UserLean;
@@ -71,9 +73,14 @@ function toReportLog(l: WorkoutLogDoc): ReportWorkoutLog {
 /** Everything the report builder needs for `[fromKey, toKey]`, in one round trip per collection. */
 async function loadReportBundle(user: UserLean, fromKey: string, toKey: string): Promise<ReportBundle> {
   const userId = user._id;
-  const [settings, goal, weighIns, bodyEntries, logs, dayIntake, muscles, catalog, program] = await Promise.all([
+  const [settings, goals, weighIns, bodyEntries, logs, dayIntake, muscles, catalog, program] = await Promise.all([
     goalSettings(),
-    Goal.findOne({ userId, "start.dateKey": { $lte: toKey } }).sort({ status: 1, createdAt: -1 }).lean<GoalDoc>(),
+    // Still one round trip, but the winner is chosen in code: sorting on `status` would order
+    // "abandoned" < "active" < "completed" and let a dropped goal shadow the live one.
+    Goal.find({ userId, "start.dateKey": { $lte: toKey } })
+      .sort({ createdAt: -1 })
+      .limit(GOAL_CANDIDATES)
+      .lean<GoalDoc[]>(),
     WeighIn.find({ userId, dateKey: { $gte: shiftKey(fromKey, -EWMA_LOOKBACK_DAYS), $lte: toKey } }).sort({ dateKey: 1 }).lean(),
     BodyEntry.find({ userId, dateKey: { $gte: shiftKey(fromKey, -EWMA_LOOKBACK_DAYS), $lte: toKey } }).sort({ date: 1 }).lean<BodyEntryDoc[]>(),
     WorkoutLog.find({ userId, dateKey: { $gte: fromKey, $lte: toKey } }).sort({ date: 1 }).lean<WorkoutLogDoc[]>(),
@@ -83,10 +90,11 @@ async function loadReportBundle(user: UserLean, fromKey: string, toKey: string):
     Program.findOne({ userId }).lean<ProgramDoc>(),
   ]);
 
+  const goal = goals.find((g) => g.status === "active") ?? goals[0] ?? null;
   return {
     user,
     settings,
-    goal: goal ?? null,
+    goal,
     weighIns: weighIns.map((w) => ({ dateKey: w.dateKey, weightKg: w.weightKg })),
     bodyEntries: bodyEntries.map((e) => ({ dateKey: e.dateKey, weightKg: e.weightKg, bodyFatPct: e.bodyFatPct, waistCm: e.waistCm })),
     logs: logs.map(toReportLog),
@@ -119,6 +127,19 @@ function buildFromBundle(b: ReportBundle, weekKey: string, todayKey: string, now
   });
 }
 
+/**
+ * A cached report is only reusable while nothing outside the data can have moved. For a week that
+ * has already ended that is always true (every writer drops the doc). For the live week it is not:
+ * `dayIndexToday`, `daysElapsed`, the logging denominator and `deficitPlannedKcal` all change at
+ * Türkiye midnight without any write happening, so the doc is only good for the day it was built.
+ */
+export function isCachedReportFresh(generatedAt: Date | string | null | undefined, weekKey: string, todayKey: string): boolean {
+  if (todayKey > weekRange(weekKey).endKey) return true;
+  if (!generatedAt) return false;
+  const at = generatedAt instanceof Date ? generatedAt : new Date(generatedAt);
+  return !Number.isNaN(at.getTime()) && trDateKey(at) === todayKey;
+}
+
 async function cacheReport(userId: Types.ObjectId, report: WeeklyReportDTO): Promise<void> {
   await WeeklyReportCache.updateOne(
     { userId, weekKey: report.weekKey },
@@ -148,7 +169,7 @@ export async function weeklyReport(ctx: AppContext, userId: string, weekKey?: st
   const week = weekKeyFor(weekKey ?? todayKey, (user.measurementDay ?? 0) as Weekday);
 
   const cached = await WeeklyReportCache.findOne({ userId: user._id, weekKey: week }).lean();
-  if (cached?.report) return cached.report as WeeklyReportDTO;
+  if (cached?.report && isCachedReportFresh(cached.generatedAt, week, todayKey)) return cached.report as WeeklyReportDTO;
 
   const { startKey, endKey } = weekRange(week);
   const bundle = await loadReportBundle(user, startKey, endKey > todayKey ? endKey : todayKey);
@@ -166,7 +187,9 @@ export async function weeklyHistory(ctx: AppContext, userId: string, limit: numb
   const weeks = previousWeekKeys(currentWeek, Math.min(limit, MAX_HISTORY_WEEKS), true).reverse();
 
   const cached = await WeeklyReportCache.find({ userId: user._id, weekKey: { $in: weeks } }).lean();
-  const byWeek = new Map(cached.map((c) => [c.weekKey, c.report as WeeklyReportDTO]));
+  const byWeek = new Map(
+    cached.filter((c) => isCachedReportFresh(c.generatedAt, c.weekKey, todayKey)).map((c) => [c.weekKey, c.report as WeeklyReportDTO])
+  );
   const missing = weeks.filter((w) => !byWeek.has(w));
 
   if (missing.length > 0) {

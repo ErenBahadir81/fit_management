@@ -19,7 +19,7 @@ import { EmptyState } from "../../../ui/EmptyState";
 import { Header } from "../../../ui/Header";
 import { Icon } from "../../../ui/Icon";
 import { Pressable } from "../../../ui/Pressable";
-import { Sheet, useSheet } from "../../../ui/Sheet";
+import { Sheet } from "../../../ui/Sheet";
 import { SuccessCheck } from "../../../ui/SuccessCheck";
 import { Text } from "../../../ui/Text";
 import { useToast } from "../../../ui/Toast";
@@ -50,17 +50,12 @@ export function ScanScreen() {
   const camera = useRef<CameraView>(null);
   const addEntries = useAddEntries(dateKey);
   const mascot = useMascot("scan");
-  const resultsSheet = useSheet();
 
   const showResults = state.phase === "results" || state.phase === "saving";
 
   useEffect(() => {
     if (CAMERA_SUPPORTED && permission && !permission.granted && permission.canAskAgain) void requestPermission();
   }, [permission, requestPermission]);
-
-  useEffect(() => {
-    if (showResults) resultsSheet.present();
-  }, [resultsSheet, showResults]);
 
   /* The analyze run: the request, the minimum theatre duration and the status ticker. */
   useEffect(() => {
@@ -126,8 +121,7 @@ export function ScanScreen() {
           scanId: state.scanId,
         }))
       );
-      void haptic.success();
-      dispatch({ type: "saved" });
+      dispatch({ type: "saved" }); // the SuccessCheck that follows fires the success haptic
     } catch {
       dispatch({ type: "saveFailed", message: "Kaydedemedim, tekrar dener misin?" });
       toast.show({ message: "Kaydedemedim, tekrar dener misin?", kind: "error" });
@@ -193,7 +187,7 @@ export function ScanScreen() {
       ) : null}
 
       {showResults ? (
-        <Sheet ref={resultsSheet.ref} enablePanDownToClose={false} onDismiss={() => undefined}>
+        <Sheet open enablePanDownToClose={false}>
           <ScanResults
             items={state.items}
             meal={state.meal}

@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
@@ -15,6 +15,26 @@ import { registerVisionModule } from "./modules/vision/index";
 
 export const API_PREFIX = "/api/v1";
 const startedAt = Date.now();
+
+/**
+ * Rate-limit bucket. The token is *verified* before it is trusted, so a client cannot mint a fresh
+ * bucket by sending a garbage `Authorization` header (which would defeat the login limit) nor by
+ * rotating its refresh token (which would defeat the scan limit). Anything unverifiable — no
+ * header, a forged one, an expired one, cookie auth — falls back to the client IP.
+ */
+export function rateLimitKey(app: FastifyInstance, req: FastifyRequest): string {
+  const header = req.headers.authorization;
+  const token = typeof header === "string" && /^bearer /i.test(header) ? header.slice(7).trim() : "";
+  if (token) {
+    try {
+      const payload = app.jwt.verify<{ sub?: string }>(token);
+      if (payload?.sub) return `u:${payload.sub}`;
+    } catch {
+      /* forged or expired → IP bucket */
+    }
+  }
+  return `ip:${req.ip}`;
+}
 
 export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   const app = Fastify({
@@ -44,9 +64,9 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
     max: 300,
     timeWindow: "1 minute",
     allowList: ctx.config.isTest ? ["127.0.0.1"] : [],
-    keyGenerator: (req) => (req.headers.authorization ? String(req.headers.authorization).slice(-32) : req.ip),
+    keyGenerator: (req) => rateLimitKey(app, req),
   });
-  await app.register(multipart, { limits: { fileSize: 6 * 1024 * 1024, files: 1 } });
+  await app.register(multipart, { limits: { fileSize: 6 * 1024 * 1024, files: 1, fields: 5, parts: 10 } });
   await app.register(authPlugin, { config: ctx.config });
 
   if (!ctx.config.isProd && !ctx.config.isTest) {

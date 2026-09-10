@@ -23,6 +23,7 @@ const fmt0 = (v: number) => fmtNumber(v, 0);
 /* ------------------------------- hero ------------------------------- */
 
 export function ScoreHero({ report, mascotEnabled }: { report: WeeklyReportDTO; mascotEnabled: boolean }) {
+  const { colors } = useTheme();
   const tone = scoreTone(report.score);
   const elapsed = report.dayIndexToday === null ? 7 : report.dayIndexToday + 1;
   return (
@@ -40,7 +41,7 @@ export function ScoreHero({ report, mascotEnabled }: { report: WeeklyReportDTO; 
             {weekLabel(report.weekKey)}
           </Text>
           <View style={styles.heroChips}>
-            {report.isCurrent ? <Chip label="Canlı" tone="success" size="sm" dot="#16A34A" testID="report-live" /> : <Chip label="Tamamlandı" size="sm" />}
+            {report.isCurrent ? <Chip label="Canlı" tone="success" size="sm" dot={colors.success} testID="report-live" /> : <Chip label="Tamamlandı" size="sm" />}
             <Text variant="caption" color="inkSubtle" tabular>
               {elapsed}/7 gün
             </Text>

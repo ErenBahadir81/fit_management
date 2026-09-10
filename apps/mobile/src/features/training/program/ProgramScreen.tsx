@@ -1,20 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeOut, useReducedMotion } from "react-native-reanimated";
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import type { MuscleDTO, ScheduleEntry, Weekday, WorkoutLogDTO } from "@fitfloow/core";
 import { todayKey } from "../../../lib/dates";
-import { haptic } from "../../../lib/haptics";
+import { useUndoWindow } from "../../../lib/useUndoWindow";
 import { Floo } from "../../../mascot/Floo";
-import { useTheme } from "../../../theme/ThemeProvider";
-import { enterCard } from "../../../theme/motion";
-import { radii, spacing } from "../../../theme/tokens";
-import { Chip } from "../../../ui/Chip";
+import { spacing } from "../../../theme/tokens";
 import { EmptyState } from "../../../ui/EmptyState";
 import { Entry } from "../../../ui/Entry";
 import { Header } from "../../../ui/Header";
-import { Icon } from "../../../ui/Icon";
+import { ListRefreshControl } from "../../../ui/ListRefreshControl";
 import { Reveal } from "../../../ui/Reveal";
 import { Screen } from "../../../ui/Screen";
 import { Segmented } from "../../../ui/Segmented";
@@ -22,6 +18,7 @@ import { Text } from "../../../ui/Text";
 import { useTabBarSpace } from "../../../ui/TabBar";
 import { useSheet } from "../../../ui/Sheet";
 import { useToast } from "../../../ui/Toast";
+import { UndoBar } from "../../../ui/UndoBar";
 import { useSession } from "../../auth/session";
 import { RecoveryPanel } from "../recovery/RecoveryPanel";
 import { groupLogsByWeek, stripItems, type StripItem } from "../lib/present";
@@ -44,8 +41,8 @@ const TABS = [
 
 type Row = { kind: "week"; key: string; title: string; count: number } | { kind: "log"; key: string; log: WorkoutLogDTO };
 
-/** Undo window before a deleted session actually leaves the server. */
-const UNDO_MS = 5000;
+const NO_LOGS: WorkoutLogDTO[] = [];
+const NO_MUSCLES: MuscleDTO[] = [];
 
 /**
  * Program tab — the week strip, today's card with the single primary action, weekly volume and
@@ -66,12 +63,21 @@ export function ProgramScreen() {
 function TrainingTabs({ tab, onChange, programName, onEdit }: { tab: Tab; onChange: (t: Tab) => void; programName?: string; onEdit: (() => void) | null }) {
   return (
     <View style={styles.tabsWrap}>
-      <Header
-        title="Program"
-        subtitle={programName}
-        right={onEdit ? { icon: "options-outline", label: "Programı düzenle", onPress: onEdit, testID: "edit-program" } : undefined}
-      />
+      <Header title="Program" subtitle={programName} right={onEdit ? { icon: "options-outline", label: "Programı düzenle", onPress: onEdit, testID: "edit-program" } : undefined} />
       <Segmented options={TABS} value={tab} onChange={onChange} testID="training-tabs" />
+    </View>
+  );
+}
+
+function WeekHeadRow({ title, count }: { title: string; count: number }) {
+  return (
+    <View style={styles.weekHead}>
+      <Text variant="label" color="inkMuted">
+        {title}
+      </Text>
+      <Text variant="caption" color="inkSubtle" tabular>
+        {count} antrenman
+      </Text>
     </View>
   );
 }
@@ -79,9 +85,7 @@ function TrainingTabs({ tab, onChange, programName, onEdit }: { tab: Tab; onChan
 function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   const router = useRouter();
   const toast = useToast();
-  const { colors } = useTheme();
   const tabSpace = useTabBarSpace();
-  const reduceMotion = useReducedMotion();
   const measurementDay = useSession((s) => (s.user?.measurementDay ?? 0) as Weekday);
 
   const program = useProgram();
@@ -99,57 +103,26 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
 
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [openLog, setOpenLog] = useState<WorkoutLogDTO | null>(null);
-  const [pending, setPending] = useState<WorkoutLogDTO | null>(null);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const view = program.data ?? null;
-  const logs = history.data ?? [];
+  const logs = history.data ?? NO_LOGS;
+  const hasProgram = Boolean(view && view.program.days.length > 0);
+  const currentDay = view?.current?.day ?? null;
 
-  /* --- undoable delete: the row leaves at once, the request fires after the undo window --- */
-  const flush = useCallback(
-    (log: WorkoutLogDTO | null) => {
-      if (undoTimer.current) clearTimeout(undoTimer.current);
-      undoTimer.current = null;
-      if (log) remove.mutate(log.id);
-    },
-    [remove]
-  );
+  /* --- undoable delete: the row leaves at once, the DELETE fires after the undo window --- */
+  const commitDelete = useCallback((log: WorkoutLogDTO) => remove.mutate(log.id), [remove]);
+  const undoWindow = useUndoWindow<WorkoutLogDTO>(commitDelete);
+  const pending = undoWindow.pending;
   const requestDelete = useCallback(
     (log: WorkoutLogDTO) => {
-      flush(pending);
-      setPending(log);
       logSheet.dismiss();
-      void haptic.warning();
-      undoTimer.current = setTimeout(() => {
-        setPending(null);
-        remove.mutate(log.id);
-        undoTimer.current = null;
-      }, UNDO_MS);
+      undoWindow.request(log);
     },
-    [flush, logSheet, pending, remove]
+    [logSheet, undoWindow]
   );
   const undoDelete = useCallback(() => {
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    undoTimer.current = null;
-    setPending(null);
-    toast.show({ message: "Kayıt geri getirildi", kind: "success" });
-  }, [toast]);
-  // Leaving the screen must not silently keep the row: commit whatever is still pending.
-  // Refs, not deps — the mutation object changes identity on every render, and a cleanup that
-  // re-ran on each render would fire the delete in a loop.
-  const pendingRef = useRef<WorkoutLogDTO | null>(null);
-  const removeRef = useRef(remove);
-  pendingRef.current = pending;
-  removeRef.current = remove;
-  useEffect(
-    () => () => {
-      if (undoTimer.current) {
-        clearTimeout(undoTimer.current);
-        if (pendingRef.current) removeRef.current.mutate(pendingRef.current.id);
-      }
-    },
-    []
-  );
+    if (undoWindow.undo()) toast.show({ message: "Kayıt geri getirildi", kind: "success" });
+  }, [toast, undoWindow]);
 
   const rows = useMemo<Row[]>(() => {
     const visible = logs.filter((l) => l.id !== pending?.id);
@@ -158,22 +131,10 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
       ...section.logs.map((log) => ({ kind: "log" as const, key: log.id, log })),
     ]);
   }, [logs, measurementDay, pending?.id]);
+  const sessionCount = useMemo(() => logs.filter((l) => !l.isOffDay).length, [logs]);
 
   const strip: StripItem[] = useMemo(() => stripItems(view?.schedule ?? []), [view?.schedule]);
   const selected = useMemo(() => strip.find((s) => s.dateKey === (selectedDay ?? "")) ?? strip.find((s) => s.isToday) ?? null, [selectedDay, strip]);
-
-  const onSelectDay = useCallback(
-    (item: StripItem) => {
-      setSelectedDay(item.dateKey);
-      const entry: ScheduleEntry | undefined = view?.schedule.find((s) => s.dateKey === item.dateKey);
-      const log = entry?.logId ? logs.find((l) => l.id === entry.logId) ?? view?.todayLog ?? null : null;
-      if (log) {
-        setOpenLog(log);
-        logSheet.present();
-      }
-    },
-    [logSheet, logs, view]
-  );
 
   const showLog = useCallback(
     (log: WorkoutLogDTO) => {
@@ -181,6 +142,15 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
       logSheet.present();
     },
     [logSheet]
+  );
+  const onSelectDay = useCallback(
+    (item: StripItem) => {
+      setSelectedDay(item.dateKey);
+      const entry: ScheduleEntry | undefined = view?.schedule.find((s) => s.dateKey === item.dateKey);
+      const log = entry?.logId ? (logs.find((l) => l.id === entry.logId) ?? view?.todayLog ?? null) : null;
+      if (log) showLog(log);
+    },
+    [logs, showLog, view]
   );
 
   const start = useCallback(() => router.push("/(modals)/workout"), [router]);
@@ -198,29 +168,14 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
     },
     [jump, jumpSheet]
   );
+  const onUndoToday = useCallback(() => undoLast.mutate(), [undoLast]);
 
   const refresh = useCallback(() => {
     void program.refetch();
     void history.refetch();
   }, [history, program]);
 
-  if (program.isError && !view) {
-    return (
-      <Screen>
-        <TrainingTabs tab={tab} onChange={onTab} onEdit={null} />
-        <EmptyState
-          illustration={<Floo mood="worried" size="m" />}
-          title="Program yüklenemedi"
-          body="Bağlantını kontrol edip tekrar dene."
-          action={{ label: "Tekrar dene", onPress: () => void program.refetch(), icon: "refresh" }}
-        />
-      </Screen>
-    );
-  }
-
-  const hasProgram = Boolean(view && view.program.days.length > 0);
-  const currentDay = view?.current?.day ?? null;
-
+  const busy = skip.isPending || jump.isPending || undoLast.isPending;
   const listHeader = useMemo(
     () => (
       <View style={styles.header}>
@@ -241,11 +196,11 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
                       day={currentDay}
                       todayLog={view.todayLog}
                       weekNumber={view.program.weekNumber}
-                      busy={skip.isPending || jump.isPending || undoLast.isPending}
+                      busy={busy}
                       onStart={start}
                       onSkip={skipSheet.present}
                       onJump={jumpSheet.present}
-                      onUndo={() => undoLast.mutate()}
+                      onUndo={onUndoToday}
                       onOpenLog={showLog}
                     />
                   </Entry>
@@ -255,89 +210,79 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
                   <Entry index={3}>
                     <View style={styles.historyHead}>
                       <Text variant="title">Geçmiş</Text>
-                      {logs.length > 0 ? (
+                      {sessionCount > 0 ? (
                         <Text variant="caption" color="inkMuted" tabular>
-                          {logs.filter((l) => !l.isOffDay).length} antrenman
+                          {sessionCount} antrenman
                         </Text>
                       ) : null}
                     </View>
                   </Entry>
                 </>
               ) : (
-                <EmptyState
-                  illustration={<Floo mood="sleepy" size="m" />}
-                  title="Program atanmamış"
-                  body="Antrenörün bir program tanımladığında günlerin burada belirir."
-                  testID="no-program"
-                />
+                <EmptyState illustration={<Floo mood="sleepy" size="m" />} title="Program atanmamış" body="Antrenörün bir program tanımladığında günlerin burada belirir." testID="no-program" />
               )}
             </View>
           ) : null}
         </Reveal>
       </View>
     ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tab, onTab, view, hasProgram, selected, currentDay, logs, skip.isPending, jump.isPending, undoLast.isPending]
+    [tab, onTab, view, hasProgram, editorSheet.present, selected, onSelectDay, currentDay, busy, start, skipSheet.present, jumpSheet.present, onUndoToday, showLog, sessionCount]
   );
+
+  const renderItem = useCallback<ListRenderItem<Row>>(
+    ({ item }) =>
+      item.kind === "week" ? (
+        <WeekHeadRow title={item.title} count={item.count} />
+      ) : (
+        <View style={styles.rowWrap}>
+          <HistoryRow log={item.log} onPress={showLog} onDelete={requestDelete} />
+        </View>
+      ),
+    [requestDelete, showLog]
+  );
+  const contentStyle = useMemo(() => ({ paddingHorizontal: spacing.gutter, paddingBottom: tabSpace + spacing.lg }), [tabSpace]);
+  const listEmpty = useMemo(
+    () => (view && hasProgram && !history.isPending ? <EmptyState compact illustration={<Floo mood="think" size="s" animate={false} />} title="Henüz kayıt yok" body="İlk antrenmanını bitirdiğinde burada görünecek." testID="no-history" /> : null),
+    [hasProgram, history.isPending, view]
+  );
+
+  if (program.isError && !view) {
+    return (
+      <Screen>
+        <TrainingTabs tab={tab} onChange={onTab} onEdit={null} />
+        <EmptyState illustration={<Floo mood="worried" size="m" />} title="Program yüklenemedi" body="Bağlantını kontrol edip tekrar dene." action={{ label: "Tekrar dene", onPress: () => void program.refetch(), icon: "refresh" }} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen scroll={false}>
       <FlashList
         testID="history-list"
         data={rows}
-        keyExtractor={(row) => row.key}
-        getItemType={(row) => row.kind}
-        renderItem={({ item }) =>
-          item.kind === "week" ? (
-            <View style={styles.weekHead}>
-              <Text variant="label" color="inkMuted">
-                {item.title}
-              </Text>
-              <Text variant="caption" color="inkSubtle" tabular>
-                {item.count} antrenman
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.rowWrap}>
-              <HistoryRow log={item.log} onPress={showLog} onDelete={requestDelete} />
-            </View>
-          )
-        }
+        keyExtractor={keyOf}
+        getItemType={typeOf}
+        renderItem={renderItem}
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={
-          view && hasProgram && !history.isPending ? (
-            <EmptyState compact illustration={<Floo mood="think" size="s" animate={false} />} title="Henüz kayıt yok" body="İlk antrenmanını bitirdiğinde burada görünecek." testID="no-history" />
-          ) : null
-        }
-        refreshing={(program.isRefetching || history.isRefetching) && !program.isPending}
-        onRefresh={refresh}
-        contentContainerStyle={{ paddingHorizontal: spacing.gutter, paddingBottom: tabSpace + spacing.lg }}
+        ListEmptyComponent={listEmpty}
+        refreshControl={<ListRefreshControl refreshing={(program.isRefetching || history.isRefetching) && !program.isPending} onRefresh={refresh} />}
+        contentContainerStyle={contentStyle}
         showsVerticalScrollIndicator={false}
       />
 
       {/* Undo lives outside the list: a header that changes height re-triggers FlashList's layout pass. */}
-      {pending ? (
-        <Animated.View
-          entering={enterCard(0, reduceMotion)}
-          exiting={FadeOut.duration(reduceMotion ? 100 : 160)}
-          style={[styles.undoBar, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, bottom: tabSpace + spacing.md }]}
-          testID="undo-bar"
-        >
-          <Icon name="trash-outline" size={16} color="inkMuted" />
-          <Text variant="label" color="inkMuted" style={styles.grow} numberOfLines={1}>
-            Kayıt silindi
-          </Text>
-          <Chip label="Geri al" tone="primary" size="sm" icon="arrow-undo-outline" onPress={undoDelete} testID="undo-delete" />
-        </Animated.View>
-      ) : null}
+      {pending ? <UndoBar message="Kayıt silindi" onUndo={undoDelete} bottom={tabSpace + spacing.md} /> : null}
 
       <SkipSheet sheetRef={skipSheet.ref} dayTitle={currentDay?.title ?? ""} busy={skip.isPending} onConfirm={confirmSkip} onCancel={skipSheet.dismiss} />
       <JumpSheet sheetRef={jumpSheet.ref} days={view?.program.days ?? []} currentIndex={view?.program.currentIndex ?? 0} onSelect={confirmJump} />
-      <LogDetailSheet sheetRef={logSheet.ref} log={openLog} muscles={(muscles.data ?? []) as MuscleDTO[]} onDelete={requestDelete} />
+      <LogDetailSheet sheetRef={logSheet.ref} log={openLog} muscles={muscles.data ?? NO_MUSCLES} onDelete={requestDelete} />
       {view ? <ProgramEditorSheet sheetRef={editorSheet.ref} program={view.program} onClose={editorSheet.dismiss} /> : null}
     </Screen>
   );
 }
+
+const keyOf = (row: Row) => row.key;
+const typeOf = (row: Row) => row.kind;
 
 const styles = StyleSheet.create({
   tabsWrap: { gap: spacing.md },
@@ -348,19 +293,4 @@ const styles = StyleSheet.create({
   historyHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginTop: spacing.sm },
   weekHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", paddingTop: spacing.md, paddingBottom: spacing.sm },
   rowWrap: { paddingBottom: spacing.sm },
-  undoBar: {
-    position: "absolute",
-    left: spacing.gutter,
-    right: spacing.gutter,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    minHeight: 52,
-  },
-  grow: { flex: 1 },
 });

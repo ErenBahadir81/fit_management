@@ -26,15 +26,22 @@ const zEnv = z.object({
   UPLOAD_DIR: z.string().default("./uploads"),
   LOG_LEVEL: z.string().default("info"),
   SEED_ON_BOOT: zBool.default(true),
-  COOKIE_SECURE: zBool.default(false),
+  /** Defaults to on in production — see loadConfig; an explicit value always wins. */
+  COOKIE_SECURE: zBool,
 });
 
-export type AppConfig = z.infer<typeof zEnv> & { corsOrigins: string[]; isTest: boolean; isProd: boolean };
+export type AppConfig = Omit<z.infer<typeof zEnv>, "COOKIE_SECURE"> & {
+  COOKIE_SECURE: boolean;
+  corsOrigins: string[];
+  isTest: boolean;
+  isProd: boolean;
+};
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = zEnv.parse({ ...env, JWT_SECRET: env.JWT_SECRET ?? (env.NODE_ENV === "test" ? "test-secret-test-secret" : undefined) });
   return {
     ...parsed,
+    COOKIE_SECURE: parsed.COOKIE_SECURE ?? parsed.NODE_ENV === "production",
     corsOrigins: parsed.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean),
     isTest: parsed.NODE_ENV === "test",
     isProd: parsed.NODE_ENV === "production",

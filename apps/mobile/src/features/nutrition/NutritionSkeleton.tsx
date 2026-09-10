@@ -1,19 +1,19 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { spacing } from "../../theme/tokens";
+import { radii, spacing } from "../../theme/tokens";
 import { useTheme } from "../../theme/ThemeProvider";
-import { Skeleton } from "../../ui/Skeleton";
+import { Skeleton, SkeletonGroup } from "../../ui/Skeleton";
 import { HERO_HEIGHT } from "./components/CalorieHero";
 import { ROW_HEIGHTS } from "./components/MealRows";
 
 /** Mirrors the day layout exactly (same heights) so the crossfade never moves anything. */
 export function NutritionSkeleton({ testID = "nutrition-skeleton" }: { testID?: string }) {
   return (
-    <View testID={testID} style={styles.stack}>
-      <Skeleton height={HERO_HEIGHT} radius={24} />
+    <SkeletonGroup testID={testID} style={styles.stack}>
+      <Skeleton height={HERO_HEIGHT} radius={radii.card} />
       <MealSkeleton entries={2} />
       <MealSkeleton entries={3} />
-    </View>
+    </SkeletonGroup>
   );
 }
 
@@ -43,7 +43,7 @@ function MealSkeleton({ entries }: { entries: number }) {
 
 const styles = StyleSheet.create({
   stack: { gap: spacing.lg },
-  meal: { borderRadius: 24, overflow: "hidden" },
+  meal: { borderRadius: radii.card, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg },
   grow: { flex: 1, gap: spacing.sm },
 });

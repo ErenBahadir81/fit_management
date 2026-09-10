@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { validateRateTable, zSettings, type SettingsDTO } from "@fitfloow/core";
 import { Settings, getSettings } from "../../models/settings";
+import { WeeklyReportCache } from "../../models/goal";
 import { AppError } from "../../lib/errors";
 import type { AppContext } from "../../context";
 
@@ -17,6 +18,8 @@ export async function adminSettingsRoutes(app: FastifyInstance, opts: { ctx: App
     if (problems.length > 0) throw AppError.validation("Hız tablosu geçersiz", problems);
     const next: SettingsDTO = { ...data, updatedAt: ctx.now().toISOString() };
     await Settings.updateOne({ _id: "global" }, { $set: { data: next } }, { upsert: true });
+    // kcalPerKgFat, the EWMA alphas and the rate table are all baked into cached reports.
+    await WeeklyReportCache.deleteMany({});
     return getSettings();
   });
 }

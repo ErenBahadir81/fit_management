@@ -43,20 +43,21 @@ export function CurrentDayCard({ day, todayLog, weekNumber, busy, onStart, onSki
 }
 
 function DueCard({ day, weekNumber, busy, onStart, onSkip, onJump }: { day: DayDTO; weekNumber: number; busy?: boolean; onStart: () => void; onSkip: () => void; onJump: () => void }) {
+  const { colors } = useTheme();
   const counts = dayCounts(day);
   return (
     <Card variant="primary" style={styles.card} testID="current-day-card">
       <View style={styles.head}>
-        <Text variant="label" style={styles.onPrimaryMuted}>
-          {weekNumber}. HAFTA · {day.order}. GÜN
+        <Text variant="label" color="onPrimaryMuted" tabular>
+          {weekNumber}. hafta · {day.order}. gün
         </Text>
-        <Icon name={KIND_ICON[day.kind]} size={18} color="rgba(255,255,255,0.9)" />
+        <Icon name={KIND_ICON[day.kind]} size={18} color="onPrimaryMuted" />
       </View>
-      <Text variant="display" style={styles.onPrimary} numberOfLines={2}>
+      <Text variant="display" color="onPrimary" numberOfLines={2}>
         {day.title}
       </Text>
       {day.focus ? (
-        <Text variant="body" style={styles.onPrimaryMuted} numberOfLines={1}>
+        <Text variant="body" color="onPrimaryMuted" numberOfLines={1}>
           {day.focus}
         </Text>
       ) : null}
@@ -68,13 +69,13 @@ function DueCard({ day, weekNumber, busy, onStart, onSkip, onJump }: { day: DayD
       </View>
 
       {day.exercises.length > 0 ? (
-        <View style={styles.exerciseList}>
+        <View style={[styles.exerciseList, { borderTopColor: colors.onPrimaryBorder }]}>
           {day.exercises.slice(0, 4).map((e) => (
             <View key={e.name} style={styles.exerciseRow}>
-              <Text variant="body" style={styles.onPrimary} numberOfLines={1}>
+              <Text variant="body" color="onPrimary" numberOfLines={1}>
                 {e.name}
               </Text>
-              <Text variant="label" tabular style={styles.onPrimaryMuted}>
+              <Text variant="label" tabular color="onPrimaryMuted">
                 {e.targetSets}×{e.targetReps}
                 {e.metric === "time" ? " sn" : ""}
                 {e.targetRIR !== null ? ` · RIR ${e.targetRIR}` : ""}
@@ -82,7 +83,7 @@ function DueCard({ day, weekNumber, busy, onStart, onSkip, onJump }: { day: DayD
             </View>
           ))}
           {day.exercises.length > 4 ? (
-            <Text variant="caption" style={styles.onPrimaryMuted}>
+            <Text variant="caption" color="onPrimaryMuted">
               +{day.exercises.length - 4} hareket daha
             </Text>
           ) : null}
@@ -116,8 +117,8 @@ function RestCard({ day, busy, onSkip, onJump }: { day: DayDTO; busy?: boolean; 
         <View style={[styles.badge, { backgroundColor: colors.surface }]}>
           <Icon name="bed-outline" size={18} color="primary" />
         </View>
-        <Text variant="label" color="inkMuted">
-          {day.order}. GÜN
+        <Text variant="label" color="inkMuted" tabular>
+          {day.order}. gün
         </Text>
       </View>
       <Text variant="heading">Dinlenme günü</Text>
@@ -176,8 +177,8 @@ function DoneCard({ log, busy, onUndo, onOpenLog, onJump }: { log: WorkoutLogDTO
 function Meta({ icon, label }: { icon: IconName; label: string }) {
   return (
     <View style={styles.meta}>
-      <Icon name={icon} size={14} color="rgba(255,255,255,0.85)" />
-      <Text variant="caption" tabular style={styles.onPrimaryMuted}>
+      <Icon name={icon} size={14} color="onPrimaryMuted" />
+      <Text variant="caption" tabular color="onPrimaryMuted">
         {label}
       </Text>
     </View>
@@ -187,11 +188,9 @@ function Meta({ icon, label }: { icon: IconName; label: string }) {
 const styles = StyleSheet.create({
   card: { minHeight: DAY_CARD_MIN_HEIGHT, gap: spacing.sm, justifyContent: "center" },
   head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  onPrimary: { color: "#FFFFFF" },
-  onPrimaryMuted: { color: "rgba(255,255,255,0.82)" },
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md, marginTop: spacing.xs },
   meta: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  exerciseList: { gap: spacing.xs, marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.25)" },
+  exerciseList: { gap: spacing.xs, marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   exerciseRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
   actions: { flexDirection: "row", marginTop: spacing.md },

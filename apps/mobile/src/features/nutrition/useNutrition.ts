@@ -22,9 +22,11 @@ import {
 } from "@fitfloow/core";
 import { useSession } from "../auth/session";
 import { useInvalidateHome } from "../home/useHome";
+import { REPORT_KEYS } from "../reports/useReport";
 import { getApi } from "../../lib/api";
 import { todayKey } from "../../lib/dates";
-import { env } from "../../lib/env";
+import { FAKE_API } from "../../lib/env";
+import { describeError } from "../../lib/errors";
 import { useToast } from "../../ui/Toast";
 import { addEntryToDay, makeOptimisticEntry, removeEntryFromDay, replaceEntryInDay, updateEntryInDay, type DraftEntry } from "./model/day";
 import { useDebouncedValue } from "./useDebouncedValue";
@@ -49,7 +51,7 @@ type NutritionFakeModule = typeof import("../../lib/fake/nutritionFake");
 type FakeStateOf = Parameters<NutritionFakeModule["findByBarcode"]>[0];
 
 function nutritionFake(): { mod: NutritionFakeModule; state: FakeStateOf } | null {
-  if (!env.fakeApi) return null;
+  if (!FAKE_API) return null;
   const state = (getApi() as { fake?: FakeStateOf }).fake;
   if (!state) return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -182,6 +184,7 @@ function useAfterWrite(dateKey: string) {
     void qc.invalidateQueries({ queryKey: nutritionDayKey(dateKey) });
     void qc.invalidateQueries({ queryKey: nutritionWeekKey(weekKeyFor(dateKey, startWeekday)) });
     void qc.invalidateQueries({ queryKey: NUTRITION_RECENT_KEY });
+    void qc.invalidateQueries({ queryKey: REPORT_KEYS.all }); // deficit bars, score, highlights
     void invalidateHome();
   }, [dateKey, invalidateHome, qc, startWeekday]);
 }
@@ -200,9 +203,9 @@ export function useAddEntry(dateKey: string) {
       const prev = patchDay(qc, dateKey, (day) => addEntryToDay(day, optimistic));
       return { prev, optimisticId: optimistic.id };
     },
-    onError: (_e, _input, ctx) => {
+    onError: (e, _input, ctx) => {
       if (ctx?.prev) qc.setQueryData(nutritionDayKey(dateKey), ctx.prev);
-      toast.show({ message: "Ekleyemedim, tekrar dener misin?", kind: "error" });
+      toast.show({ message: describeError(e, "Ekleyemedim, tekrar dener misin?"), kind: "error" });
     },
     onSuccess: (entry, _input, ctx) => {
       if (ctx?.optimisticId) patchDay(qc, dateKey, (day) => replaceEntryInDay(day, ctx.optimisticId, entry));
@@ -250,9 +253,9 @@ export function useUpdateEntry(dateKey: string) {
       const prev = patchDay(qc, dateKey, (day) => updateEntryInDay(day, input.id, { grams: input.grams, meal: input.meal }));
       return { prev };
     },
-    onError: (_e, _input, ctx) => {
+    onError: (e, _input, ctx) => {
       if (ctx?.prev) qc.setQueryData(nutritionDayKey(dateKey), ctx.prev);
-      toast.show({ message: "Güncelleyemedim, tekrar dener misin?", kind: "error" });
+      toast.show({ message: describeError(e, "Güncelleyemedim, tekrar dener misin?"), kind: "error" });
     },
     onSettled: afterWrite,
   });
@@ -270,9 +273,9 @@ export function useDeleteEntry(dateKey: string) {
       const prev = patchDay(qc, dateKey, (day) => removeEntryFromDay(day, id));
       return { prev };
     },
-    onError: (_e, _id, ctx) => {
+    onError: (e, _id, ctx) => {
       if (ctx?.prev) qc.setQueryData(nutritionDayKey(dateKey), ctx.prev);
-      toast.show({ message: "Silemedim, tekrar dener misin?", kind: "error" });
+      toast.show({ message: describeError(e, "Silemedim, tekrar dener misin?"), kind: "error" });
     },
     onSettled: afterWrite,
   });
@@ -289,9 +292,10 @@ export function useSetTarget() {
       qc.setQueryData(NUTRITION_TARGET_KEY, target);
       void qc.invalidateQueries({ queryKey: ["nutrition-day"] });
       void qc.invalidateQueries({ queryKey: ["nutrition-week"] });
+      void qc.invalidateQueries({ queryKey: REPORT_KEYS.all });
       void invalidateHome();
     },
-    onError: () => toast.show({ message: "Hedefi kaydedemedim.", kind: "error" }),
+    onError: (e) => toast.show({ message: describeError(e, "Hedefi kaydedemedim."), kind: "error" }),
   });
 }
 

@@ -3,12 +3,24 @@ import { z } from "zod";
 import { zLoginInput, zUpdateMeInput, zChangePasswordInput } from "@fitfloow/core";
 import bcrypt from "bcryptjs";
 import { User, toUserDTO } from "../../models/user";
+import { invalidateAllWeeklyReports } from "../../models/goal";
 import { AppError } from "../../lib/errors";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "../../lib/auth";
 import type { AppConfig } from "../../config";
 import { hashPassword, login, revokeRefreshToken, rotateRefreshToken } from "./auth.service";
 
 const zRefreshBody = z.object({ refreshToken: z.string().optional() }).default({});
+
+/**
+ * Login is limited **per IP** (02-api-contract.md): the caller is not authenticated yet, so the
+ * bucket must never be derived from anything the client controls (a header would let an attacker
+ * mint a new bucket per guess).
+ */
+export const LOGIN_RATE_LIMIT = {
+  max: 20,
+  timeWindow: "1 minute",
+  keyGenerator: (req: { ip: string }) => `login:${req.ip}`,
+};
 
 export async function authRoutes(app: FastifyInstance, opts: { config: AppConfig }) {
   const { config } = opts;
@@ -23,7 +35,7 @@ export async function authRoutes(app: FastifyInstance, opts: { config: AppConfig
     "/auth/login",
     {
       schema: { body: zLoginInput, querystring: z.object({ cookie: z.string().optional() }) },
-      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      config: { rateLimit: LOGIN_RATE_LIMIT },
     },
     async (req, reply) => {
       const { username, password } = req.body as z.infer<typeof zLoginInput>;
@@ -67,8 +79,14 @@ export async function authRoutes(app: FastifyInstance, opts: { config: AppConfig
 
   app.patch("/me", { preHandler: [app.authenticate], schema: { body: zUpdateMeInput } }, async (req) => {
     const input = req.body as z.infer<typeof zUpdateMeInput>;
+    const before = await User.findById(req.auth.id).select("measurementDay").lean();
+    if (!before) throw AppError.notFound("Kullanıcı");
     const user = await User.findByIdAndUpdate(req.auth.id, { $set: input }, { returnDocument: "after" });
     if (!user) throw AppError.notFound("Kullanıcı");
+    // The measurement day *is* the week boundary: every cached report is keyed by the old one.
+    if (input.measurementDay !== undefined && input.measurementDay !== before.measurementDay) {
+      await invalidateAllWeeklyReports(user._id);
+    }
     return { user: toUserDTO(user) };
   });
 

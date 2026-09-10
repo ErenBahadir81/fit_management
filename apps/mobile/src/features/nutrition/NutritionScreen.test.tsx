@@ -1,8 +1,7 @@
 import React from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { shiftKey, type NutritionDayView } from "@fitfloow/core";
-import { QueryClient } from "@tanstack/react-query";
-import { renderUI } from "../../../__tests__/helpers";
+import { makeQueryClient, renderUI } from "../../../__tests__/helpers";
 import { mockRouter } from "../../../__tests__/mocks/expo-router";
 import { useSession } from "../auth/session";
 import { getApi, setApi } from "../../lib/api";
@@ -29,14 +28,6 @@ jest.mock("expo-camera", () => {
 
 const today = todayKey();
 
-/**
- * Like the shared `makeQueryClient` but mutations are garbage-collected at once: react-query's
- * default 5-minute mutation GC timer keeps the jest event loop alive after the suite finishes.
- */
-function testClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 0 }, mutations: { retry: false, gcTime: 0 } } });
-}
-
 async function signedInApi(latencyMs = 0) {
   const api = createNutritionFakeApi({ latencyMs, signedIn: true });
   setApi(api);
@@ -52,7 +43,7 @@ describe("NutritionScreen — day", () => {
 
   test("shows the skeleton first, then today's ring and meal sections", async () => {
     await signedInApi(30); // a beat of latency so the cold first paint is the skeleton
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     expect(screen.getByTestId("nutrition-skeleton", { includeHiddenElements: true })).toBeTruthy();
 
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
@@ -67,7 +58,7 @@ describe("NutritionScreen — day", () => {
 
   test("renders straight from a warm cache without mounting the skeleton", async () => {
     const api = await signedInApi();
-    const qc = testClient();
+    const qc = makeQueryClient();
     qc.setQueryData(nutritionDayKey(today), await api.nutrition.day(today));
     await renderUI(<NutritionScreen />, { queryClient: qc });
     expect(screen.queryByTestId("nutrition-skeleton", { includeHiddenElements: true })).toBeNull();
@@ -75,7 +66,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("the FAB opens the action sheet; 'Tara' routes to the scan modal with the date and meal", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
 
     await fireEvent.press(screen.getByTestId("nutrition-fab"));
@@ -87,7 +78,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("search → pick a food → add: the entry and the totals update optimistically", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
 
     await fireEvent.press(screen.getByTestId("meal-add-snack"));
@@ -106,7 +97,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("tapping an entry edits its grams; deleting offers an undo that restores it", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByText("Tavuk göğsü (ızgara)")).toBeTruthy());
 
     const day = await getApi().nutrition.day(today);
@@ -128,7 +119,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("'Elle gir' logs a hand-typed food into the chosen meal", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
 
     await fireEvent.press(screen.getByTestId("meal-add-breakfast"));
@@ -147,7 +138,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("the barcode reader resolves a packaged product and adds it", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
 
     await fireEvent.press(screen.getByTestId("nutrition-fab"));
@@ -165,7 +156,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("an unknown barcode offers manual entry instead of a dead end", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
 
     await fireEvent.press(screen.getByTestId("nutrition-fab"));
@@ -180,7 +171,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("the target sheet switches to manual macros and the ring follows", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
 
     await fireEvent.press(screen.getByTestId("open-target"));
@@ -193,7 +184,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("the day pager moves to another day and the 'Bugün' pill comes back", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
     expect(screen.queryByTestId("jump-today")).toBeNull();
 
@@ -206,7 +197,7 @@ describe("NutritionScreen — day", () => {
   });
 
   test("the week tab shows the bars, the average and an adherence chip", async () => {
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
 
     await fireEvent.press(screen.getByTestId("nutrition-tabs-week"));
@@ -218,7 +209,7 @@ describe("NutritionScreen — day", () => {
 
   test("an unreachable API shows a retry state instead of a crash", async () => {
     setApi(createNutritionFakeApi({ latencyMs: 0 })); // no session → 401
-    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByText("Tekrar dene")).toBeTruthy());
   });
 });
@@ -227,7 +218,7 @@ describe("NutritionScreen — optimistic rollback", () => {
   test("a failed add is rolled back and the user is told", async () => {
     const api = await signedInApi();
     jest.spyOn(api.nutrition, "addEntry").mockRejectedValue(Object.assign(new Error("boom"), { status: 500 }));
-    const qc = testClient();
+    const qc = makeQueryClient();
     const before = (await api.nutrition.day(today)) as NutritionDayView;
     qc.setQueryData(nutritionDayKey(today), before);
 

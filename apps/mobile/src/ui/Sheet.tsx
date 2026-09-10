@@ -1,8 +1,10 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useRef } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { StyleSheet, View, type ViewStyle, type StyleProp } from "react-native";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps, type BottomSheetModalProps } from "@gorhom/bottom-sheet";
+import { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeProvider";
+import { springs } from "../theme/motion";
 import { radii, spacing } from "../theme/tokens";
 import { Text } from "./Text";
 
@@ -17,6 +19,12 @@ export interface SheetProps extends Partial<Omit<BottomSheetModalProps, "childre
   /** Pad content with the screen gutter (default true). */
   padded?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /**
+   * Declarative mode: `true` presents on mount / when it flips to true, `false` dismisses.
+   * Pair it with `onDismiss` to unmount the sheet after the close animation. Leave undefined to
+   * drive the sheet through the ref (`useSheet`).
+   */
+  open?: boolean;
 }
 
 function Backdrop(props: BottomSheetBackdropProps) {
@@ -24,15 +32,25 @@ function Backdrop(props: BottomSheetBackdropProps) {
 }
 
 /**
- * Bottom sheet (gorhom v5) with dynamic sizing, dimmed backdrop, drag handle and keyboard awareness.
- * `const ref = useSheet(); <Sheet ref={ref}>…</Sheet>; ref.current?.present()`.
- * Use full-screen modal routes (app/(modals)) instead when the flow needs the whole screen.
+ * The one bottom sheet (gorhom v5): dynamic sizing, dimmed backdrop, drag handle, keyboard-aware
+ * (`interactive`) and the app's `gentle` spring. Imperative (`useSheet` → ref) or declarative (`open`).
+ * Full-screen flows (camera, workout logger) are routes under `app/(modals)` instead.
  */
-export const Sheet = forwardRef<SheetRef, SheetProps>(function Sheet({ children, title, padded = true, contentStyle, ...rest }, ref) {
+export const Sheet = forwardRef<SheetRef, SheetProps>(function Sheet({ children, title, padded = true, contentStyle, open, ...rest }, ref) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const reduce = useReducedMotion();
   const modal = useRef<BottomSheetModal>(null);
   useImperativeHandle(ref, () => ({ present: () => modal.current?.present(), dismiss: () => modal.current?.dismiss() }), []);
+
+  useEffect(() => {
+    if (open === undefined) return;
+    if (open) modal.current?.present();
+    else modal.current?.dismiss();
+  }, [open]);
+
+  // One spring for every sheet; reduced motion gets a short, non-bouncy timing-like spring.
+  const animationConfigs = useMemo(() => (reduce ? { damping: 40, stiffness: 400, mass: 1, overshootClamping: true } : { ...springs.gentle, overshootClamping: false }), [reduce]);
 
   return (
     <BottomSheetModal
@@ -42,6 +60,7 @@ export const Sheet = forwardRef<SheetRef, SheetProps>(function Sheet({ children,
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       android_keyboardInputMode="adjustResize"
+      animationConfigs={animationConfigs}
       backdropComponent={Backdrop}
       backgroundStyle={{ backgroundColor: isDark ? colors.surfaceElevated : colors.surface, borderRadius: radii.sheet }}
       handleIndicatorStyle={{ backgroundColor: colors.borderStrong, width: 40, height: 5 }}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View, type ScrollViewProps } from "react-native";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { FlashList } from "@shopify/flash-list";
@@ -10,8 +10,8 @@ import { Chip } from "../../../ui/Chip";
 import { EmptyState } from "../../../ui/EmptyState";
 import { Icon } from "../../../ui/Icon";
 import { Pressable } from "../../../ui/Pressable";
-import { Sheet, useSheet } from "../../../ui/Sheet";
-import { Skeleton } from "../../../ui/Skeleton";
+import { Sheet } from "../../../ui/Sheet";
+import { Skeleton, SkeletonGroup } from "../../../ui/Skeleton";
 import { Text } from "../../../ui/Text";
 import { useFoodSearch, useRecentFoods } from "../useNutrition";
 import { CustomFoodForm } from "./CustomFoodForm";
@@ -48,14 +48,11 @@ type Mode = { kind: "list" } | { kind: "detail"; food: FoodDTO } | { kind: "cust
 
 /** Search / recents / custom food, all in one sheet with a back step to the list. */
 export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClose, adding }: SearchSheetProps) {
-  const sheet = useSheet();
   const { colors } = useTheme();
   const [meal, setMeal] = useState<Meal>(initialMeal);
   const [text, setText] = useState("");
   const [remote, setRemote] = useState(false);
   const [mode, setMode] = useState<Mode>(start === "manual" ? { kind: "custom" } : { kind: "list" });
-
-  useEffect(() => sheet.present(), [sheet]);
 
   const search = useFoodSearch(text, { remote });
   const recents = useRecentFoods();
@@ -63,14 +60,8 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
   const items = showRecents ? recents.data ?? [] : [...search.foods, ...search.remote];
 
   const openDetail = useCallback((food: FoodDTO) => setMode({ kind: "detail", food }), []);
-  /** Every add closes the sheet first, so the day (or the scan sheet) is what springs back. */
-  const submit = useCallback(
-    (input: SearchAddInput) => {
-      sheet.dismiss();
-      onAdd(input);
-    },
-    [onAdd, sheet]
-  );
+  /** Every add hands the input up; the parent unmounts this sheet so the day (or the scan sheet) is what springs back. */
+  const submit = useCallback((input: SearchAddInput) => onAdd(input), [onAdd]);
   const quickAdd = useCallback((food: FoodDTO, grams: number) => submit({ food, grams, meal }), [meal, submit]);
 
   const listEmpty = useMemo(() => {
@@ -90,7 +81,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
   }, [recents.isPending, remote, search.isPending, showRecents]);
 
   return (
-    <Sheet ref={sheet.ref} onDismiss={onClose}>
+    <Sheet open onDismiss={onClose}>
       {mode.kind === "detail" ? (
         <FoodDetail
           testID="search-detail"
@@ -214,14 +205,14 @@ function FoodRow({ food, onPress, onQuickAdd }: { food: FoodDTO; onPress: (f: Fo
 
 function ResultsSkeleton() {
   return (
-    <View style={styles.skeleton} testID="food-results-skeleton">
+    <SkeletonGroup style={styles.skeleton} testID="food-results-skeleton">
       {[0, 1, 2, 3].map((i) => (
         <View key={i} style={styles.skeletonRow}>
           <Skeleton width={`${50 + i * 8}%`} height={14} />
           <Skeleton width="35%" height={10} />
         </View>
       ))}
-    </View>
+    </SkeletonGroup>
   );
 }
 

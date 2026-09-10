@@ -7,7 +7,7 @@ import { createEntry, dayView, deleteEntry, updateEntry, weekView } from "./entr
 import { resolveTarget, setTarget } from "./target.service";
 
 const zSearchQuery = z.object({
-  q: z.string().default(""),
+  q: z.string().max(80).default(""),
   limit: z.coerce.number().int().min(1).max(MAX_SEARCH_LIMIT).default(20),
   /** Accepts the client's `remote=1`; anything falsy or absent keeps the request local. */
   remote: z.string().max(8).optional(),

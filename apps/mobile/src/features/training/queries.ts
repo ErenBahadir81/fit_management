@@ -19,9 +19,11 @@ import {
   type WorkoutLogDTO,
 } from "@fitfloow/core";
 import { getApi } from "../../lib/api";
+import { describeError } from "../../lib/errors";
 import { haptic } from "../../lib/haptics";
 import { useToast } from "../../ui/Toast";
 import { HOME_QUERY_KEY } from "../home/useHome";
+import { REPORT_KEYS } from "../reports/useReport";
 
 export interface WorkoutsParams {
   from?: string;
@@ -79,7 +81,7 @@ export function useMuscles() {
   });
 }
 
-/** Refresh everything a completed/skipped session touches. */
+/** Refresh everything a completed/skipped session touches: program, recovery, history, stats, home and the weekly report. */
 export function useInvalidateTraining() {
   const qc = useQueryClient();
   return useCallback(() => {
@@ -88,6 +90,8 @@ export function useInvalidateTraining() {
     void qc.invalidateQueries({ queryKey: ["workouts"] });
     void qc.invalidateQueries({ queryKey: ["training-stats"] });
     void qc.invalidateQueries({ queryKey: HOME_QUERY_KEY });
+    void qc.invalidateQueries({ queryKey: REPORT_KEYS.all });
+    void qc.invalidateQueries({ queryKey: ["mascot"] });
   }, [qc]);
 }
 
@@ -176,10 +180,10 @@ function useRollback() {
   const qc = useQueryClient();
   const toast = useToast();
   return useCallback(
-    (ctx: ProgramCtx | undefined, message: string) => {
+    (ctx: ProgramCtx | undefined, error: unknown, message: string) => {
       if (ctx?.prev) qc.setQueryData(trainingKeys.program, ctx.prev);
       else void qc.invalidateQueries({ queryKey: trainingKeys.program });
-      toast.show({ message, kind: "error" });
+      toast.show({ message: describeError(error, message), kind: "error" });
     },
     [qc, toast]
   );
@@ -197,7 +201,7 @@ export function useSkipDay() {
       if (prev) qc.setQueryData(trainingKeys.program, applySession(prev, null, trDateKey()));
       return { prev };
     },
-    onError: (_e, _v, ctx) => rollback(ctx, "Gün atlanamadı. Tekrar dene."),
+    onError: (e, _v, ctx) => rollback(ctx, e, "Gün atlanamadı. Tekrar dene."),
     onSuccess: () => {
       void haptic.select();
       invalidate();
@@ -217,11 +221,9 @@ export function useCompleteWorkout() {
       if (prev) qc.setQueryData(trainingKeys.program, applySession(prev, input, trDateKey()));
       return { prev };
     },
-    onError: (_e, _v, ctx) => rollback(ctx, "Antrenman kaydedilemedi. Tekrar dene."),
-    onSuccess: () => {
-      void haptic.success();
-      invalidate();
-    },
+    onError: (e, _v, ctx) => rollback(ctx, e, "Antrenman kaydedilemedi. Tekrar dene."),
+    // The success haptic belongs to the SuccessCheck the logger shows — one big moment, one buzz.
+    onSuccess: () => invalidate(),
   });
 }
 
@@ -244,7 +246,7 @@ export function useJumpTo() {
       }
       return { prev };
     },
-    onError: (_e, _v, ctx) => rollback(ctx, "Gün değiştirilemedi."),
+    onError: (e, _v, ctx) => rollback(ctx, e, "Gün değiştirilemedi."),
     onSuccess: () => {
       void haptic.select();
       void qc.invalidateQueries({ queryKey: trainingKeys.program });
@@ -272,11 +274,12 @@ export function useUpdateProgram() {
       }
       return { prev };
     },
-    onError: (_e, _v, ctx) => rollback(ctx, "Program kaydedilemedi. Tekrar dene."),
+    onError: (e, _v, ctx) => rollback(ctx, e, "Program kaydedilemedi. Tekrar dene."),
     onSuccess: () => {
       void haptic.success();
       void qc.invalidateQueries({ queryKey: trainingKeys.program });
       void qc.invalidateQueries({ queryKey: HOME_QUERY_KEY });
+      void qc.invalidateQueries({ queryKey: REPORT_KEYS.all }); // planned sessions per week
     },
   });
 }
@@ -294,9 +297,9 @@ export function useDeleteWorkout() {
       for (const [key, logs] of lists) qc.setQueryData(key, logs.filter((l) => l.id !== id));
       return { lists };
     },
-    onError: (_e, _id, ctx) => {
+    onError: (e, _id, ctx) => {
       for (const [key, logs] of ctx?.lists ?? []) qc.setQueryData(key, logs);
-      toast.show({ message: "Kayıt silinemedi.", kind: "error" });
+      toast.show({ message: describeError(e, "Kayıt silinemedi."), kind: "error" });
     },
     onSuccess: () => invalidate(),
   });
@@ -308,7 +311,7 @@ export function useUndoLast() {
   const toast = useToast();
   return useMutation<unknown, unknown, void>({
     mutationFn: async () => getApi().training.undoLast(),
-    onError: () => toast.show({ message: "Geri alınamadı.", kind: "error" }),
+    onError: (e) => toast.show({ message: describeError(e, "Geri alınamadı."), kind: "error" }),
     onSuccess: () => {
       void haptic.select();
       invalidate();

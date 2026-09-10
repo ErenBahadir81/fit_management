@@ -1,6 +1,6 @@
 import React from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut, LinearTransition, ZoomIn, useReducedMotion } from "react-native-reanimated";
 import type { MuscleDTO } from "@fitfloow/core";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
@@ -28,7 +28,9 @@ export interface ExercisePaneProps {
 /** One exercise, one pane: logged sets above, the set you are on as the hero. */
 export function ExercisePane({ exercise, index, width, muscles, onSetReps, onSetRir, onUndoSet, onAddSet, onRemoveSet, onToggleSkip }: ExercisePaneProps) {
   const { colors } = useTheme();
+  const reduce = useReducedMotion();
   const active = activeSetIndex(exercise);
+  const rowLayout = reduce ? undefined : LinearTransition.springify().damping(20).stiffness(220);
   const isTime = exercise.metric === "time";
   const unit = isTime ? "sn" : "tekrar";
   const nameOf = (key: string) => muscles.find((m) => m.key === key)?.name ?? key;
@@ -67,28 +69,30 @@ export function ExercisePane({ exercise, index, width, muscles, onSetReps, onSet
             <View style={styles.setList}>
               {exercise.sets.map((set, i) =>
                 set.done ? (
-                  <Pressable
-                    key={i}
-                    onPress={() => onUndoSet(i)}
-                    haptic="select"
-                    testID={`set-done-${index}-${i}`}
-                    accessibilityLabel={`${i + 1}. set tamam, ${set.reps} ${unit}${set.rir !== null ? `, RIR ${set.rir}` : ""}. Geri almak için dokun`}
-                    style={[styles.doneRow, { backgroundColor: colors.successSoft }]}
-                  >
-                    <View style={[styles.badge, { backgroundColor: colors.success }]}>
-                      <Icon name="checkmark" size={14} color={colors.inkInverse} />
-                    </View>
-                    <Text variant="bodyStrong" tabular style={styles.grow}>
-                      {set.reps} {unit}
-                    </Text>
-                    {set.rir !== null ? (
-                      <Text variant="caption" color="inkMuted" tabular>
-                        RIR {set.rir}
+                  // Completing a set: the row settles into place and the check pops in (bouncy spring).
+                  <Animated.View key={i} layout={rowLayout} entering={reduce ? FadeIn.duration(150) : FadeIn.duration(180)} exiting={FadeOut.duration(120)}>
+                    <Pressable
+                      onPress={() => onUndoSet(i)}
+                      haptic="select"
+                      testID={`set-done-${index}-${i}`}
+                      accessibilityLabel={`${i + 1}. set tamam, ${set.reps} ${unit}${set.rir !== null ? `, RIR ${set.rir}` : ""}. Geri almak için dokun`}
+                      style={[styles.doneRow, { backgroundColor: colors.successSoft }]}
+                    >
+                      <Animated.View entering={reduce ? undefined : ZoomIn.springify().damping(12).stiffness(220)} style={[styles.badge, { backgroundColor: colors.success }]}>
+                        <Icon name="checkmark" size={14} color="onPrimary" />
+                      </Animated.View>
+                      <Text variant="bodyStrong" tabular style={styles.grow}>
+                        {set.reps} {unit}
                       </Text>
-                    ) : null}
-                  </Pressable>
+                      {set.rir !== null ? (
+                        <Text variant="caption" color="inkMuted" tabular>
+                          RIR {set.rir}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  </Animated.View>
                 ) : i === active ? (
-                  <Animated.View key={i} entering={FadeIn.duration(160)} style={[styles.activeCard, { backgroundColor: colors.surface, borderColor: colors.primary }]} testID={`set-active-${index}`}>
+                  <Animated.View key={i} layout={rowLayout} entering={FadeIn.duration(160)} style={[styles.activeCard, { backgroundColor: colors.surface, borderColor: colors.primary }]} testID={`set-active-${index}`}>
                     <Text variant="label" tone="primary">
                       {i + 1}. SET
                     </Text>
@@ -106,7 +110,7 @@ export function ExercisePane({ exercise, index, width, muscles, onSetReps, onSet
                     </View>
                   </Animated.View>
                 ) : (
-                  <View key={i} style={[styles.pendingRow, { borderColor: colors.border }]} testID={`set-pending-${index}-${i}`}>
+                  <Animated.View key={i} layout={rowLayout} style={[styles.pendingRow, { borderColor: colors.border }]} testID={`set-pending-${index}-${i}`}>
                     <View style={[styles.badge, { backgroundColor: colors.surfaceMuted }]}>
                       <Text variant="caption" color="inkMuted" tabular>
                         {i + 1}
@@ -115,7 +119,7 @@ export function ExercisePane({ exercise, index, width, muscles, onSetReps, onSet
                     <Text variant="body" color="inkSubtle" tabular style={styles.grow}>
                       {set.reps} {unit}
                     </Text>
-                  </View>
+                  </Animated.View>
                 )
               )}
             </View>

@@ -91,7 +91,7 @@ export function WorkoutScreen() {
 
   const completeSet = useCallback(() => {
     if (!state) return;
-    void haptic.success();
+    void haptic.medium(); // one firm tap per set; the success buzz is saved for the finish
     dispatch({ type: "complete-set", at: Date.now() });
   }, [dispatch, state]);
 
@@ -144,13 +144,14 @@ export function WorkoutScreen() {
   }
 
   if (!state || paneCount === 0) {
+    const noProgram = Boolean(view && view.program.days.length === 0);
     return (
       <Screen tabBar={false} edges={["top", "bottom"]}>
         <Header title="Antrenman" compact left={{ icon: "close", label: "Kapat", onPress: () => router.back() }} />
         <EmptyState
           illustration={<Floo mood="sleepy" size="m" />}
-          title={view ? "Bugün kaydedilecek bir şey yok" : "Hazırlanıyor…"}
-          body={view ? "Bugün dinlenme günü. Yarın görüşürüz." : "Programın yükleniyor."}
+          title={!view ? "Hazırlanıyor…" : noProgram ? "Program atanmamış" : "Bugün kaydedilecek bir şey yok"}
+          body={!view ? "Programın yükleniyor." : noProgram ? "Antrenörün bir program tanımladığında buradan başlarsın." : "Bugün dinlenme günü. Yarın görüşürüz."}
           testID="workout-empty"
         />
       </Screen>

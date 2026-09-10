@@ -42,8 +42,7 @@ export function Pressable({
 
   const animate = useCallback(
     (to: number) => {
-      "worklet";
-      scale.value = reduceMotion ? withTiming(to, timing.reduced) : withSpring(to, springs.snappy);
+      scale.set(reduceMotion ? withTiming(to, timing.reduced) : withSpring(to, springs.snappy));
     },
     [reduceMotion, scale]
   );
@@ -73,7 +72,7 @@ export function Pressable({
     [disabled, onPress]
   );
 
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }] }));
 
   return (
     <AnimatedRNPressable

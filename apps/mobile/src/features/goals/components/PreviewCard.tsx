@@ -29,7 +29,7 @@ export function PreviewCard({ plan, pending, warnings }: PreviewCardProps) {
     <View style={styles.wrap}>
       <Card variant="primary" style={styles.card} testID="goal-preview" accessibilityLabel={plan && reachable ? `Plan: ${fmtNumber(plan.fatToLoseKg, 1)} kilo yağ, ${plan.estimatedWeeks} hafta, günde ${fmtInt(plan.initialDailyCalorieTarget)} kalori` : "Plan hesaplanamadı"}>
         <View style={styles.head}>
-          <Text variant="label" style={styles.muted}>
+          <Text variant="label" color="onPrimaryMuted">
             Plan önizleme
           </Text>
           <Status pending={pending} />
@@ -37,8 +37,8 @@ export function PreviewCard({ plan, pending, warnings }: PreviewCardProps) {
         {plan && reachable ? (
           <>
             <View style={styles.heroRow}>
-              <CountUp value={plan.fatToLoseKg} format={fmt1} variant="hero" style={styles.white} testID="preview-fat" />
-              <Text variant="title" style={styles.muted}>
+              <CountUp value={plan.fatToLoseKg} format={fmt1} variant="hero" color="onPrimary" testID="preview-fat" />
+              <Text variant="title" color="onPrimaryMuted">
                 kg yağ
               </Text>
             </View>
@@ -47,16 +47,16 @@ export function PreviewCard({ plan, pending, warnings }: PreviewCardProps) {
               <Stat value={`${fmtInt(plan.initialDailyCalorieTarget)} kcal`} label="günlük" testID="preview-kcal" />
               <Stat value={fmtDate(plan.targetDate, "short")} label="hedef tarih" testID="preview-date" />
             </View>
-            <Text variant="caption" style={styles.muted} tabular>
+            <Text variant="caption" color="onPrimaryMuted" tabular>
               Haftada ~{fmtNumber(plan.initialRateKgPerWeek, 2)} kg · {fmtInt(plan.macros.protein)} g protein
             </Text>
           </>
         ) : (
           <View style={styles.unreachable}>
-            <Text variant="title" style={styles.white}>
+            <Text variant="title" color="onPrimary">
               {plan ? "Bu hedef zaten geride" : "Önce bir ölçüm gerekli"}
             </Text>
-            <Text variant="body" style={styles.muted}>
+            <Text variant="body" color="onPrimaryMuted">
               {plan ? "Şu anki oranının altında bir hedef seç." : "Yağ oranını hesaplamak için boyun ve bel ölçüsü lazım."}
             </Text>
           </View>
@@ -76,10 +76,10 @@ export function PreviewCard({ plan, pending, warnings }: PreviewCardProps) {
 function Stat({ value, label, testID }: { value: string; label: string; testID?: string }) {
   return (
     <View style={styles.stat}>
-      <Text variant="title" style={styles.white} tabular numberOfLines={1} testID={testID}>
+      <Text variant="title" color="onPrimary" tabular numberOfLines={1} testID={testID}>
         {value}
       </Text>
-      <Text variant="caption" style={styles.muted}>
+      <Text variant="caption" color="onPrimaryMuted">
         {label}
       </Text>
     </View>
@@ -91,19 +91,19 @@ function Status({ pending }: { pending: boolean }) {
   const reduce = useReducedMotion();
   const pulse = useSharedValue(1);
   useEffect(() => {
-    if (pending && !reduce) pulse.value = withRepeat(withTiming(0.3, { duration: 600, easing: Easing.inOut(Easing.quad) }), -1, true);
+    if (pending && !reduce) pulse.set(withRepeat(withTiming(0.3, { duration: 600, easing: Easing.inOut(Easing.quad) }), -1, true));
     else {
       cancelAnimation(pulse);
-      pulse.value = withTiming(1, { duration: 150 });
+      pulse.set(withTiming(1, { duration: 150 }));
     }
     return () => cancelAnimation(pulse);
   }, [pending, reduce, pulse]);
-  const dot = useAnimatedStyle(() => ({ opacity: pulse.value }));
+  const dot = useAnimatedStyle(() => ({ opacity: pulse.get() }));
   const { colors } = useTheme();
   return (
     <View style={styles.status} accessibilityLiveRegion="polite" testID="preview-status">
-      {pending ? <Animated.View style={[styles.dot, { backgroundColor: colors.onPrimary }, dot]} /> : <Icon name="checkmark-circle" size={14} color="#FFFFFF" />}
-      <Text variant="caption" style={styles.muted}>
+      {pending ? <Animated.View style={[styles.dot, { backgroundColor: colors.onPrimary }, dot]} /> : <Icon name="checkmark-circle" size={14} color="onPrimary" />}
+      <Text variant="caption" color="onPrimaryMuted">
         {pending ? "hesaplanıyor" : "plan doğrulandı"}
       </Text>
     </View>
@@ -118,8 +118,6 @@ const styles = StyleSheet.create({
   stats: { flexDirection: "row", gap: spacing.md, marginTop: spacing.xs },
   stat: { flex: 1, gap: 2 },
   unreachable: { gap: spacing.xs, paddingVertical: spacing.md },
-  white: { color: "#FFFFFF" },
-  muted: { color: "rgba(255,255,255,0.82)" },
   status: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   dot: { width: 8, height: 8, borderRadius: 4 },
   warnings: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },

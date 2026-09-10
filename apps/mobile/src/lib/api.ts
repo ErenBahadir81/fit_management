@@ -1,6 +1,6 @@
 import { createApiClient, type ApiClient, type FetchLike } from "@fitfloow/api-client";
 import { createSecureTokenStore } from "./auth";
-import { env } from "./env";
+import { FAKE_API, env } from "./env";
 
 /** The app-wide token store (secure). Also used by the FakeApi in demo mode so logins persist. */
 export const tokenStore = createSecureTokenStore();
@@ -32,7 +32,8 @@ let client: ApiClient | null = null;
 /** The client every feature uses. Lazily created; `EXPO_PUBLIC_API_FAKE=1` swaps in the in-memory FakeApi. */
 export function getApi(): ApiClient {
   if (!client) {
-    if (env.fakeApi) {
+    if (FAKE_API) {
+      // Required lazily behind the inlined flag so the fake never reaches a production bundle.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { createFakeApi } = require("./fake") as typeof import("./fake");
       client = createFakeApi({ tokens: tokenStore });

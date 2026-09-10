@@ -150,6 +150,8 @@ export function computeGoalProgress(
     projectedDate,
     weeksRemainingPlan: Math.max(0, roadmap.length - planWeeksElapsed),
     weeksRemainingProjected,
-    currentWeek: roadmapWeekAt(roadmap, daysElapsed),
+    // The roadmap is indexed on the *plan* timeline (a recalibration re-simulates it from the
+    // day it ran), so `currentWeek` must use planOffset — exactly like weekIndexInPlan and tdeeAtDay.
+    currentWeek: roadmapWeekAt(roadmap, planOffset),
   };
 }

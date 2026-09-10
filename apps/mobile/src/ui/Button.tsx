@@ -29,8 +29,8 @@ export function Button({ label, variant = "primary", size = "md", icon, iconRigh
   const { colors, shadows } = useTheme();
   const isDisabled = Boolean(disabled) || Boolean(loading);
 
-  const bg = { primary: colors.primary, secondary: colors.primarySoft, ghost: "transparent", danger: colors.dangerSoft, inverse: "#FFFFFF" }[variant];
-  const fg = { primary: colors.onPrimary, secondary: colors.primary, ghost: colors.ink, danger: colors.danger, inverse: "#5A4AE3" }[variant];
+  const bg = { primary: colors.primary, secondary: colors.primarySoft, ghost: "transparent", danger: colors.dangerSoft, inverse: colors.onPrimary }[variant];
+  const fg = { primary: colors.onPrimary, secondary: colors.primary, ghost: colors.ink, danger: colors.danger, inverse: colors.primaryStrong }[variant];
   const textVariant = size === "sm" ? "label" : "title";
 
   return (

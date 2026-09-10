@@ -6,10 +6,13 @@ import { clearQueryCache } from "../../lib/queryClient";
 import { STORAGE_KEYS, getJSON, removeKey, setJSON } from "../../lib/storage";
 
 export type SessionStatus = "booting" | "signedOut" | "signedIn";
+/** Why the last sign-out happened — the login screen explains an expired session. */
+export type SignedOutReason = "expired" | "user" | null;
 
 export interface SessionState {
   status: SessionStatus;
   user: UserDTO | null;
+  signedOutReason: SignedOutReason;
   /** After a successful login. */
   signIn: (user: UserDTO) => void;
   /** Update the cached user (e.g. after PATCH /me). */
@@ -17,7 +20,7 @@ export interface SessionState {
   /** Revoke on the server (best effort), clear tokens + caches. */
   signOut: () => Promise<void>;
   /** Local-only sign-out (401 that could not be refreshed). */
-  forceSignOut: () => void;
+  forceSignOut: (reason?: SignedOutReason) => void;
   /** App start: cached user + tokens → signed in instantly, then `/auth/me` in the background. */
   boot: () => Promise<void>;
 }
@@ -25,10 +28,11 @@ export interface SessionState {
 export const useSession = create<SessionState>((set, get) => ({
   status: "booting",
   user: null,
+  signedOutReason: null,
 
   signIn: (user) => {
     setJSON(STORAGE_KEYS.sessionUser, user);
-    set({ status: "signedIn", user });
+    set({ status: "signedIn", user, signedOutReason: null });
   },
 
   setUser: (user) => {
@@ -42,14 +46,15 @@ export const useSession = create<SessionState>((set, get) => ({
     } catch {
       /* offline logout is fine */
     }
-    get().forceSignOut();
+    get().forceSignOut("user");
   },
 
-  forceSignOut: () => {
+  forceSignOut: (reason = null) => {
     void tokenStore.clear();
     removeKey(STORAGE_KEYS.sessionUser);
+    removeKey(STORAGE_KEYS.workoutDraft); // a half-logged workout belongs to the account, not the device
     clearQueryCache();
-    set({ status: "signedOut", user: null });
+    set({ status: "signedOut", user: null, signedOutReason: reason });
   },
 
   boot: async () => {
@@ -68,7 +73,7 @@ export const useSession = create<SessionState>((set, get) => ({
       if (get().status !== "signedIn") set({ status: "signedIn" });
     } catch (e) {
       if (e instanceof ApiClientError && e.status === 401) {
-        get().forceSignOut();
+        get().forceSignOut(cached ? "expired" : null);
       } else if (!cached) {
         // no cached identity and the server is unreachable → back to login
         get().forceSignOut();
@@ -79,5 +84,5 @@ export const useSession = create<SessionState>((set, get) => ({
 }));
 
 onUnauthorized(() => {
-  if (useSession.getState().status !== "signedOut") useSession.getState().forceSignOut();
+  if (useSession.getState().status !== "signedOut") useSession.getState().forceSignOut("expired");
 });

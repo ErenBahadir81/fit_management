@@ -1,7 +1,6 @@
 import React from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
-import { QueryClient } from "@tanstack/react-query";
-import { renderUI } from "../../../../__tests__/helpers";
+import { makeQueryClient, renderUI } from "../../../../__tests__/helpers";
 import { mockRouter } from "../../../../__tests__/mocks/expo-router";
 import { useSession } from "../../auth/session";
 import { setApi } from "../../../lib/api";
@@ -55,14 +54,6 @@ afterAll(() => {
 
 const today = todayKey();
 
-/**
- * Like the shared `makeQueryClient` but mutations are garbage-collected at once: react-query's
- * default 5-minute mutation GC timer keeps the jest event loop alive after the suite finishes.
- */
-function testClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 0 }, mutations: { retry: false, gcTime: 0 } } });
-}
-
 async function setup(opts: NutritionFakeOptions = {}) {
   const api = createNutritionFakeApi({ latencyMs: 0, signedIn: true, ...opts });
   setApi(api);
@@ -90,7 +81,7 @@ describe("ScanScreen", () => {
 
   test("the AI theatre runs for at least 1.8 s even when the API answers instantly", async () => {
     await setup();
-    await renderUI(<ScanScreen />, { queryClient: testClient() });
+    await renderUI(<ScanScreen />, { queryClient: makeQueryClient() });
     expect(screen.getByTestId("scan-camera")).toBeTruthy();
 
     await capture();
@@ -110,7 +101,7 @@ describe("ScanScreen", () => {
 
   test("grams edits update the live total and removing a card drops it", async () => {
     await setup({ scanScenario: "single" });
-    await renderUI(<ScanScreen />, { queryClient: testClient() });
+    await renderUI(<ScanScreen />, { queryClient: makeQueryClient() });
     await capture();
     await act(async () => void jest.advanceTimersByTime(MIN_ANALYZE_MS + 50));
     await waitFor(() => expect(screen.getByTestId("scan-results")).toBeTruthy());
@@ -126,7 +117,7 @@ describe("ScanScreen", () => {
   test("saving writes one entry per detection with source 'scan' and returns to the day", async () => {
     const api = await setup({ scanScenario: "single" });
     const addEntry = jest.spyOn(api.nutrition, "addEntry");
-    await renderUI(<ScanScreen />, { queryClient: testClient() });
+    await renderUI(<ScanScreen />, { queryClient: makeQueryClient() });
     await capture();
     await act(async () => void jest.advanceTimersByTime(MIN_ANALYZE_MS + 50));
     await waitFor(() => expect(screen.getByTestId("scan-results")).toBeTruthy());
@@ -144,7 +135,7 @@ describe("ScanScreen", () => {
 
   test("a photo with no food gets a friendly message, not an error", async () => {
     await setup({ scanScenario: "notFood" });
-    await renderUI(<ScanScreen />, { queryClient: testClient() });
+    await renderUI(<ScanScreen />, { queryClient: makeQueryClient() });
     await capture();
     await act(async () => void jest.advanceTimersByTime(MIN_ANALYZE_MS + 50));
 
@@ -156,7 +147,7 @@ describe("ScanScreen", () => {
 
   test("a vision outage explains itself and offers search instead of crashing", async () => {
     await setup({ scanFails: "unavailable" });
-    await renderUI(<ScanScreen />, { queryClient: testClient() });
+    await renderUI(<ScanScreen />, { queryClient: makeQueryClient() });
     await capture();
     await act(async () => void jest.advanceTimersByTime(MIN_ANALYZE_MS + 50));
 
@@ -176,7 +167,7 @@ describe("ScanScreen", () => {
 
   test("the gallery route works without ever touching the camera", async () => {
     await setup({ scanScenario: "single" });
-    await renderUI(<ScanScreen />, { queryClient: testClient() });
+    await renderUI(<ScanScreen />, { queryClient: makeQueryClient() });
     await fireEvent.press(screen.getByTestId("scan-gallery"));
     await act(async () => {
       await Promise.resolve();

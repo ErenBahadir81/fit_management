@@ -38,7 +38,7 @@ export function Toggle({ value, onChange, disabled, testID, ...rest }: TogglePro
       style={styles.hit}
     >
       <Animated.View style={[styles.track, track]}>
-        <Animated.View style={[styles.knob, { backgroundColor: "#FFFFFF" }, knob]} />
+        <Animated.View style={[styles.knob, { backgroundColor: colors.onPrimary }, knob]} />
       </Animated.View>
     </Pressable>
   );

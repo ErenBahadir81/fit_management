@@ -19,10 +19,12 @@ import {
 import type { AppContext } from "../../context";
 import { AppError } from "../../lib/errors";
 import { BodyEntry, WeighIn, type BodyEntryDoc } from "../../models/body";
-import { Goal, toGoalDTO, type GoalDoc } from "../../models/goal";
-import { dayIntakeFor, goalSettings, invalidateWeeksFor, loadUser, oid, type UserLean } from "./shared";
+import { Goal, invalidateAllWeeklyReports, toGoalDTO, type GoalDoc } from "../../models/goal";
+import { dayIntakeFor, goalSettings, loadUser, oid, type UserLean } from "./shared";
 
 const HISTORY_DAYS = 200;
+/** Weigh-in history kept before the progress window so the EWMA does not start cold. */
+const EWMA_LOOKBACK_DAYS = 120;
 
 export interface GoalState {
   weightKg: number;
@@ -105,7 +107,7 @@ export async function createGoal(ctx: AppContext, userId: string, input: GoalInp
     tdeeOverride: null,
     history: [{ at: ctx.now(), event: "created", snapshot: { targetBodyFatPct: input.targetBodyFatPct, profile: input.profile } }],
   });
-  await invalidateWeeksFor(user._id, [startKey], user.measurementDay);
+  await invalidateAllWeeklyReports(user._id);
   return toGoalDTO(doc.toObject());
 }
 
@@ -133,7 +135,7 @@ export async function updateGoal(ctx: AppContext, userId: string, input: Partial
     { returnDocument: "after" }
   ).lean<GoalDoc>();
   if (!updated) throw AppError.notFound("Aktif hedef");
-  await invalidateWeeksFor(user._id, [todayKey], user.measurementDay);
+  await invalidateAllWeeklyReports(user._id);
   return toGoalDTO(updated);
 }
 
@@ -169,7 +171,7 @@ export async function recalibrateGoal(ctx: AppContext, userId: string): Promise<
     { returnDocument: "after" }
   ).lean<GoalDoc>();
   if (!updated) throw AppError.notFound("Aktif hedef");
-  await invalidateWeeksFor(user._id, [todayKey], user.measurementDay);
+  await invalidateAllWeeklyReports(user._id);
   return { goal: toGoalDTO(updated), recalibration };
 }
 
@@ -181,7 +183,7 @@ export async function closeGoal(ctx: AppContext, userId: string, status: "comple
     { returnDocument: "after" }
   ).lean<GoalDoc>();
   if (!updated) throw AppError.notFound("Aktif hedef");
-  await invalidateWeeksFor(user._id, [trDateKey(ctx.now())], user.measurementDay);
+  await invalidateAllWeeklyReports(user._id);
   return toGoalDTO(updated);
 }
 
@@ -194,7 +196,10 @@ export async function currentGoalView(ctx: AppContext, userId: string): Promise<
   const todayKey = trDateKey(ctx.now());
   const fromKey = goal.start.dateKey < shiftKey(todayKey, -HISTORY_DAYS) ? shiftKey(todayKey, -HISTORY_DAYS) : goal.start.dateKey;
   const [weighIns, entries, dayIntake] = await Promise.all([
-    WeighIn.find({ userId: user._id, dateKey: { $lte: todayKey } }).sort({ dateKey: 1 }).lean(),
+    // Bounded: the EWMA only needs enough history before the window to be warm.
+    WeighIn.find({ userId: user._id, dateKey: { $gte: shiftKey(fromKey, -EWMA_LOOKBACK_DAYS), $lte: todayKey } })
+      .sort({ dateKey: 1 })
+      .lean(),
     BodyEntry.find({ userId: user._id, dateKey: { $gte: fromKey, $lte: todayKey } }).sort({ date: 1 }).lean<BodyEntryDoc[]>(),
     dayIntakeFor(user._id, fromKey, todayKey),
   ]);

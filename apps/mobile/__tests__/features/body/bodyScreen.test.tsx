@@ -13,9 +13,6 @@ import { createFakeApi } from "../../../src/lib/fake";
 import { fmtNumber, fmtPct } from "../../../src/lib/format";
 
 jest.mock("expo-router", () => require("../../mocks/expo-router"));
-jest.mock("@shopify/flash-list", () => require("../../mocks/flashList").flashListMock());
-jest.mock("@shopify/flash-list/dist/recyclerview/utils/measureLayout", () => require("../../mocks/flashList").measureLayoutMock());
-jest.mock("react-native-gesture-handler/ReanimatedSwipeable", () => require("../../mocks/swipeable"));
 
 const TODAY = "2026-09-10";
 const makeApi = (latencyMs = 0) => createFakeApi({ latencyMs, signedIn: true, today: () => TODAY });

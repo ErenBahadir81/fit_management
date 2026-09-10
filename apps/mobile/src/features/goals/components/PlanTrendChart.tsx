@@ -7,7 +7,7 @@ import { dateTickLabels, niceDomain, ticks } from "../../../charts/chartMath";
 import { fmtDate, fmtNumber } from "../../../lib/format";
 import { haptic } from "../../../lib/haptics";
 import { useTheme } from "../../../theme/ThemeProvider";
-import { spacing } from "../../../theme/tokens";
+import { radii, spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
 import type { PlanRow } from "../goalMath";
 
@@ -112,7 +112,7 @@ export function PlanTrendChart({ rows, targetWeightKg, todayKey, height = 200, t
                 {todayIndex >= 0 && points.expected[todayIndex] ? (
                   <SkLine p1={{ x: points.expected[todayIndex].x, y: chartBounds.top }} p2={{ x: points.expected[todayIndex].x, y: chartBounds.bottom }} color={colors.border} strokeWidth={1} />
                 ) : null}
-                <Scatter points={points.raw} radius={2.5} color={colors.primary} opacity={0.3} />
+                <Scatter points={points.raw} radius={2.5} color={colors.primary} opacity={0.3} animate={{ type: "timing", duration: 320 }} />
                 <Line points={points.actual} color={colors.primary} strokeWidth={2.5} curveType="monotoneX" connectMissingData={false} animate={{ type: "timing", duration: 320 }} />
                 {isActive && <Cursor x={state.x.position} y={state.y.actual.position} color={colors.primary} track={colors.border} />}
               </>
@@ -166,7 +166,7 @@ function Legend({ color, dashed, label }: { color: string; dashed?: boolean; lab
 }
 
 const styles = StyleSheet.create({
-  empty: { borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  empty: { borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
   tooltip: { minHeight: 44, justifyContent: "flex-end", marginBottom: spacing.xs },
   legend: { flexDirection: "row", gap: spacing.md, flexWrap: "wrap" },
   legendItem: { flexDirection: "row", alignItems: "center", gap: spacing.xs },

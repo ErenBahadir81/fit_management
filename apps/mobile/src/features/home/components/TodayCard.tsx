@@ -71,14 +71,14 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
   const est = day.kind === "strength" ? `~${Math.round(day.exercises.reduce((a, e) => a + e.targetSets, 0) * 2.6)} dk` : day.run ? `~${day.run.targetMin} dk` : "";
   return (
     <Card variant="primary" style={styles.min} testID="home-today">
-      <Text variant="label" style={styles.onPrimaryMuted}>
-        BUGÜNÜN ANTRENMANI
+      <Text variant="label" color="onPrimaryMuted">
+        Bugünün antrenmanı
       </Text>
-      <Text variant="heading" style={[styles.title, styles.onPrimary]} numberOfLines={1}>
+      <Text variant="heading" color="onPrimary" style={styles.title} numberOfLines={1}>
         {day.title}
       </Text>
       {day.focus ? (
-        <Text variant="body" style={styles.onPrimaryMuted} numberOfLines={1}>
+        <Text variant="body" color="onPrimaryMuted" numberOfLines={1}>
           {day.focus}
           {count ? ` · ${count}` : ""}
           {est ? ` · ${est}` : ""}
@@ -117,8 +117,6 @@ const styles = StyleSheet.create({
   badge: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   title: { marginTop: spacing.sm },
   chips: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.sm, flexWrap: "wrap" },
-  onPrimary: { color: "#FFFFFF" },
-  onPrimaryMuted: { color: "rgba(255,255,255,0.82)" },
   cta: { marginTop: spacing.lg, flexDirection: "row" },
   rowWrap: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   rowTexts: { flex: 1, gap: spacing.xs },

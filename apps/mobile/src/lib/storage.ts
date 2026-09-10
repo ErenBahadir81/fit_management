@@ -27,4 +27,6 @@ export const STORAGE_KEYS = {
   sessionUser: "session.user",
   queryCache: "query.cache.v1",
   webTokens: "auth.tokens.web",
+  /** In-progress workout draft (cleared on finish, discard and sign-out). */
+  workoutDraft: "training.workout.draft.v1",
 } as const;

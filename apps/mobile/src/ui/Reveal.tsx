@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, View, type ViewProps } from "react-native";
 import Animated, { FadeIn, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { durations, easeOut } from "../theme/motion";
@@ -15,19 +15,20 @@ export interface RevealProps extends ViewProps {
  * If `ready` on first render (persisted cache hit) the skeleton is never mounted: instant paint.
  */
 export function Reveal({ ready, skeleton, children, style, ...rest }: RevealProps) {
-  const showedSkeleton = useRef(!ready);
+  // Fixed on first render: whether this mount ever painted the skeleton (drives the crossfade).
+  const [showedSkeleton] = useState(!ready);
   const [overlay, setOverlay] = useState(false);
   const opacity = useSharedValue(1);
 
   useEffect(() => {
-    if (ready && showedSkeleton.current) {
+    if (ready && showedSkeleton) {
       setOverlay(true);
       opacity.value = 1;
       opacity.value = withTiming(0, { duration: durations.base, easing: easeOut }, (finished) => {
         if (finished) runOnJS(setOverlay)(false);
       });
     }
-  }, [ready, opacity]);
+  }, [ready, opacity, showedSkeleton]);
 
   const overlayStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
@@ -40,7 +41,7 @@ export function Reveal({ ready, skeleton, children, style, ...rest }: RevealProp
   }
   return (
     <View {...rest} style={style}>
-      <Animated.View entering={showedSkeleton.current ? FadeIn.duration(durations.base) : undefined}>{children}</Animated.View>
+      <Animated.View entering={showedSkeleton ? FadeIn.duration(durations.base) : undefined}>{children}</Animated.View>
       {overlay && (
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, overlayStyle]}>
           {skeleton}

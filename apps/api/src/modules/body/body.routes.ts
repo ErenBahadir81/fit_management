@@ -14,7 +14,8 @@ import {
   upsertWeighIn,
 } from "./body.service";
 
-const zLimit = z.object({ limit: z.coerce.number().int().min(1).max(500).optional() });
+/** Always bounded: without a default the route streamed a user's whole measurement history. */
+const zLimit = z.object({ limit: z.coerce.number().int().min(1).max(500).default(500) });
 const zDays = z.object({ days: z.coerce.number().int().min(1).max(365).default(90) });
 const zId = z.object({ id: z.string().min(1) });
 

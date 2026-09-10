@@ -39,6 +39,8 @@ const BodyEntrySchema = new Schema<BodyEntryDoc>(
   { timestamps: true }
 );
 BodyEntrySchema.index({ userId: 1, date: -1 });
+// Reports, goal progress and trends all range-scan on the day key, never on `date`.
+BodyEntrySchema.index({ userId: 1, dateKey: 1 });
 
 export const BodyEntry: Model<BodyEntryDoc> = (mongoose.models.BodyEntry as Model<BodyEntryDoc>) || model<BodyEntryDoc>("BodyEntry", BodyEntrySchema);
 

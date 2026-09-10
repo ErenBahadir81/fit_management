@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import type { BodyEntryDTO, BodySummary, GoalView, WeeklyReportDTO } from "@fitfloow/core";
 import { Floo } from "../../mascot/Floo";
@@ -9,6 +9,7 @@ import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { Entry } from "../../ui/Entry";
 import { Header } from "../../ui/Header";
+import { ListRefreshControl } from "../../ui/ListRefreshControl";
 import { Reveal } from "../../ui/Reveal";
 import { Screen } from "../../ui/Screen";
 import { useSheet } from "../../ui/Sheet";
@@ -63,6 +64,8 @@ export function BodyScreen() {
   const onDelete = useCallback((id: string) => del.mutate(id), [del]);
   const goGoal = useCallback(() => router.push(goalQ.data?.goal?.status === "active" ? "/(modals)/goal/roadmap" : "/(modals)/goal/setup"), [router, goalQ.data]);
   const goReport = useCallback(() => router.push("/(modals)/report/current"), [router]);
+  const renderItem = useCallback<ListRenderItem<Row>>(({ item }) => <MeasurementRow entry={item.entry} prev={item.prev} onDelete={onDelete} />, [onDelete]);
+  const contentStyle = useMemo(() => ({ paddingHorizontal: spacing.gutter, paddingBottom: tabSpace + spacing.md }), [tabSpace]);
 
   if (summaryQ.isError && !summaryQ.data) {
     return (
@@ -88,17 +91,16 @@ export function BodyScreen() {
         {summary ? (
           <FlashList<Row>
             data={rows}
-            keyExtractor={(r) => r.entry.id}
-            renderItem={({ item }) => <MeasurementRow entry={item.entry} prev={item.prev} onDelete={onDelete} />}
+            keyExtractor={keyOf}
+            renderItem={renderItem}
             ListHeaderComponent={<BodyHeader summary={summary} trendsData={trendsQ.data} goal={goalQ.data} report={reportQ.data} entries={entriesQ.data} onAdd={sheet.present} onGoal={goGoal} onReport={goReport} />}
             ListEmptyComponent={
               entriesQ.data ? (
                 <EmptyState compact illustration={<Floo mood="sleepy" size="s" />} title="Henüz ölçüm yok" body="Boyun ve bel ölçüsüyle yağ oranını hesaplayalım." action={{ label: "Ölçüm ekle", onPress: sheet.present, icon: "add" }} />
               ) : null
             }
-            contentContainerStyle={{ paddingHorizontal: spacing.gutter, paddingBottom: tabSpace + spacing.md }}
-            refreshing={summaryQ.isRefetching && !summaryQ.isPending}
-            onRefresh={onRefresh}
+            contentContainerStyle={contentStyle}
+            refreshControl={<ListRefreshControl refreshing={summaryQ.isRefetching && !summaryQ.isPending} onRefresh={onRefresh} />}
             showsVerticalScrollIndicator={false}
             testID="body-list"
           />
@@ -154,6 +156,8 @@ function BodyHeader({ summary, trendsData, goal, report, entries, onAdd, onGoal,
     </View>
   );
 }
+
+const keyOf = (r: Row) => r.entry.id;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

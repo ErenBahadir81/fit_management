@@ -22,32 +22,30 @@ export interface CountUpProps extends Omit<TextProps, "children"> {
  */
 export function CountUp({ value, format, from = 0, digits = 1, duration = 700, accessibilityLabel, ...rest }: CountUpProps) {
   const reduce = useReducedMotion();
-  const sv = useSharedValue(reduce ? value : from);
+  const sv = useSharedValue(from);
   const first = useRef(true);
-  const [text, setText] = useState(() => format(reduce ? value : from));
-  const update = useCallback((v: number) => setText(format(v)), [format]);
+  const [rolled, setRolled] = useState(() => format(from));
+  const update = useCallback((v: number) => setRolled(format(v)), [format]);
 
   useEffect(() => {
-    if (reduce) {
-      sv.value = value;
-      update(value);
-      return;
-    }
+    if (reduce) return;
     if (first.current) {
       first.current = false;
-      sv.value = from;
+      sv.set(from);
     }
-    sv.value = withTiming(value, { duration, easing: easeOut });
-  }, [value, reduce, duration, from, sv, update]);
+    sv.set(withTiming(value, { duration, easing: easeOut }));
+  }, [value, reduce, duration, from, sv]);
 
   useAnimatedReaction(
-    () => Math.round(sv.value * 10 ** digits),
+    () => Math.round(sv.get() * 10 ** digits),
     (cur, prev) => {
       if (cur !== prev) runOnJS(update)(cur / 10 ** digits);
     },
     [digits, update]
   );
 
+  // Reduced motion: no roll, the final value is rendered directly.
+  const text = reduce ? format(value) : rolled;
   return (
     <Text {...rest} tabular accessibilityLabel={accessibilityLabel ?? format(value)}>
       {text}

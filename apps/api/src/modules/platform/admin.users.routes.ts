@@ -18,7 +18,7 @@ import { User, type UserDoc } from "../../models/user";
 import { Program, toProgramDTO } from "../../models/program";
 import { WorkoutLog, toWorkoutLogDTO } from "../../models/workoutLog";
 import { BodyEntry, toBodyEntryDTO } from "../../models/body";
-import { Goal, toGoalDTO } from "../../models/goal";
+import { Goal, invalidateAllWeeklyReports, toGoalDTO } from "../../models/goal";
 import { AppError } from "../../lib/errors";
 import type { AppContext } from "../../context";
 import { hashPassword } from "./auth.service";
@@ -109,6 +109,10 @@ export async function adminUsersRoutes(app: FastifyInstance, opts: { ctx: AppCon
     }
     const user = await User.findByIdAndUpdate(existing._id, { $set: set }, { returnDocument: "after" }).lean<UserDoc>();
     if (!user) throw AppError.notFound("Kullanıcı");
+    // Moving the measurement day re-keys every week; the cached reports use the old boundary.
+    if (input.measurementDay !== undefined && input.measurementDay !== existing.measurementDay) {
+      await invalidateAllWeeklyReports(user._id);
+    }
     return { user: await toAdminUserDTO(user) };
   });
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { MuscleReadiness } from "@fitfloow/core";
 import { fmtNumber } from "../../../lib/format";
@@ -101,12 +101,13 @@ function OverallCard({ overall }: { overall: { readiness: number; status: Muscle
   );
 }
 
-function MuscleCard({ muscle, onPress }: { muscle: MuscleReadiness; onPress: (m: MuscleReadiness) => void }) {
+const MuscleCard = memo(function MuscleCard({ muscle, onPress }: { muscle: MuscleReadiness; onPress: (m: MuscleReadiness) => void }) {
   const { colors } = useTheme();
   const s = RECOVERY_TR[muscle.status];
+  const press = useCallback(() => onPress(muscle), [muscle, onPress]);
   return (
     <Pressable
-      onPress={() => onPress(muscle)}
+      onPress={press}
       testID={`muscle-${muscle.key}`}
       accessibilityLabel={`${muscle.name}, %${Math.round(muscle.readiness)} hazır, ${s.label}, ${hoursToFullLabel(muscle)}`}
       scaleTo={0.98}
@@ -128,7 +129,7 @@ function MuscleCard({ muscle, onPress }: { muscle: MuscleReadiness; onPress: (m:
       </Text>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   stack: { gap: spacing.lg },

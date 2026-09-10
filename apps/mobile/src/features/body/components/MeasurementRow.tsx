@@ -1,12 +1,10 @@
-import React, { memo, useCallback, useRef } from "react";
+import React, { memo, useCallback } from "react";
 import { StyleSheet, View } from "react-native";
-import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import type { BodyEntryDTO } from "@fitfloow/core";
 import { fmtCm, fmtDate, fmtDelta, fmtKg, fmtPct } from "../../../lib/format";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
-import { Icon } from "../../../ui/Icon";
-import { Pressable } from "../../../ui/Pressable";
+import { SwipeToDelete } from "../../../ui/SwipeToDelete";
 import { Text } from "../../../ui/Text";
 import { BODY_HEIGHTS } from "../BodySkeleton";
 
@@ -20,29 +18,12 @@ export interface MeasurementRowProps {
 /** History row: date, weight/waist, bf % with its delta. Swipe left to delete (a11y: "Sil" action). */
 export const MeasurementRow = memo(function MeasurementRow({ entry, prev, onDelete }: MeasurementRowProps) {
   const { colors } = useTheme();
-  const swipe = useRef<SwipeableMethods>(null);
   const delta = prev ? entry.bodyFatPct - prev.bodyFatPct : null;
   const tone = delta === null ? "neutral" : delta < -0.05 ? "success" : delta > 0.05 ? "warning" : "neutral";
-
-  const remove = useCallback(() => {
-    swipe.current?.close();
-    onDelete(entry.id);
-  }, [entry.id, onDelete]);
-
-  const renderRight = useCallback(
-    () => (
-      <Pressable onPress={remove} haptic="medium" accessibilityLabel="Ölçümü sil" style={[styles.action, { backgroundColor: colors.danger }]} testID={`entry-delete-${entry.id}`}>
-        <Icon name="trash-outline" size={20} color="#FFFFFF" />
-        <Text variant="label" style={styles.actionText}>
-          Sil
-        </Text>
-      </Pressable>
-    ),
-    [colors.danger, entry.id, remove]
-  );
+  const remove = useCallback(() => onDelete(entry.id), [entry.id, onDelete]);
 
   return (
-    <ReanimatedSwipeable ref={swipe} renderRightActions={renderRight} rightThreshold={48} friction={2} overshootRight={false}>
+    <SwipeToDelete onDelete={remove} deleteTestID={`entry-delete-${entry.id}`} deleteLabel="Ölçümü sil" radius={radii.control}>
       <View
         style={[styles.row, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}
         testID={`entry-row-${entry.id}`}
@@ -68,7 +49,7 @@ export const MeasurementRow = memo(function MeasurementRow({ entry, prev, onDele
           </Text>
         </View>
       </View>
-    </ReanimatedSwipeable>
+    </SwipeToDelete>
   );
 });
 
@@ -76,6 +57,4 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: BODY_HEIGHTS.row, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   texts: { flex: 1, gap: 2 },
   right: { alignItems: "flex-end", gap: 2 },
-  action: { width: 88, marginVertical: spacing.xs, borderRadius: radii.control, alignItems: "center", justifyContent: "center", gap: 2 },
-  actionText: { color: "#FFFFFF" },
 });

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { WEEKDAYS_TR_SHORT, keyWeekday } from "@fitfloow/core";
 import { haptic } from "../../../lib/haptics";
 import { todayKey } from "../../../lib/dates";
@@ -24,25 +24,26 @@ export interface DayPagerProps {
 
 /**
  * The date strip above the day: swipe it like a pager (it snaps day by day and selects what lands
- * in the middle) or tap a day. Today is a filled pill, logged days carry a dot.
+ * in the middle) or tap a day. Today is a filled pill, logged days carry a dot. A month of 52 pt
+ * cells is cheap enough for a plain ScrollView — no virtualization, no layout-event dependence.
  */
 export function DayPager({ days, selected, onSelect, loggedKeys, testID = "nutrition-day-pager" }: DayPagerProps) {
   const { colors } = useTheme();
-  const listRef = useRef<FlatList<string>>(null);
+  const scroller = useRef<ScrollView>(null);
   const [width, setWidth] = useState(0);
   const today = todayKey();
   const index = Math.max(0, days.indexOf(selected));
   const settling = useRef(false);
-  // Start scrolled to the selected day (usually today) instead of a month ago — `contentOffset`
-  // positions the strip on the very first frame, no post-layout jump.
-  const initial = useRef(index);
+  // Start on the selected day (usually today) instead of a month ago — `contentOffset` positions
+  // the strip on the very first frame, no post-layout jump. Fixed at mount on purpose.
+  const [initialOffset] = useState(() => ({ x: index * STEP, y: 0 }));
 
   const sidePad = width > 0 ? Math.max(spacing.gutter, (width - ITEM_W) / 2) : spacing.gutter;
 
   // Keep the selected day centred when it changes from outside (tap, "Bugün", deep link).
   useEffect(() => {
     if (width === 0 || settling.current) return;
-    listRef.current?.scrollToOffset({ offset: index * STEP, animated: true });
+    scroller.current?.scrollTo({ x: index * STEP, animated: true });
   }, [index, width]);
 
   const onMomentumEnd = useCallback(
@@ -57,81 +58,66 @@ export function DayPager({ days, selected, onSelect, loggedKeys, testID = "nutri
     },
     [days, onSelect, selected]
   );
-
-  const renderItem = useCallback(
-    ({ item }: { item: string }) => (
-      <DayCell
-        dateKey={item}
-        selected={item === selected}
-        isToday={item === today}
-        logged={Boolean(loggedKeys?.has(item))}
-        onPress={() => {
-          if (item !== selected) onSelect(item);
-        }}
-      />
-    ),
-    [loggedKeys, onSelect, selected, today]
-  );
+  const onBeginDrag = useCallback(() => {
+    settling.current = true;
+  }, []);
 
   const contentStyle = useMemo(() => ({ paddingHorizontal: sidePad, gap: GAP }), [sidePad]);
 
   return (
     <View testID={testID} onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[styles.wrap, { borderBottomColor: colors.border }]}>
-      <FlatList
-        ref={listRef}
+      <ScrollView
+        ref={scroller}
         horizontal
-        data={days}
-        keyExtractor={(k) => k}
-        renderItem={renderItem}
         showsHorizontalScrollIndicator={false}
         snapToInterval={STEP}
         decelerationRate="fast"
-        contentOffset={{ x: initial.current * STEP, y: 0 }}
-        getItemLayout={(_, i) => ({ length: STEP, offset: STEP * i, index: i })}
-        initialNumToRender={days.length}
-        removeClippedSubviews={false}
-        onScrollBeginDrag={() => {
-          settling.current = true;
-        }}
+        contentOffset={initialOffset}
+        onScrollBeginDrag={onBeginDrag}
         onMomentumScrollEnd={onMomentumEnd}
         contentContainerStyle={contentStyle}
         accessibilityLabel="Gün seçici"
-      />
+      >
+        {days.map((key) => (
+          <DayCell key={key} dateKey={key} selected={key === selected} isToday={key === today} logged={Boolean(loggedKeys?.has(key))} onSelect={onSelect} />
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
-function DayCell({ dateKey, selected, isToday, logged, onPress }: { dateKey: string; selected: boolean; isToday: boolean; logged: boolean; onPress: () => void }) {
+const DayCell = memo(function DayCell({ dateKey, selected, isToday, logged, onSelect }: { dateKey: string; selected: boolean; isToday: boolean; logged: boolean; onSelect: (key: string) => void }) {
   const { colors } = useTheme();
   const dayNumber = Number(dateKey.slice(8, 10));
   const label = WEEKDAYS_TR_SHORT[keyWeekday(dateKey)];
-  const bg = selected ? colors.primary : "transparent";
-  const fg = selected ? colors.onPrimary : isToday ? colors.primary : colors.ink;
+  const press = useCallback(() => {
+    if (!selected) onSelect(dateKey);
+  }, [dateKey, onSelect, selected]);
 
   return (
     <Pressable
       testID={`day-${dateKey}`}
-      onPress={onPress}
+      onPress={press}
       haptic="select"
       minTarget={false}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={`${label} ${dayNumber}${isToday ? ", bugün" : ""}${logged ? ", kayıtlı" : ""}`}
-      style={[styles.cell, { width: ITEM_W, backgroundColor: bg }]}
+      style={[styles.cell, selected && { backgroundColor: colors.primary }]}
     >
-      <Text variant="caption" style={{ color: selected ? colors.onPrimary : colors.inkSubtle }}>
+      <Text variant="caption" color={selected ? "onPrimary" : "inkSubtle"}>
         {label}
       </Text>
-      <Text variant="title" tabular style={{ color: fg }}>
+      <Text variant="title" tabular color={selected ? "onPrimary" : isToday ? "primary" : "ink"}>
         {dayNumber}
       </Text>
-      <View style={[styles.dot, { backgroundColor: logged ? (selected ? colors.onPrimary : colors.primary) : "transparent" }]} />
+      <View style={[styles.dot, logged && { backgroundColor: selected ? colors.onPrimary : colors.primary }]} />
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: { marginHorizontal: -spacing.gutter },
-  cell: { height: 64, borderRadius: radii.md, alignItems: "center", justifyContent: "center", gap: 1 },
-  dot: { width: 5, height: 5, borderRadius: 3, marginTop: 2 },
+  cell: { width: ITEM_W, height: 64, borderRadius: radii.md, alignItems: "center", justifyContent: "center", gap: 1 },
+  dot: { width: 5, height: 5, borderRadius: 3, marginTop: 2, backgroundColor: "transparent" },
 });

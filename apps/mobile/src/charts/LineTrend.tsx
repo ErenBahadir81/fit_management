@@ -6,7 +6,7 @@ import { CartesianChart, Line, Scatter, useChartPressState, useLinePath } from "
 import { haptic } from "../lib/haptics";
 import { fmtDate, fmtNumber } from "../lib/format";
 import { useTheme } from "../theme/ThemeProvider";
-import { spacing } from "../theme/tokens";
+import { radii, spacing } from "../theme/tokens";
 import { Text } from "../ui/Text";
 import { buildTrendSeries, dateTickLabels, ticks, type TrendPoint } from "./chartMath";
 
@@ -104,7 +104,7 @@ export function LineTrend({ points, goal, unit = "", height = 200, digits = 1, t
             {({ points: p }) => (
               <>
                 {goal != null && <GoalLine points={p.goal} color={colors.inkSubtle} />}
-                <Scatter points={p.raw} radius={3} color={colors.primary} opacity={0.35} />
+                <Scatter points={p.raw} radius={3} color={colors.primary} opacity={0.35} animate={{ type: "timing", duration: 320 }} />
                 <Line points={p.ewma} color={colors.primary} strokeWidth={2.5} curveType="monotoneX" connectMissingData animate={{ type: "timing", duration: 320 }} />
                 {isActive && <Cursor x={state.x.position} y={state.y.ewma.position} color={colors.primary} track={colors.border} />}
               </>
@@ -147,7 +147,7 @@ function Cursor({ x, y, color, track }: { x: { value: number }; y: { value: numb
 }
 
 const styles = StyleSheet.create({
-  empty: { borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  empty: { borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
   tooltip: { minHeight: 44, justifyContent: "flex-end", marginBottom: spacing.xs },
   row: { flexDirection: "row" },
   yAxis: { width: 44, justifyContent: "space-between", paddingVertical: 8, alignItems: "flex-end", paddingRight: spacing.sm },

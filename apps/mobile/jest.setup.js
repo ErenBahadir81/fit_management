@@ -75,3 +75,74 @@ jest.mock("victory-native", () => {
     }),
   };
 });
+
+// FlashList v2 has no layout engine under Jest: it measures a 0×0 parent, renders nothing, and
+// re-measures forever the moment the data shrinks ("Maximum update depth exceeded"). Every screen
+// test renders the same tree without virtualization instead — header, rows, empty/footer slots and
+// the refresh control all behave like the real list, just eagerly.
+jest.mock("@shopify/flash-list", () => {
+  const React = require("react");
+  const { RefreshControl, ScrollView, View } = require("react-native");
+  const actual = jest.requireActual("@shopify/flash-list");
+  const node = (C) => (React.isValidElement(C) ? C : typeof C === "function" ? React.createElement(C) : null);
+  const FlashList = React.forwardRef(function FlashListMock(props, ref) {
+    const {
+      data = [],
+      renderItem,
+      keyExtractor,
+      ListHeaderComponent,
+      ListEmptyComponent,
+      ListFooterComponent,
+      contentContainerStyle,
+      testID,
+      refreshing,
+      onRefresh,
+      refreshControl,
+      renderScrollComponent,
+      horizontal,
+      keyboardShouldPersistTaps,
+      showsVerticalScrollIndicator,
+      showsHorizontalScrollIndicator,
+    } = props;
+    React.useImperativeHandle(ref, () => ({ scrollToOffset: () => {}, scrollToIndex: () => {}, scrollToEnd: () => {}, scrollToTop: () => {} }), []);
+    const Scroller = renderScrollComponent ?? ScrollView;
+    return React.createElement(
+      Scroller,
+      {
+        testID,
+        horizontal,
+        keyboardShouldPersistTaps,
+        showsVerticalScrollIndicator,
+        showsHorizontalScrollIndicator,
+        contentContainerStyle,
+        refreshControl: refreshControl ?? (onRefresh ? React.createElement(RefreshControl, { refreshing: Boolean(refreshing), onRefresh }) : undefined),
+      },
+      node(ListHeaderComponent),
+      data.length === 0 ? node(ListEmptyComponent) : data.map((item, index) => React.createElement(View, { key: keyExtractor ? keyExtractor(item, index) : String(index) }, renderItem({ item, index, target: "Cell", extraData: props.extraData }))),
+      node(ListFooterComponent)
+    );
+  });
+  return { ...actual, FlashList, AnimatedFlashList: FlashList };
+});
+
+// expo-camera is native; screens mount it only on device. Tests that need to drive a scan replace
+// this stub with their own (a test-file `jest.mock` wins over this one).
+jest.mock("expo-camera", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  const CameraView = React.forwardRef(function CameraViewMock(props, ref) {
+    React.useImperativeHandle(ref, () => ({ takePictureAsync: async () => ({ uri: "file://photo.jpg", width: 800, height: 600, format: "jpg" }) }), []);
+    return React.createElement(View, { testID: props.testID ?? "camera-view" });
+  });
+  return {
+    CameraView,
+    useCameraPermissions: () => [{ granted: true, canAskAgain: true, status: "granted" }, jest.fn(async () => ({ granted: true, canAskAgain: true, status: "granted" }))],
+  };
+});
+
+// expo-image needs its native view; a plain View keeps `source`/`testID` for assertions.
+jest.mock("expo-image", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  return { Image: (props) => React.createElement(View, { testID: props.testID, accessibilityLabel: props.accessibilityLabel, style: props.style }) };
+});

@@ -180,3 +180,42 @@ describe("computeGoalProgress — projection", () => {
     expect(p.projectedDate).toBeNull();
   });
 });
+
+/* --------------------------- review regressions --------------------------- */
+
+describe("computeGoalProgress — re-planned goals (review)", () => {
+  // A recalibration / PATCH /goals/current re-simulates the roadmap from *today*, so
+  // `plan.startKey` moves forward while `goal.start.dateKey` stays put.
+  const REPLAN_AT = shiftKey(START, 21);
+  const replanned: GoalLike = {
+    ...goal,
+    plan: computeGoalPlan({
+      sex: "male",
+      weightKg: 98,
+      bodyFatPct: 28,
+      heightCm: 180,
+      age: null,
+      activityLevel: "moderate",
+      targetBodyFatPct: 20,
+      profile: "optimal",
+      startDate: REPLAN_AT,
+      settings: S,
+    }),
+  };
+
+  it("reads the current roadmap week from the plan timeline, not the goal timeline", () => {
+    const p = computeGoalProgress(replanned, [], [], [], REPLAN_AT, S);
+    expect(p.weekIndexInPlan).toBe(1);
+    // currentWeek is what /reports/home turns into today's calorie + protein target.
+    expect(p.currentWeek?.weekIndex).toBe(1);
+    expect(p.currentWeek?.startKey).toBe(REPLAN_AT);
+    expect(p.currentWeek?.dailyCalorieTarget).toBe(replanned.plan.roadmap[0].dailyCalorieTarget);
+  });
+
+  it("keeps currentWeek and weekIndexInPlan in step as the plan progresses", () => {
+    for (const week of [0, 1, 2]) {
+      const p = computeGoalProgress(replanned, [], [], [], shiftKey(REPLAN_AT, 7 * week + 2), S);
+      expect(p.currentWeek?.weekIndex).toBe(p.weekIndexInPlan);
+    }
+  });
+});

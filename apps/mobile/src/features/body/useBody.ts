@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BodyEntryDTO, BodyEntryInput, BodySummary, BodyTrends, WeighInDTO } from "@fitfloow/core";
 import { getApi } from "../../lib/api";
 import { todayKey } from "../../lib/dates";
+import { describeError } from "../../lib/errors";
 import { haptic } from "../../lib/haptics";
 import { useToast } from "../../ui/Toast";
 import { GOAL_KEY } from "../goals/useGoal";
@@ -46,7 +47,7 @@ export function useInvalidateBody() {
 
 interface WeighInCtx {
   summary?: BodySummary;
-  trends: Array<[readonly unknown[], BodyTrends | undefined]>;
+  trends: [readonly unknown[], BodyTrends | undefined][];
 }
 
 /**
@@ -69,10 +70,10 @@ export function useQuickWeighIn() {
       for (const [key, data] of trends) if (data) qc.setQueryData(key, optimisticTrends(data, dateKey, input.weightKg));
       return { summary, trends };
     },
-    onError: (_e, _input, ctx) => {
+    onError: (e, _input, ctx) => {
       if (ctx?.summary) qc.setQueryData(BODY_KEYS.summary, ctx.summary);
       for (const [key, data] of ctx?.trends ?? []) if (data) qc.setQueryData(key, data);
-      toast.show({ message: "Tartı kaydedilemedi. Tekrar dene.", kind: "error" });
+      toast.show({ message: describeError(e, "Tartı kaydedilemedi. Tekrar dene."), kind: "error" });
     },
     onSuccess: () => {
       void haptic.success();
@@ -92,9 +93,9 @@ export function useCreateBodyEntry() {
       qc.setQueryData<BodyEntriesView>(BODY_KEYS.entries, (prev) =>
         prev ? { ...prev, entries: [...prev.entries.filter((e) => e.dateKey !== entry.dateKey), entry].sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1)) } : prev
       );
-      void haptic.success();
+      // The success haptic comes from the SuccessCheck the sheet shows next.
     },
-    onError: () => toast.show({ message: "Ölçüm kaydedilemedi. Tekrar dene.", kind: "error" }),
+    onError: (e) => toast.show({ message: describeError(e, "Ölçüm kaydedilemedi. Tekrar dene."), kind: "error" }),
     onSettled: () => void invalidate(),
   });
 }
@@ -112,9 +113,9 @@ export function useDeleteBodyEntry() {
       if (prev) qc.setQueryData<BodyEntriesView>(BODY_KEYS.entries, { ...prev, entries: prev.entries.filter((e) => e.id !== id) });
       return { prev };
     },
-    onError: (_e, _id, ctx) => {
+    onError: (e, _id, ctx) => {
       if (ctx?.prev) qc.setQueryData(BODY_KEYS.entries, ctx.prev);
-      toast.show({ message: "Silinemedi. Tekrar dene.", kind: "error" });
+      toast.show({ message: describeError(e, "Silinemedi. Tekrar dene."), kind: "error" });
     },
     onSuccess: () => void haptic.select(),
     onSettled: () => void invalidate(),

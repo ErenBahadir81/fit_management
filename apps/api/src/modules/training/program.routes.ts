@@ -22,6 +22,7 @@ import {
 import type { AppContext } from "../../context";
 import { AppError } from "../../lib/errors";
 import { Program, toProgramDTO, type ProgramDoc } from "../../models/program";
+import { invalidateAllWeeklyReports } from "../../models/goal";
 import { WorkoutLog, toWorkoutLogDTO, type WorkoutLogDoc } from "../../models/workoutLog";
 import { listActiveMuscles } from "../../models/muscle";
 import {
@@ -86,6 +87,8 @@ export async function programRoutes(app: FastifyInstance, ctx: AppContext) {
     program.lastActionAt = ctx.now();
     program.markModified("days");
     await program.save();
+    // The cycle drives `plannedSessions`, which every cached report already baked into its score.
+    await invalidateAllWeeklyReports(req.auth.id);
     return { program: toProgramDTO(program) };
   });
 

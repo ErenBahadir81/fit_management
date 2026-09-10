@@ -82,3 +82,12 @@ export async function invalidateWeeklyReports(userId: Types.ObjectId | string, w
   if (weekKeys.length === 0) return;
   await WeeklyReportCache.deleteMany({ userId, weekKey: { $in: weekKeys } });
 }
+
+/**
+ * Drop *every* cached report of a user. Used by writes that change all weeks at once rather than
+ * the data of one day: a goal re-plan (new roadmap → new targets, expectations and score for every
+ * week), a measurement-day change (new week keys) and a program change (new plannedSessions).
+ */
+export async function invalidateAllWeeklyReports(userId: Types.ObjectId | string): Promise<void> {
+  await WeeklyReportCache.deleteMany({ userId });
+}

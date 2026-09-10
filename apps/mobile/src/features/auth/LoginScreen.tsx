@@ -8,7 +8,6 @@ import { getApi } from "../../lib/api";
 import { env } from "../../lib/env";
 import { haptic } from "../../lib/haptics";
 import { Floo } from "../../mascot/Floo";
-import { useTheme } from "../../theme/ThemeProvider";
 import { spacing } from "../../theme/tokens";
 import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
@@ -31,9 +30,9 @@ function messageFor(e: unknown): string {
 /** Login: Floo idle, two fields, one action. Errors shake the card (skipped under reduced motion). */
 export function LoginScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
   const reduce = useReducedMotion();
   const signIn = useSession((s) => s.signIn);
+  const signedOutReason = useSession((s) => s.signedOutReason);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ username?: string; password?: string; form?: string }>({});
@@ -41,14 +40,14 @@ export function LoginScreen() {
   const [mood, setMood] = useState<Mood>("happy");
   const passwordRef = useRef<TextInput>(null);
   const shake = useSharedValue(0);
-  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.value }] }));
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.get() }] }));
 
   const fail = useCallback(
     (next: typeof errors) => {
       setErrors(next);
       setMood("worried");
       void haptic.error();
-      if (!reduce) shake.value = withSequence(withTiming(-10, { duration: 50 }), withTiming(10, { duration: 50 }), withTiming(-6, { duration: 50 }), withTiming(6, { duration: 50 }), withTiming(0, { duration: 60 }));
+      if (!reduce) shake.set(withSequence(withTiming(-10, { duration: 50 }), withTiming(10, { duration: 50 }), withTiming(-6, { duration: 50 }), withTiming(6, { duration: 50 }), withTiming(0, { duration: 60 })));
     },
     [reduce, shake]
   );
@@ -86,6 +85,11 @@ export function LoginScreen() {
           Hoş geldin. Kaldığımız yerden devam edelim mi?
         </Text>
       </View>
+      {signedOutReason === "expired" ? (
+        <Text variant="label" tone="warning" align="center" accessibilityLiveRegion="polite" testID="login-expired">
+          Oturumun süresi doldu, tekrar giriş yap.
+        </Text>
+      ) : null}
       <Animated.View style={shakeStyle}>
         <Card style={styles.card}>
           <TextField
@@ -138,7 +142,7 @@ export function LoginScreen() {
           }} />
         </View>
       )}
-      <Text variant="caption" color="inkSubtle" align="center" style={{ color: colors.inkSubtle }}>
+      <Text variant="caption" color="inkSubtle" align="center">
         Hesabın yoksa yöneticinle iletişime geç.
       </Text>
     </Screen>

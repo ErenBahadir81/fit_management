@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { DietTargetDTO } from "@fitfloow/core";
 import { fmtInt } from "../../../lib/format";
 import { spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { Segmented } from "../../../ui/Segmented";
-import { Sheet, useSheet } from "../../../ui/Sheet";
+import { Sheet } from "../../../ui/Sheet";
 import { Surface } from "../../../ui/Surface";
 import { Text } from "../../../ui/Text";
 import { TextField } from "../../../ui/TextField";
@@ -30,9 +30,6 @@ const num = (v: string) => {
 
 /** Auto (from the goal) or manual macros. Auto is the default and needs no input. */
 export function TargetSheet({ target, onSave, onClose, saving }: TargetSheetProps) {
-  const sheet = useSheet();
-  useEffect(() => sheet.present(), [sheet]);
-
   const [mode, setMode] = useState<"auto" | "manual">(target.mode);
   const [calories, setCalories] = useState(String(Math.round(target.calories)));
   const [protein, setProtein] = useState(String(Math.round(target.protein)));
@@ -43,7 +40,7 @@ export function TargetSheet({ target, onSave, onClose, saving }: TargetSheetProp
   const invalid = mode === "manual" && (parsed.calories == null || parsed.calories < 500 || parsed.calories > 8000 || parsed.protein == null || parsed.carbs == null || parsed.fat == null);
 
   return (
-    <Sheet ref={sheet.ref} onDismiss={onClose}>
+    <Sheet open onDismiss={onClose}>
       <View style={styles.stack} testID="target-sheet">
         <Text variant="heading">Günlük hedef</Text>
         <Segmented
@@ -89,14 +86,13 @@ export function TargetSheet({ target, onSave, onClose, saving }: TargetSheetProp
           full
           loading={saving}
           disabled={invalid}
-          onPress={() => {
-            sheet.dismiss();
+          onPress={() =>
             onSave(
               mode === "auto"
                 ? { mode: "auto" }
                 : { mode: "manual", calories: parsed.calories ?? undefined, protein: parsed.protein ?? undefined, carbs: parsed.carbs ?? undefined, fat: parsed.fat ?? undefined }
-            );
-          }}
+            )
+          }
         />
       </View>
     </Sheet>

@@ -25,3 +25,6 @@ export { TabBar, TAB_ITEMS, TAB_BAR_HEIGHT, tabIndexForRoute, useTabBarSpace, ty
 export { Entry, type EntryProps } from "./Entry";
 export { Screen, type ScreenProps } from "./Screen";
 export { Sheet, useSheet, SheetActions, type SheetProps, type SheetRef } from "./Sheet";
+export { SwipeToDelete, SWIPE_ACTION_WIDTH, type SwipeToDeleteProps } from "./SwipeToDelete";
+export { UndoBar, type UndoBarProps } from "./UndoBar";
+export { ListRefreshControl } from "./ListRefreshControl";

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -43,45 +43,37 @@ export interface ProgramEditorSheetProps {
  * edited on a local draft and committed with a single optimistic `PUT /program`.
  */
 export function ProgramEditorSheet({ sheetRef, program, onClose }: ProgramEditorSheetProps) {
-  const [days, setDays] = useState<DayDTO[]>(program.days);
-  const [dirty, setDirty] = useState(false);
+  // `null` = untouched → the editor mirrors the server; a local draft never gets clobbered by refetches.
+  const [draft, setDraft] = useState<DayDTO[] | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: "days" });
   const save = useUpdateProgram();
-
-  // Follow the server while untouched; never clobber in-flight edits.
-  useEffect(() => {
-    if (!dirty) setDays(program.days);
-  }, [dirty, program.days]);
-
-  const patch = useCallback((next: DayDTO[]) => {
-    setDays(next);
-    setDirty(true);
-  }, []);
+  const days = draft ?? program.days;
+  const dirty = draft !== null;
 
   const move = useCallback(
     (from: number, to: number) => {
-      setDays((prev) => {
-        const clamped = Math.max(0, Math.min(prev.length - 1, to));
+      setDraft((prev) => {
+        const base = prev ?? program.days;
+        const clamped = Math.max(0, Math.min(base.length - 1, to));
         if (clamped === from) return prev;
-        const next = [...prev];
+        const next = [...base];
         const [row] = next.splice(from, 1);
         next.splice(clamped, 0, row);
         return next.map((d, i) => ({ ...d, order: i + 1 }));
       });
-      setDirty(true);
       void haptic.select();
     },
-    []
+    [program.days]
   );
 
-  const updateDay = useCallback((index: number, day: DayDTO) => patch(days.map((d, i) => (i === index ? day : d))), [days, patch]);
+  const updateDay = useCallback((index: number, day: DayDTO) => setDraft((prev) => (prev ?? program.days).map((d, i) => (i === index ? day : d))), [program.days]);
 
   const commit = useCallback(() => {
     save.mutate(
       { name: program.name, days: days.map((d, i) => ({ ...d, order: i + 1 })) },
       {
         onSuccess: () => {
-          setDirty(false);
+          setDraft(null);
           setMode({ kind: "days" });
           onClose();
         },
@@ -91,10 +83,9 @@ export function ProgramEditorSheet({ sheetRef, program, onClose }: ProgramEditor
 
   const close = useCallback(() => {
     setMode({ kind: "days" });
-    setDirty(false);
-    setDays(program.days);
+    setDraft(null);
     onClose();
-  }, [onClose, program.days]);
+  }, [onClose]);
 
   const title = mode.kind === "days" ? "Programı düzenle" : mode.kind === "day" ? days[mode.index]?.title ?? "Gün" : "Hareket ekle";
 
@@ -179,18 +170,18 @@ function DayRow({
 
   // Rows the dragged one passes over slide out of the way, on the UI thread.
   const shift = useDerivedValue(() => {
-    "worklet";
-    if (dragIndex.value === -1 || dragIndex.value === index) return 0;
-    const target = dragIndex.value + Math.round(offsetY.value / ROW_H);
-    if (dragIndex.value < index && target >= index) return -ROW_H;
-    if (dragIndex.value > index && target <= index) return ROW_H;
+    const drag = dragIndex.get();
+    if (drag === -1 || drag === index) return 0;
+    const target = drag + Math.round(offsetY.get() / ROW_H);
+    if (drag < index && target >= index) return -ROW_H;
+    if (drag > index && target <= index) return ROW_H;
     return 0;
   });
 
   const style = useAnimatedStyle(() => {
-    const dragging = dragIndex.value === index;
+    const dragging = dragIndex.get() === index;
     return {
-      transform: [{ translateY: dragging ? offsetY.value : withSpring(shift.value, springs.snappy) }, { scale: withSpring(dragging ? 1.02 : 1, springs.snappy) }],
+      transform: [{ translateY: dragging ? offsetY.get() : withSpring(shift.get(), springs.snappy) }, { scale: withSpring(dragging ? 1.02 : 1, springs.snappy) }],
       zIndex: dragging ? 10 : 0,
       opacity: dragging ? 0.96 : 1,
     };
@@ -199,25 +190,21 @@ function DayRow({
   const pan = Gesture.Pan()
     .activateAfterLongPress(120)
     .onStart(() => {
-      "worklet";
-      dragIndex.value = index;
-      offsetY.value = 0;
+      dragIndex.set(index);
+      offsetY.set(0);
     })
     .onUpdate((e) => {
-      "worklet";
-      offsetY.value = e.translationY;
+      offsetY.set(e.translationY);
     })
     .onEnd(() => {
-      "worklet";
-      const to = index + Math.round(offsetY.value / ROW_H);
-      dragIndex.value = -1;
-      offsetY.value = 0;
+      const to = index + Math.round(offsetY.get() / ROW_H);
+      dragIndex.set(-1);
+      offsetY.set(0);
       if (to !== index) runOnJS(onMove)(index, to);
     })
     .onFinalize(() => {
-      "worklet";
-      dragIndex.value = -1;
-      offsetY.value = 0;
+      dragIndex.set(-1);
+      offsetY.set(0);
     });
 
   return (

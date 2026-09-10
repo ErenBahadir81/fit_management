@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { memo, useCallback } from "react";
 import { StyleSheet, View } from "react-native";
 import type { Meal, MealEntryDTO, Totals } from "@fitfloow/core";
 import { fmtGrams, fmtInt } from "../../../lib/format";
@@ -6,14 +6,14 @@ import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Icon } from "../../../ui/Icon";
 import { Pressable } from "../../../ui/Pressable";
+import { SwipeToDelete } from "../../../ui/SwipeToDelete";
 import { Text } from "../../../ui/Text";
 import { MEAL_ICON, MEAL_LABEL } from "../model/meals";
-import { SwipeToDelete } from "./SwipeToDelete";
 
 export const ROW_HEIGHTS = { header: 56, entry: 60, empty: 52, add: 56 } as const;
 
 /** Section head: meal name, its kcal, and a rounded top edge for the section "card". */
-export function MealHeaderRow({ meal, totals, count }: { meal: Meal; totals: Totals; count: number }) {
+export const MealHeaderRow = memo(function MealHeaderRow({ meal, totals, count }: { meal: Meal; totals: Totals; count: number }) {
   const { colors } = useTheme();
   return (
     <View style={[styles.section, styles.top, { backgroundColor: colors.surface }]}>
@@ -30,9 +30,9 @@ export function MealHeaderRow({ meal, totals, count }: { meal: Meal; totals: Tot
       ) : null}
     </View>
   );
-}
+});
 
-export function MealEmptyRow({ meal }: { meal: Meal }) {
+export const MealEmptyRow = memo(function MealEmptyRow({ meal }: { meal: Meal }) {
   const { colors } = useTheme();
   return (
     <View style={[styles.section, styles.empty, { backgroundColor: colors.surface }]}>
@@ -41,14 +41,15 @@ export function MealEmptyRow({ meal }: { meal: Meal }) {
       </Text>
     </View>
   );
-}
+});
 
-export function MealAddRow({ meal, onPress }: { meal: Meal; onPress: (meal: Meal) => void }) {
+export const MealAddRow = memo(function MealAddRow({ meal, onPress }: { meal: Meal; onPress: (meal: Meal) => void }) {
   const { colors } = useTheme();
+  const press = useCallback(() => onPress(meal), [meal, onPress]);
   return (
     <Pressable
       testID={`meal-add-${meal}`}
-      onPress={() => onPress(meal)}
+      onPress={press}
       accessibilityLabel={`${MEAL_LABEL[meal]} öğününe ekle`}
       minTarget={false}
       style={[styles.section, styles.add, styles.bottom, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
@@ -59,7 +60,7 @@ export function MealAddRow({ meal, onPress }: { meal: Meal; onPress: (meal: Meal
       </Text>
     </Pressable>
   );
-}
+});
 
 export interface EntryRowProps {
   entry: MealEntryDTO;
@@ -68,17 +69,22 @@ export interface EntryRowProps {
 }
 
 /** One logged food: tap to edit grams, swipe left to delete (with undo in the day screen). */
-export function EntryRow({ entry, onPress, onDelete }: EntryRowProps) {
+export const EntryRow = memo(function EntryRow({ entry, onPress, onDelete }: EntryRowProps) {
   const { colors } = useTheme();
   const remove = useCallback(() => onDelete(entry), [entry, onDelete]);
+  const open = useCallback(() => onPress(entry), [entry, onPress]);
 
   return (
-    <SwipeToDelete onDelete={remove}>
+    <SwipeToDelete onDelete={remove} deleteTestID={`entry-delete-${entry.id}`} deleteLabel={`${entry.name} kaydını sil`} radius={0}>
       <Pressable
         testID={`entry-${entry.id}`}
-        onPress={() => onPress(entry)}
+        onPress={open}
         minTarget={false}
         accessibilityLabel={`${entry.name}, ${fmtGrams(entry.grams)}, ${fmtInt(entry.totals.kcal)} kilokalori. Düzenlemek için dokun.`}
+        accessibilityActions={[{ name: "delete", label: "Sil" }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === "delete") remove();
+        }}
         style={[styles.section, styles.entry, { backgroundColor: colors.surface }]}
       >
         <View style={styles.grow}>
@@ -98,7 +104,7 @@ export function EntryRow({ entry, onPress, onDelete }: EntryRowProps) {
       </Pressable>
     </SwipeToDelete>
   );
-}
+});
 
 const styles = StyleSheet.create({
   section: { paddingHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.sm },

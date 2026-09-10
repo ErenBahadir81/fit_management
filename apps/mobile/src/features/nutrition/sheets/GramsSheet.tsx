@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { Meal, MealEntryDTO } from "@fitfloow/core";
 import { spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
-import { Sheet, useSheet } from "../../../ui/Sheet";
+import { Sheet } from "../../../ui/Sheet";
 import { FoodDetail } from "./FoodDetail";
 
 export interface GramsSheetProps {
@@ -16,12 +16,10 @@ export interface GramsSheetProps {
 
 /** Tap an entry → fix the grams (±10 g, hold to run) or move it to another meal. */
 export function GramsSheet({ entry, onSave, onDelete, onClose, saving }: GramsSheetProps) {
-  const sheet = useSheet();
   const [meal, setMeal] = useState<Meal>(entry.meal);
-  useEffect(() => sheet.present(), [sheet]);
 
   return (
-    <Sheet ref={sheet.ref} onDismiss={onClose}>
+    <Sheet open onDismiss={onClose}>
       <View style={styles.stack}>
         <FoodDetail
           testID="grams-sheet"
@@ -30,10 +28,7 @@ export function GramsSheet({ entry, onSave, onDelete, onClose, saving }: GramsSh
           initialGrams={entry.grams}
           meal={meal}
           onMealChange={setMeal}
-          onAdd={(grams) => {
-            sheet.dismiss();
-            onSave({ grams, meal });
-          }}
+          onAdd={(grams) => onSave({ grams, meal })}
           submitLabel="Kaydet"
           adding={saving}
         />
@@ -42,10 +37,7 @@ export function GramsSheet({ entry, onSave, onDelete, onClose, saving }: GramsSh
           label="Sil"
           variant="danger"
           icon="trash-outline"
-          onPress={() => {
-            sheet.dismiss();
-            onDelete();
-          }}
+          onPress={onDelete}
           full
         />
       </View>

@@ -11,49 +11,6 @@ import { ProgramScreen } from "./ProgramScreen";
 
 jest.mock("expo-router", () => require("../../../../__tests__/mocks/expo-router"));
 
-/**
- * FlashList v2 needs a real layout engine: under Jest it re-measures forever as soon as the data
- * shrinks (the undo-delete case below). This mock renders the same tree without virtualization.
- * TODO(F4c): hoist into jest.setup.js — F3's lists will need it too.
- */
-interface MockListProps {
-  data?: unknown[];
-  renderItem: (info: { item: unknown; index: number; target: string }) => React.ReactNode;
-  keyExtractor?: (item: unknown, index: number) => string;
-  ListHeaderComponent?: React.ReactNode | (() => React.ReactNode);
-  ListEmptyComponent?: React.ReactNode | (() => React.ReactNode);
-  ListFooterComponent?: React.ReactNode | (() => React.ReactNode);
-  contentContainerStyle?: unknown;
-  testID?: string;
-  refreshing?: boolean;
-  onRefresh?: () => void;
-}
-
-jest.mock("@shopify/flash-list", () => {
-  const ReactMock = require("react") as typeof import("react");
-  const { RefreshControl, ScrollView, View } = require("react-native") as typeof import("react-native");
-  const node = (C: MockListProps["ListHeaderComponent"]) =>
-    ReactMock.isValidElement(C) ? C : typeof C === "function" ? ReactMock.createElement(C as React.FC) : null;
-  return {
-    FlashList: ({ data = [], renderItem, keyExtractor, ListHeaderComponent, ListEmptyComponent, ListFooterComponent, contentContainerStyle, testID, refreshing, onRefresh }: MockListProps) =>
-      ReactMock.createElement(
-        ScrollView,
-        {
-          testID,
-          contentContainerStyle: contentContainerStyle as never,
-          refreshControl: onRefresh ? ReactMock.createElement(RefreshControl, { refreshing: Boolean(refreshing), onRefresh }) : undefined,
-        },
-        node(ListHeaderComponent),
-        data.length === 0
-          ? node(ListEmptyComponent)
-          : data.map((item, index) =>
-              ReactMock.createElement(View, { key: keyExtractor ? keyExtractor(item, index) : String(index) }, renderItem({ item, index, target: "Cell" }))
-            ),
-        node(ListFooterComponent)
-      ),
-  };
-});
-
 async function signIn(api: ReturnType<typeof createFakeApi>) {
   useSession.setState({ status: "signedIn", user: (await api.auth.me()).user });
 }

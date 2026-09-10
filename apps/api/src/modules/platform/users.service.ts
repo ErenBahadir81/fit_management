@@ -4,7 +4,7 @@ import { User, toUserDTO, type UserDoc } from "../../models/user";
 import { Program, ProgramTemplate, toProgramDTO } from "../../models/program";
 import { WorkoutLog } from "../../models/workoutLog";
 import { BodyEntry, WeighIn } from "../../models/body";
-import { Goal, WeeklyReportCache } from "../../models/goal";
+import { Goal, WeeklyReportCache, invalidateAllWeeklyReports } from "../../models/goal";
 import { DietTarget, MealEntry, Scan } from "../../models/nutrition";
 import { AppError } from "../../lib/errors";
 
@@ -104,5 +104,6 @@ export async function assignTemplate(userId: Types.ObjectId, templateId: string,
     },
     { upsert: true, returnDocument: "after" }
   );
+  await invalidateAllWeeklyReports(userId);
   return toProgramDTO(program!);
 }

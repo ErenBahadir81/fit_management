@@ -30,7 +30,9 @@ export function Stepper({ value, onChange, step = 1, min = -Infinity, max = Infi
   const digits = decimalsOf(step);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const latest = useRef(value);
-  latest.current = value;
+  useEffect(() => {
+    latest.current = value;
+  }, [value]);
 
   const apply = useCallback(
     (dir: 1 | -1) => {

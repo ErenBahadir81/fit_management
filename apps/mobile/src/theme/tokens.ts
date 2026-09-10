@@ -17,6 +17,10 @@ export interface ThemeColors {
   primaryStrong: string;
   primarySoft: string;
   onPrimary: string;
+  /** Secondary text on a primary (violet) surface. */
+  onPrimaryMuted: string;
+  /** Hairlines on a primary surface. */
+  onPrimaryBorder: string;
   gradient: readonly [string, string];
   success: string;
   successSoft: string;
@@ -47,6 +51,8 @@ export const light: ThemeColors = {
   primaryStrong: "#5A4AE3",
   primarySoft: "#EEEBFF",
   onPrimary: "#FFFFFF",
+  onPrimaryMuted: "rgba(255,255,255,0.82)",
+  onPrimaryBorder: "rgba(255,255,255,0.25)",
   gradient: ["#6D5DF6", "#8B7CFF"],
   success: "#16A34A",
   successSoft: "#E4F6EA",
@@ -77,6 +83,8 @@ export const dark: ThemeColors = {
   primaryStrong: "#6D5DF6",
   primarySoft: "#26224A",
   onPrimary: "#FFFFFF",
+  onPrimaryMuted: "rgba(255,255,255,0.82)",
+  onPrimaryBorder: "rgba(255,255,255,0.25)",
   gradient: ["#6D5DF6", "#8B7CFF"],
   success: "#22C55E",
   successSoft: "#12301E",

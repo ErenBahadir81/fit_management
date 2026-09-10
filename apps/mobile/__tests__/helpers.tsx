@@ -4,8 +4,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "../src/theme";
 import { ToastProvider } from "../src/ui/Toast";
 
+/**
+ * Deterministic client for screen tests. Mutations are garbage-collected at once: react-query's
+ * default 5-minute mutation GC timer would otherwise keep the Jest event loop alive after a suite.
+ */
 export function makeQueryClient() {
-  return new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 0 }, mutations: { retry: false } } });
+  return new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 0 }, mutations: { retry: false, gcTime: 0 } } });
 }
 
 export function Providers({ children, queryClient }: { children: React.ReactNode; queryClient?: QueryClient }) {
