@@ -3,9 +3,25 @@ import { Food } from "../src/models/nutrition";
 import { seedFoods } from "../src/modules/nutrition/seed/index";
 import { asUser, createTestApp, seedBasics, type TestApp } from "./harness";
 
+const OFF_SEARCH = "https://world.openfoodfacts.org/cgi/search.pl";
+const OFF_PRODUCT = "https://world.openfoodfacts.org/api/v2/product/";
+
+type FakeReply = { status?: number; body: unknown };
+const EMPTY_SEARCH: FakeReply = { body: { count: 0, products: [] } };
+const NO_PRODUCT: FakeReply = { status: 404, body: { status: 0 } };
+
+/**
+ * `FakeHttpClient` has no reset, so each upstream is registered once with an indirection the tests
+ * swap per case (routes are matched first-registered-wins).
+ */
+let offSearchReply: FakeReply = EMPTY_SEARCH;
+let offProductReply: FakeReply = NO_PRODUCT;
+
 let t: TestApp;
 beforeAll(async () => {
   t = await createTestApp();
+  t.http.on(OFF_SEARCH, () => offSearchReply);
+  t.http.on(OFF_PRODUCT, () => offProductReply);
 });
 afterAll(async () => {
   await t.close();
@@ -14,10 +30,11 @@ beforeEach(async () => {
   await t.reset();
   await seedBasics();
   await seedFoods();
+  offSearchReply = EMPTY_SEARCH;
+  offProductReply = NO_PRODUCT;
+  t.http.calls.length = 0;
+  t.clock.now = new Date("2026-09-10T09:00:00.000Z");
 });
-
-const OFF_SEARCH = "https://world.openfoodfacts.org/cgi/search.pl";
-const OFF_PRODUCT = "https://world.openfoodfacts.org/api/v2/product/";
 
 const nutella = {
   code: "3017624010701",
@@ -111,7 +128,7 @@ describe("GET /nutrition/foods/search", () => {
   });
 
   it("adds Open Food Facts results and caches them when remote=1", async () => {
-    t.http.on(OFF_SEARCH, () => ({ body: { count: 1, products: [nutella] } }));
+    offSearchReply = { body: { count: 1, products: [nutella] } };
     const { headers } = await asUser(t);
     const body = (await search(headers, "q=nutella&remote=1")).json();
     expect(body.remote).toHaveLength(1);
@@ -128,7 +145,7 @@ describe("GET /nutrition/foods/search", () => {
   });
 
   it("swallows an Open Food Facts outage and still returns local results", async () => {
-    t.http.on(OFF_SEARCH, () => ({ status: 503, body: "<html>Page temporarily unavailable</html>" }));
+    offSearchReply = { status: 503, body: "<html>Page temporarily unavailable</html>" };
     const { headers } = await asUser(t);
     const body = (await search(headers, "q=pilav&remote=1")).json();
     expect(body.foods.length).toBeGreaterThan(0);
@@ -216,7 +233,7 @@ describe("GET /nutrition/foods/barcode/:code", () => {
   });
 
   it("falls back to Open Food Facts and caches the product", async () => {
-    t.http.on(OFF_PRODUCT, () => ({ body: { status: 1, product: nutella } }));
+    offProductReply = { body: { status: 1, product: nutella } };
     const { headers } = await asUser(t);
     const res = await t.app.inject({ method: "GET", url: "/api/v1/nutrition/foods/barcode/3017624010701", headers });
     expect(res.statusCode).toBe(200);
@@ -231,7 +248,7 @@ describe("GET /nutrition/foods/barcode/:code", () => {
   });
 
   it("returns null when the barcode is unknown everywhere", async () => {
-    t.http.on(OFF_PRODUCT, () => ({ status: 404, body: { status: 0 } }));
+    offProductReply = NO_PRODUCT;
     const { headers } = await asUser(t);
     const res = await t.app.inject({ method: "GET", url: "/api/v1/nutrition/foods/barcode/1111111111111", headers });
     expect(res.statusCode).toBe(200);
@@ -257,7 +274,6 @@ describe("GET /nutrition/recent", () => {
 
     const res = await t.app.inject({ method: "GET", url: "/api/v1/nutrition/recent", headers });
     expect(res.json().foods.map((f: { name: string }) => f.name)).toEqual(["Pilav", "Yoğurt (tam yağlı)"]);
-    t.clock.now = new Date("2026-09-10T09:00:00.000Z");
   });
 
   it("is empty for a fresh user", async () => {
