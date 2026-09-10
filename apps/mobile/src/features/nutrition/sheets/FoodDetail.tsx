@@ -136,7 +136,7 @@ function MacroPill({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   stack: { gap: spacing.md },
   head: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  back: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  back: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1, gap: 2 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   amount: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.md, gap: spacing.md },

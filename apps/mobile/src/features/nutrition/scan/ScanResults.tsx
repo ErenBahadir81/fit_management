@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   card: { padding: spacing.md, gap: spacing.sm },
   cardHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   cardBody: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  remove: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  remove: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   addMore: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
   meals: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },

@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { shiftKey, type NutritionDayView } from "@fitfloow/core";
 import { QueryClient } from "@tanstack/react-query";
 import { renderUI } from "../../../__tests__/helpers";
@@ -12,6 +12,20 @@ import { NutritionScreen } from "./NutritionScreen";
 import { nutritionDayKey } from "./useNutrition";
 
 jest.mock("expo-router", () => require("../../../__tests__/mocks/expo-router"));
+
+/** Barcode reading needs the native camera: stand in for it and keep the last props to drive scans. */
+let cameraProps: { onBarcodeScanned?: (r: { data: string; type: string }) => void } = {};
+jest.mock("expo-camera", () => {
+  const React2 = require("react");
+  const { View } = require("react-native");
+  return {
+    CameraView: (props: Record<string, unknown>) => {
+      cameraProps = props as typeof cameraProps;
+      return React2.createElement(View, { testID: "camera-view" });
+    },
+    useCameraPermissions: () => [{ granted: true, canAskAgain: true, status: "granted" }, jest.fn(async () => ({ granted: true }))],
+  };
+});
 
 const today = todayKey();
 
@@ -111,6 +125,58 @@ describe("NutritionScreen — day", () => {
 
     await fireEvent.press(screen.getByTestId("undo-delete"));
     await waitFor(() => expect(screen.getByText("Tavuk göğsü (ızgara)")).toBeTruthy());
+  });
+
+  test("'Elle gir' logs a hand-typed food into the chosen meal", async () => {
+    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId("meal-add-breakfast"));
+    await fireEvent.press(screen.getByTestId("add-manual"));
+
+    await fireEvent.changeText(screen.getByTestId("custom-name"), "Ev yapımı granola");
+    await fireEvent.changeText(screen.getByTestId("custom-kcal"), "420");
+    await fireEvent.changeText(screen.getByTestId("custom-protein"), "9,5");
+    await fireEvent.changeText(screen.getByTestId("custom-carbs"), "60");
+    await fireEvent.changeText(screen.getByTestId("custom-fat"), "15");
+    await fireEvent.press(screen.getByTestId("custom-food-continue"));
+
+    expect(screen.getByTestId("custom-detail-kcal")).toHaveTextContent("420"); // 100 g
+    await fireEvent.press(screen.getByTestId("custom-detail-submit"));
+    await waitFor(() => expect(screen.getByText("Ev yapımı granola")).toBeTruthy());
+  });
+
+  test("the barcode reader resolves a packaged product and adds it", async () => {
+    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId("nutrition-fab"));
+    await fireEvent.press(screen.getByTestId("add-barcode"));
+    expect(screen.getByTestId("camera-view")).toBeTruthy();
+
+    await act(async () => {
+      cameraProps.onBarcodeScanned?.({ data: "8690504010012", type: "ean13" }); // Ayran
+    });
+    await waitFor(() => expect(screen.getByTestId("barcode-detail")).toBeTruthy());
+    expect(screen.getByText("Ayran")).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId("barcode-detail-submit"));
+    await waitFor(() => expect(screen.getAllByText("Ayran").length).toBeGreaterThan(0));
+  });
+
+  test("an unknown barcode offers manual entry instead of a dead end", async () => {
+    await renderUI(<NutritionScreen />, { queryClient: testClient() });
+    await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId("nutrition-fab"));
+    await fireEvent.press(screen.getByTestId("add-barcode"));
+    await act(async () => {
+      cameraProps.onBarcodeScanned?.({ data: "0000000000000", type: "ean13" });
+    });
+
+    await waitFor(() => expect(screen.getByText("Bu barkodu tanımıyorum")).toBeTruthy());
+    await fireEvent.press(screen.getByText("Elle gir"));
+    await waitFor(() => expect(screen.getByTestId("custom-food-form")).toBeTruthy());
   });
 
   test("the target sheet switches to manual macros and the ring follows", async () => {

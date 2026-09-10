@@ -27,7 +27,7 @@ function toNumber(v: string): number | null {
 export function validateDraft(d: Draft): { per100g: Per100g; name: string } | { error: string } {
   const name = d.name.trim();
   if (name.length < 2) return { error: "Bir isim yaz" };
-  const kcal = toNumber(d.kcal);
+  const kcal = d.kcal.trim() === "" ? null : toNumber(d.kcal); // an empty box is not "0 kcal"
   const protein = toNumber(d.protein || "0");
   const carbs = toNumber(d.carbs || "0");
   const fat = toNumber(d.fat || "0");
@@ -93,7 +93,7 @@ export function CustomFoodForm({ onContinue, onBack }: { onContinue: (name: stri
 const styles = StyleSheet.create({
   stack: { gap: spacing.md },
   head: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  back: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  back: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", gap: spacing.md },
   grow: { flex: 1 },
 });

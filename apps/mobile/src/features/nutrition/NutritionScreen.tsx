@@ -20,7 +20,7 @@ import { useTabBarSpace } from "../../ui/TabBar";
 import { useToast } from "../../ui/Toast";
 import { CalorieHero } from "./components/CalorieHero";
 import { DayPager } from "./components/DayPager";
-import { Fab } from "./components/Fab";
+import { Fab, FAB_SIZE } from "./components/Fab";
 import { EntryRow, MealAddRow, MealEmptyRow, MealHeaderRow } from "./components/MealRows";
 import { UndoBar } from "./components/UndoBar";
 import { buildDayRows, type DayRow } from "./components/dayRows";
@@ -200,7 +200,11 @@ export function NutritionScreen() {
       </View>
 
       {tab === "day" ? (
-        <Reveal style={styles.grow} ready={Boolean(day.data)} skeleton={<View style={styles.skeletonPad}>{<NutritionSkeleton />}</View>}>
+        <Reveal style={styles.grow} ready={Boolean(day.data)} skeleton={
+            <View style={styles.skeletonPad}>
+              <NutritionSkeleton />
+            </View>
+          }>
           <FlashList
             testID="nutrition-day-list"
             data={rows}
@@ -224,7 +228,7 @@ export function NutritionScreen() {
       )}
 
       {tab === "day" ? <Fab onPress={() => openAdd(defaultMeal)} bottom={tabSpace + spacing.md} /> : null}
-      {undo ? <UndoBar message={`${undo.name} silindi`} onUndo={onUndoDelete} bottom={tabSpace + spacing.md} /> : null}
+      {undo ? <UndoBar message={`${undo.name} silindi`} onUndo={onUndoDelete} bottom={tabSpace + spacing.md + (tab === "day" ? FAB_SIZE + spacing.md : 0)} /> : null}
 
       {sheet?.kind === "add" ? <AddSheet meal={sheet.meal} onPick={onPickAction} onClose={closeSheet} /> : null}
       {sheet?.kind === "search" ? <SearchSheet meal={sheet.meal} start={sheet.start} onAdd={onAddFood} onClose={closeSheet} adding={addEntry.isPending} /> : null}

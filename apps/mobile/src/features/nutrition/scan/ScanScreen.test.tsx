@@ -83,7 +83,10 @@ describe("ScanScreen", () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
   });
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => {
+    jest.clearAllTimers(); // the theatre's loops must not outlive the test
+    jest.useRealTimers();
+  });
 
   test("the AI theatre runs for at least 1.8 s even when the API answers instantly", async () => {
     await setup();
