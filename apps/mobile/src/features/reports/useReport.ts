@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { WeeklyReportDTO, WeeklyReportSummary } from "@fitfloow/core";
 import { getApi } from "../../lib/api";
 
@@ -14,6 +14,8 @@ export function useWeeklyReport(week: string = CURRENT_WEEK) {
   return useQuery<WeeklyReportDTO>({
     queryKey: REPORT_KEYS.weekly(week),
     queryFn: () => getApi().reports.weekly(week === CURRENT_WEEK ? undefined : week),
+    // week switching keeps the previous page on screen (dimmed) instead of flashing a skeleton
+    placeholderData: keepPreviousData,
   });
 }
 

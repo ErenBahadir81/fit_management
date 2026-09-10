@@ -1,16 +1,14 @@
 import React, { useCallback } from "react";
 import { StyleSheet, View } from "react-native";
-import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
-import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import type { Meal, MealEntryDTO, Totals } from "@fitfloow/core";
 import { fmtGrams, fmtInt } from "../../../lib/format";
-import { haptic } from "../../../lib/haptics";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Icon } from "../../../ui/Icon";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
 import { MEAL_ICON, MEAL_LABEL } from "../model/meals";
+import { SwipeToDelete } from "./SwipeToDelete";
 
 export const ROW_HEIGHTS = { header: 56, entry: 60, empty: 52, add: 56 } as const;
 
@@ -72,26 +70,10 @@ export interface EntryRowProps {
 /** One logged food: tap to edit grams, swipe left to delete (with undo in the day screen). */
 export function EntryRow({ entry, onPress, onDelete }: EntryRowProps) {
   const { colors } = useTheme();
-
-  const renderRightActions = useCallback(
-    (_progress: SharedValue<number>, translation: SharedValue<number>) => <DeleteAction translation={translation} />,
-    []
-  );
-
-  const handleOpen = useCallback(() => {
-    void haptic.medium();
-    onDelete(entry);
-  }, [entry, onDelete]);
+  const remove = useCallback(() => onDelete(entry), [entry, onDelete]);
 
   return (
-    <ReanimatedSwipeable
-      friction={2}
-      rightThreshold={40}
-      overshootRight={false}
-      renderRightActions={renderRightActions}
-      onSwipeableOpen={handleOpen}
-      containerStyle={{ backgroundColor: colors.danger }}
-    >
+    <SwipeToDelete onDelete={remove}>
       <Pressable
         testID={`entry-${entry.id}`}
         onPress={() => onPress(entry)}
@@ -114,20 +96,7 @@ export function EntryRow({ entry, onPress, onDelete }: EntryRowProps) {
           kcal
         </Text>
       </Pressable>
-    </ReanimatedSwipeable>
-  );
-}
-
-function DeleteAction({ translation }: { translation: SharedValue<number> }) {
-  const { colors } = useTheme();
-  const style = useAnimatedStyle(() => ({ opacity: Math.min(1, Math.abs(translation.value) / 60) }));
-  return (
-    <Animated.View style={[styles.delete, { backgroundColor: colors.danger }, style]}>
-      <Icon name="trash-outline" size={20} color={colors.onPrimary} />
-      <Text variant="caption" style={{ color: colors.onPrimary }}>
-        Sil
-      </Text>
-    </Animated.View>
+    </SwipeToDelete>
   );
 }
 
@@ -140,5 +109,4 @@ const styles = StyleSheet.create({
   add: { minHeight: ROW_HEIGHTS.add, borderTopWidth: StyleSheet.hairlineWidth },
   iconBubble: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   grow: { flex: 1 },
-  delete: { width: 88, alignItems: "center", justifyContent: "center", gap: 2 },
 });

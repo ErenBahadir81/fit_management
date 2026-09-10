@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import * as Haptics from "expo-haptics";
 import { round, type BodySummary, type BodyTrends } from "@fitfloow/core";
 import { makeQueryClient, renderUI } from "../../helpers";
@@ -15,6 +15,7 @@ import { fmtNumber, fmtPct } from "../../../src/lib/format";
 jest.mock("expo-router", () => require("../../mocks/expo-router"));
 jest.mock("@shopify/flash-list", () => require("../../mocks/flashList").flashListMock());
 jest.mock("@shopify/flash-list/dist/recyclerview/utils/measureLayout", () => require("../../mocks/flashList").measureLayoutMock());
+jest.mock("react-native-gesture-handler/ReanimatedSwipeable", () => require("../../mocks/swipeable"));
 
 const TODAY = "2026-09-10";
 const makeApi = (latencyMs = 0) => createFakeApi({ latencyMs, signedIn: true, today: () => TODAY });
@@ -34,8 +35,9 @@ describe("BodyScreen", () => {
     await waitFor(() => expect(screen.getByTestId("body-hero")).toBeTruthy());
     const summary = await api.body.summary();
     expect(screen.getByTestId("body-hero-weight").props.accessibilityLabel).toBe(fmtNumber(summary.ewmaWeightKg, 1));
-    expect(screen.getByText(fmtPct(summary.latest!.bodyFatPct, 1))).toBeTruthy();
-    expect(screen.getByText(/±3,5/)).toBeTruthy();
+    const hero = within(screen.getByTestId("body-hero"));
+    expect(hero.getByText(fmtPct(summary.latest!.bodyFatPct, 1))).toBeTruthy();
+    expect(hero.getByText(/±3,5/)).toBeTruthy();
     expect(screen.getByTestId("weighin-save")).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId("body-trend")).toBeTruthy());
     await waitFor(() => expect(screen.getAllByTestId(/^entry-row-/).length).toBe(6));

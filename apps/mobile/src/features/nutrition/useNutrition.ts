@@ -24,6 +24,7 @@ import { useSession } from "../auth/session";
 import { useInvalidateHome } from "../home/useHome";
 import { getApi } from "../../lib/api";
 import { todayKey } from "../../lib/dates";
+import { env } from "../../lib/env";
 import { useToast } from "../../ui/Toast";
 import { addEntryToDay, makeOptimisticEntry, removeEntryFromDay, replaceEntryInDay, updateEntryInDay, type DraftEntry } from "./model/day";
 import { useDebouncedValue } from "./useDebouncedValue";
@@ -38,7 +39,32 @@ export const NUTRITION_RECENT_KEY = ["nutrition-recent"] as const;
 export const SEARCH_MIN_CHARS = 2;
 export const SEARCH_DEBOUNCE_MS = 300;
 
+/**
+ * Demo mode only: seed the extra nutrition foods/barcodes into the in-memory fake so search,
+ * recents and the barcode reader have something to show. Required lazily so the fixtures never
+ * reach a production bundle (same pattern as `lib/api.ts`).
+ */
+let demoSeeded = false;
+type NutritionFakeModule = typeof import("../../lib/fake/nutritionFake");
+type FakeStateOf = Parameters<NutritionFakeModule["findByBarcode"]>[0];
+
+function nutritionFake(): { mod: NutritionFakeModule; state: FakeStateOf } | null {
+  if (!env.fakeApi) return null;
+  const state = (getApi() as { fake?: FakeStateOf }).fake;
+  if (!state) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return { mod: require("../../lib/fake/nutritionFake") as NutritionFakeModule, state };
+}
+function ensureDemoFixtures(): void {
+  if (demoSeeded) return;
+  const fake = nutritionFake();
+  if (!fake) return;
+  demoSeeded = true;
+  fake.mod.installNutritionFixtures(fake.state);
+}
+
 export function useNutritionDay(dateKey: string) {
+  ensureDemoFixtures();
   return useQuery<NutritionDayView>({ queryKey: nutritionDayKey(dateKey), queryFn: () => getApi().nutrition.day(dateKey) });
 }
 
@@ -281,7 +307,15 @@ export function useCreateFood() {
 
 /** Barcode lookup — returns null when neither the local catalog nor OFF knows the code. */
 export function useBarcodeLookup() {
-  return useMutation({ mutationFn: async (code: string) => (await getApi().nutrition.barcode(code)).food });
+  return useMutation({
+    mutationFn: async (code: string) => {
+      const food = (await getApi().nutrition.barcode(code)).food;
+      if (food) return food;
+      // Demo mode: the base fake answers null for every code — resolve from the seeded fixtures.
+      const fake = nutritionFake();
+      return fake ? fake.mod.findByBarcode(fake.state, code) : null;
+    },
+  });
 }
 
 /** The dates the day pager renders: `back` days behind today through `ahead` days after. */

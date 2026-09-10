@@ -1,6 +1,6 @@
-import { PlaceholderScreen } from "../../src/ui/PlaceholderScreen";
+import { ProgramScreen } from "../../src/features/training";
 
-/** F2 replaces this with `src/features/training/ProgramScreen`. */
+/** Program tab: week strip, today's card, weekly volume, history — plus the recovery segment. */
 export default function ProgramRoute() {
-  return <PlaceholderScreen title="Program" subtitle="Antrenman günlerin" body="Program, antrenman kaydı ve toparlanma ekranları burada olacak." />;
+  return <ProgramScreen />;
 }

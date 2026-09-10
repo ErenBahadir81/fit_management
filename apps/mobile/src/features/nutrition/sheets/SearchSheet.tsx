@@ -19,8 +19,14 @@ import { FoodDetail } from "./FoodDetail";
 
 const LIST_HEIGHT = 320;
 
-/** gorhom's scrollable, so the list and the sheet's pan gesture cooperate (its props are stricter). */
-const SheetScroll = BottomSheetScrollView as unknown as React.ComponentType<ScrollViewProps>;
+/**
+ * gorhom's scrollable, so the list and the sheet's pan gesture cooperate. FlashList *calls*
+ * `renderScrollComponent(props)`, so this has to be a plain function component (a class or a
+ * forwardRef object would throw); the ref arrives as a prop and is spread through.
+ */
+function SheetScroll(props: ScrollViewProps) {
+  return <BottomSheetScrollView {...(props as React.ComponentProps<typeof BottomSheetScrollView>)} />;
+}
 
 export interface SearchAddInput {
   food?: FoodDTO | null;

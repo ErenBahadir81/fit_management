@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import type { BodyTrends } from "@fitfloow/core";
 import { LineTrend } from "../../../charts/LineTrend";
 import { fmtDelta } from "../../../lib/format";
 import { radii, spacing } from "../../../theme/tokens";
@@ -19,8 +18,6 @@ const OPTIONS = RANGES.map((r) => ({ value: String(r.days), label: r.label }));
 export interface TrendsCardProps {
   /** Goal target weight → dashed line (null when no goal). */
   goalWeightKg: number | null;
-  /** Lifted so the hero can show the 7-day delta of the same series. */
-  onTrends?: (t: BodyTrends | undefined) => void;
 }
 
 /** Weight trend: EWMA line, faded raw dots, dashed goal, scrub with haptic ticks; 30/90/180/365. */

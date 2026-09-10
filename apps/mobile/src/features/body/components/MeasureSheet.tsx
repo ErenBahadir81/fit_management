@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   field: { gap: spacing.xs },
   fieldRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  input: { flexDirection: "row", alignItems: "center", gap: spacing.xs, height: 40, borderRadius: radii.sm, borderWidth: 1, paddingHorizontal: spacing.md, minWidth: 96 },
+  input: { flexDirection: "row", alignItems: "center", gap: spacing.xs, height: spacing.touch, borderRadius: radii.sm, borderWidth: 1, paddingHorizontal: spacing.md, minWidth: 96 },
   inputText: { flex: 1, fontSize: 15, fontVariant: ["tabular-nums"], paddingVertical: 0, textAlign: "right" },
   preview: { borderRadius: radii.md, padding: spacing.lg, gap: spacing.xs, minHeight: 64, justifyContent: "center" },
   previewHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
