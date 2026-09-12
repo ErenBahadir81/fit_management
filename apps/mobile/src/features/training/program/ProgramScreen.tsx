@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { FlashList, type ListRenderItem } from "@shopify/flash-list";
+import { List, type ListRenderItem } from "../../../ui/List";
 import { useRouter } from "expo-router";
 import type { MuscleDTO, ScheduleEntry, Weekday, WorkoutLogDTO } from "@fitfloow/core";
 import { todayKey } from "../../../lib/dates";
@@ -257,7 +257,7 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
 
   return (
     <Screen scroll={false}>
-      <FlashList
+      <List
         testID="history-list"
         data={rows}
         keyExtractor={keyOf}

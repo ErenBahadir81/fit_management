@@ -1,6 +1,12 @@
 import { NutritionScreen } from "../../src/features/nutrition/NutritionScreen";
 
 /** Beslenme: day log (pager, calorie ring, meals) + week summary. */
+import { ScreenErrorBoundary } from "../../src/ui/ScreenErrorBoundary";
+
 export default function NutritionRoute() {
-  return <NutritionScreen />;
+  return (
+    <ScreenErrorBoundary name="nutrition">
+      <NutritionScreen />
+    </ScreenErrorBoundary>
+  );
 }

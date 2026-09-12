@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View, type ScrollViewProps } from "react-native";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
-import { FlashList } from "@shopify/flash-list";
+import { List } from "../../../ui/List";
 import type { FoodDTO, Meal, Per100g } from "@fitfloow/core";
 import { fmtInt } from "../../../lib/format";
 import { useTheme } from "../../../theme/ThemeProvider";
@@ -141,7 +141,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
           </View>
 
           <View style={styles.list}>
-            <FlashList
+            <List
               testID="food-results"
               data={items}
               renderScrollComponent={SheetScroll}

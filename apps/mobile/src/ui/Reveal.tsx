@@ -6,6 +6,8 @@ import { durations, easeOut } from "../theme/motion";
 export interface RevealProps extends ViewProps {
   /** True as soon as there is data (cached or fresh). */
   ready: boolean;
+  /** Set when the revealed content is a list/scroller that must fill the remaining height. */
+  grow?: boolean;
   skeleton: React.ReactNode;
   children: React.ReactNode;
 }
@@ -14,7 +16,7 @@ export interface RevealProps extends ViewProps {
  * Skeleton → content with a 200 ms crossfade and no layout jump.
  * If `ready` on first render (persisted cache hit) the skeleton is never mounted: instant paint.
  */
-export function Reveal({ ready, skeleton, children, style, ...rest }: RevealProps) {
+export function Reveal({ ready, grow, skeleton, children, style, ...rest }: RevealProps) {
   // Fixed on first render: whether this mount ever painted the skeleton (drives the crossfade).
   const [showedSkeleton] = useState(!ready);
   // Flips once the skeleton overlay has faded out (set from the animation callback, never in render).
@@ -43,7 +45,9 @@ export function Reveal({ ready, skeleton, children, style, ...rest }: RevealProp
   }
   return (
     <View {...rest} style={style}>
-      <Animated.View entering={showedSkeleton ? FadeIn.duration(durations.base) : undefined}>{children}</Animated.View>
+      <Animated.View style={grow ? styles.grow : undefined} entering={showedSkeleton ? FadeIn.duration(durations.base) : undefined}>
+        {children}
+      </Animated.View>
       {overlay && (
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, overlayStyle]}>
           {skeleton}
@@ -52,3 +56,7 @@ export function Reveal({ ready, skeleton, children, style, ...rest }: RevealProp
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  grow: { flex: 1, minHeight: 0 },
+});

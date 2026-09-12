@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { FlashList } from "@shopify/flash-list";
+import { List } from "../../ui/List";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { GoalDTO, GoalProgress, Recalibration } from "@fitfloow/core";
@@ -91,7 +91,7 @@ export function RoadmapScreen() {
       </View>
       <Reveal ready={Boolean(goal)} skeleton={<RoadmapSkeleton />} style={styles.flex}>
         {goal ? (
-          <FlashList<RoadmapRow>
+          <List<RoadmapRow>
             data={rows}
             keyExtractor={(r) => String(r.week.weekIndex)}
             renderItem={({ item }) => <RoadmapWeekRow row={item} />}

@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import { FlashList, type ListRenderItem } from "@shopify/flash-list";
+import { List, type ListRenderItem } from "../../ui/List";
 import { useRouter } from "expo-router";
 import type { BodyEntryDTO, BodySummary, GoalView, WeeklyReportDTO } from "@fitfloow/core";
 import { Floo } from "../../mascot/Floo";
@@ -89,7 +89,7 @@ export function BodyScreen() {
     <Screen scroll={false}>
       <Reveal ready={Boolean(summary)} skeleton={<BodySkeleton />} style={styles.flex}>
         {summary ? (
-          <FlashList<Row>
+          <List<Row>
             data={rows}
             keyExtractor={keyOf}
             renderItem={renderItem}
