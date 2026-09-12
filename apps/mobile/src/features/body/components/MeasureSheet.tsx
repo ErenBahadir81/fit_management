@@ -1,5 +1,5 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, TextInput, View } from "react-native";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 import { round, type BodyEntryDTO, type BodyEntryInput, type Gender } from "@fitfloow/core";
@@ -31,6 +31,14 @@ const GENDER_OPTIONS = [
   { value: "male", label: "Erkek" },
   { value: "female", label: "Kadın" },
 ] as const;
+
+/**
+ * `BottomSheetTextInput` only exists to keep a field above the on-screen keyboard. On web it calls
+ * `TextInputState.currentlyFocusedInput()`, which react-native-web does not implement, so every
+ * blur threw `currentlyFocusedInput is not a function` and killed the screen. There is no keyboard
+ * to dodge on web, so use the plain input there.
+ */
+const SheetInput = Platform.OS === "web" ? TextInput : BottomSheetTextInput;
 
 const toText = (v: number) => String(v).replace(".", ",");
 const parse = (s: string) => {
@@ -71,7 +79,7 @@ function MeasureField({ id, label, value, onChange, step, min, max, unit }: Fiel
       <View style={styles.fieldRow}>
         <Stepper value={value} onChange={onChange} step={step} min={min} max={max} format={(v) => `${fmtNumber(v, digits)} ${unit}`} label={label} size="sm" testID={id} />
         <View style={[styles.input, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          <BottomSheetTextInput
+          <SheetInput
             testID={`${id}-input`}
             value={text}
             onChangeText={onText}
@@ -233,8 +241,8 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md },
   field: { gap: spacing.xs },
   fieldRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  input: { flexDirection: "row", alignItems: "center", gap: spacing.xs, height: spacing.touch, borderRadius: radii.sm, borderWidth: 1, paddingHorizontal: spacing.md, minWidth: 96 },
-  inputText: { flex: 1, fontSize: 15, fontVariant: ["tabular-nums"], paddingVertical: 0, textAlign: "right" },
+  input: { flex: 1, flexShrink: 1, flexDirection: "row", alignItems: "center", gap: spacing.xs, height: spacing.touch, borderRadius: radii.sm, borderWidth: 1, paddingHorizontal: spacing.md, minWidth: 88, maxWidth: 140 },
+  inputText: { flex: 1, minWidth: 0, width: "100%", fontSize: 15, fontVariant: ["tabular-nums"], paddingVertical: 0, textAlign: "right" },
   preview: { borderRadius: radii.md, padding: spacing.lg, gap: spacing.xs, minHeight: 64, justifyContent: "center" },
   previewHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   previewBf: { flexDirection: "row", alignItems: "baseline", gap: spacing.xs },

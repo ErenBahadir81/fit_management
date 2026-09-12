@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { Circle, DashPathEffect, Group, Line as SkLine, Path } from "@shopify/react-native-skia";
 import { runOnJS, useAnimatedReaction, useDerivedValue } from "react-native-reanimated";
 import { CartesianChart, Line, Scatter, useChartPressState, useLinePath } from "victory-native";
@@ -9,6 +9,10 @@ import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing } from "../theme/tokens";
 import { Text } from "../ui/Text";
 import { buildTrendSeries, dateTickLabels, ticks, type TrendPoint } from "./chartMath";
+import { SvgLineChart } from "./SvgLineChart";
+
+/** Skia needs CanvasKit, which is not shipped for web — see `SvgLineChart`. */
+const SKIA = Platform.OS !== "web";
 
 export interface LineTrendProps {
   points: TrendPoint[];
@@ -90,26 +94,44 @@ export function LineTrend({ points, goal, unit = "", height = 200, digits = 1, t
           ))}
         </View>
         <View style={styles.canvas}>
-          <CartesianChart
-            data={series.data}
-            xKey="x"
-            yKeys={["ewma", "raw", "goal"]}
-            domain={{ y: series.domainY }}
-            domainPadding={{ left: 8, right: 8, top: 8, bottom: 8 }}
-            chartPressState={state}
-            frame={{ lineWidth: 0 }}
-            xAxis={{ font: null, lineWidth: 0, tickCount: 0 }}
-            yAxis={[{ font: null, lineColor: colors.chartGrid, lineWidth: 1, tickValues: yTicks }]}
-          >
-            {({ points: p }) => (
-              <>
-                {goal != null && <GoalLine points={p.goal} color={colors.inkSubtle} />}
-                <Scatter points={p.raw} radius={3} color={colors.primary} opacity={0.35} animate={{ type: "timing", duration: 320 }} />
-                <Line points={p.ewma} color={colors.primary} strokeWidth={2.5} curveType="monotoneX" connectMissingData animate={{ type: "timing", duration: 320 }} />
-                {isActive && <Cursor x={state.x.position} y={state.y.ewma.position} color={colors.primary} track={colors.border} />}
-              </>
-            )}
-          </CartesianChart>
+          {SKIA ? (
+            <CartesianChart
+              data={series.data}
+              xKey="x"
+              yKeys={["ewma", "raw", "goal"]}
+              domain={{ y: series.domainY }}
+              domainPadding={{ left: 8, right: 8, top: 8, bottom: 8 }}
+              chartPressState={state}
+              frame={{ lineWidth: 0 }}
+              xAxis={{ font: null, lineWidth: 0, tickCount: 0 }}
+              yAxis={[{ font: null, lineColor: colors.chartGrid, lineWidth: 1, tickValues: yTicks }]}
+            >
+              {({ points: p }) => (
+                <>
+                  {goal != null && <GoalLine points={p.goal} color={colors.inkSubtle} />}
+                  <Scatter points={p.raw} radius={3} color={colors.primary} opacity={0.35} animate={{ type: "timing", duration: 320 }} />
+                  <Line points={p.ewma} color={colors.primary} strokeWidth={2.5} curveType="monotoneX" connectMissingData animate={{ type: "timing", duration: 320 }} />
+                  {isActive && <Cursor x={state.x.position} y={state.y.ewma.position} color={colors.primary} track={colors.border} />}
+                </>
+              )}
+            </CartesianChart>
+          ) : (
+            <SvgLineChart
+              count={series.data.length}
+              height={height}
+              domainY={series.domainY}
+              gridColor={colors.chartGrid}
+              yTicks={yTicks}
+              refLines={goal != null ? [{ value: goal, color: colors.inkSubtle }] : []}
+              series={[
+                { values: series.data.map((d) => d.raw), color: colors.primary, dots: true, dotRadius: 3, opacity: 0.35 },
+                { values: series.data.map((d) => d.ewma), color: colors.primary, width: 2.5, connectMissing: true },
+              ]}
+              activeIndex={active}
+              activeColor={colors.border}
+              onActiveIndexChange={setActive}
+            />
+          )}
         </View>
       </View>
       <View style={styles.xAxis}>

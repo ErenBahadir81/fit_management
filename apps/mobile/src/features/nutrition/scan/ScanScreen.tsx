@@ -29,7 +29,7 @@ import { SearchSheet } from "../sheets/SearchSheet";
 import { useAddEntries } from "../useNutrition";
 import { AiThinking } from "./AiThinking";
 import { ScanResults } from "./ScanResults";
-import { CAMERA_SUPPORTED, scanFileFrom } from "./camera";
+import { CAMERA_SUPPORTED, scanUploadFrom } from "./camera";
 
 const TICK_MS = 200;
 const DONE_MS = 1100;
@@ -63,12 +63,16 @@ export function ScanScreen() {
     const controller = new AbortController();
     const min = setTimeout(() => dispatch({ type: "minElapsed" }), MIN_ANALYZE_MS);
     const ticker = setInterval(() => dispatch({ type: "tick", at: Date.now() }), TICK_MS);
-    getApi()
-      .nutrition.scan(scanFileFrom(state.photoUri), controller.signal)
-      .then((result) => dispatch({ type: "result", result }))
-      .catch((e) => {
+    const uri = state.photoUri;
+    void (async () => {
+      try {
+        const upload = await scanUploadFrom(uri);
+        if (controller.signal.aborted) return;
+        dispatch({ type: "result", result: await getApi().nutrition.scan(upload, controller.signal) });
+      } catch (e) {
         if (!controller.signal.aborted) dispatch({ type: "failed", error: mapScanError(e) });
-      });
+      }
+    })();
     return () => {
       clearTimeout(min);
       clearInterval(ticker);

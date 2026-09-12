@@ -89,7 +89,7 @@ export function RoadmapScreen() {
       <View style={styles.headerWrap}>
         <Header title="Yol haritası" compact left={{ icon: "close", label: "Kapat", onPress: () => router.back() }} right={{ icon: "ellipsis-horizontal", label: "Daha fazla", onPress: presentMenu, testID: "roadmap-menu" }} />
       </View>
-      <Reveal ready={Boolean(goal)} skeleton={<RoadmapSkeleton />} style={styles.flex}>
+      <Reveal grow ready={Boolean(goal)} skeleton={<RoadmapSkeleton />} style={styles.flex}>
         {goal ? (
           <List<RoadmapRow>
             data={rows}

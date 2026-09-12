@@ -149,7 +149,9 @@ function settle(state: ScanState, outcome: NonNullable<ScanState["pending"]>): S
     mock: result.mock,
     notFood: items.length === 0,
     items,
-    photoUri: result.imageUrl ?? state.photoUri,
+    // The local capture stays the preview: `imageUrl` is an API-relative, auth-gated path that no
+    // <Image> can load on its own.
+    photoUri: state.photoUri ?? result.imageUrl,
   };
 }
 

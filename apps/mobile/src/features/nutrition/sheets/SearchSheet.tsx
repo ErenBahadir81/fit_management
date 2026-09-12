@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { StyleSheet, View, type ScrollViewProps } from "react-native";
+import { Platform, StyleSheet, TextInput, View, type ScrollViewProps } from "react-native";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { List } from "../../../ui/List";
 import type { FoodDTO, Meal, Per100g } from "@fitfloow/core";
@@ -27,6 +27,13 @@ const LIST_HEIGHT = 320;
 function SheetScroll(props: ScrollViewProps) {
   return <BottomSheetScrollView {...(props as React.ComponentProps<typeof BottomSheetScrollView>)} />;
 }
+
+/**
+ * `BottomSheetTextInput` only exists to keep the field above the on-screen keyboard. On web its
+ * blur handler calls `TextInputState.currentlyFocusedInput()`, which react-native-web does not
+ * implement, so every blur of the search box threw. There is no keyboard to dodge on web.
+ */
+const SheetInput = Platform.OS === "web" ? TextInput : BottomSheetTextInput;
 
 export interface SearchAddInput {
   food?: FoodDTO | null;
@@ -114,7 +121,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
         <View style={styles.stack}>
           <View style={[styles.field, { backgroundColor: colors.surfaceMuted }]}>
             <Icon name="search" size={18} color="inkSubtle" />
-            <BottomSheetTextInput
+            <SheetInput
               testID="food-search-input"
               value={text}
               onChangeText={setText}

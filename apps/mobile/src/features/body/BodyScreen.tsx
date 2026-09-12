@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { List, type ListRenderItem } from "../../ui/List";
 import { useRouter } from "expo-router";
 import type { BodyEntryDTO, BodySummary, GoalView, WeeklyReportDTO } from "@fitfloow/core";
+import { useUndoWindow } from "../../lib/useUndoWindow";
 import { Floo } from "../../mascot/Floo";
 import { spacing } from "../../theme/tokens";
 import { Button } from "../../ui/Button";
@@ -15,6 +16,8 @@ import { Screen } from "../../ui/Screen";
 import { useSheet } from "../../ui/Sheet";
 import { useTabBarSpace } from "../../ui/TabBar";
 import { Text } from "../../ui/Text";
+import { useToast } from "../../ui/Toast";
+import { UndoBar } from "../../ui/UndoBar";
 import { useSession } from "../auth/session";
 import { useGoalView } from "../goals/useGoal";
 import { CURRENT_WEEK, useWeeklyReport } from "../reports/useReport";
@@ -46,13 +49,26 @@ export function BodyScreen() {
   const goalQ = useGoalView();
   const reportQ = useWeeklyReport(CURRENT_WEEK);
   const del = useDeleteBodyEntry();
+  const toast = useToast();
   const { ref: measureRef, present: openMeasure } = useSheet();
   const tabSpace = useTabBarSpace();
 
+  /* --- undoable delete: the row leaves at once, the DELETE fires after the undo window --- */
+  const commitDelete = useCallback((entry: BodyEntryDTO) => del.mutate(entry.id), [del]);
+  const undoWindow = useUndoWindow<BodyEntryDTO>(commitDelete);
+  const pendingDelete = undoWindow.pending;
+  const onDelete = useCallback((id: string) => {
+    const entry = entriesQ.data?.entries.find((e) => e.id === id);
+    if (entry) undoWindow.request(entry);
+  }, [entriesQ.data, undoWindow]);
+  const undoDelete = useCallback(() => {
+    if (undoWindow.undo()) toast.show({ message: "Ölçüm geri getirildi", kind: "success" });
+  }, [toast, undoWindow]);
+
   const rows = useMemo<Row[]>(() => {
-    const list = [...(entriesQ.data?.entries ?? [])].sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
+    const list = [...(entriesQ.data?.entries ?? [])].filter((e) => e.id !== pendingDelete?.id).sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
     return list.map((entry, i) => ({ entry, prev: list[i + 1] ?? null }));
-  }, [entriesQ.data]);
+  }, [entriesQ.data, pendingDelete]);
 
   const onRefresh = useCallback(() => {
     void summaryQ.refetch();
@@ -61,7 +77,6 @@ export function BodyScreen() {
     void goalQ.refetch();
     void reportQ.refetch();
   }, [summaryQ, entriesQ, trendsQ, goalQ, reportQ]);
-  const onDelete = useCallback((id: string) => del.mutate(id), [del]);
   const goGoal = useCallback(() => router.push(goalQ.data?.goal?.status === "active" ? "/(modals)/goal/roadmap" : "/(modals)/goal/setup"), [router, goalQ.data]);
   const goReport = useCallback(() => router.push("/(modals)/report/current"), [router]);
   const renderItem = useCallback<ListRenderItem<Row>>(({ item }) => <MeasurementRow entry={item.entry} prev={item.prev} onDelete={onDelete} />, [onDelete]);
@@ -87,13 +102,13 @@ export function BodyScreen() {
 
   return (
     <Screen scroll={false}>
-      <Reveal ready={Boolean(summary)} skeleton={<BodySkeleton />} style={styles.flex}>
+      <Reveal grow ready={Boolean(summary)} skeleton={<BodySkeleton />} style={styles.flex}>
         {summary ? (
           <List<Row>
             data={rows}
             keyExtractor={keyOf}
             renderItem={renderItem}
-            ListHeaderComponent={<BodyHeader summary={summary} trendsData={trendsQ.data} goal={goalQ.data} report={reportQ.data} entries={entriesQ.data} onAdd={openMeasure} onGoal={goGoal} onReport={goReport} />}
+            ListHeaderComponent={<BodyHeader summary={summary} trendsData={trendsQ.data} goal={goalQ.data} report={reportQ.data} entries={entriesQ.data} rowCount={rows.length} onAdd={openMeasure} onGoal={goGoal} onReport={goReport} />}
             ListEmptyComponent={
               entriesQ.data ? (
                 <EmptyState compact illustration={<Floo mood="sleepy" size="s" />} title="Henüz ölçüm yok" body="Boyun ve bel ölçüsüyle yağ oranını hesaplayalım." action={{ label: "Ölçüm ekle", onPress: openMeasure, icon: "add" }} />
@@ -106,6 +121,7 @@ export function BodyScreen() {
           />
         ) : null}
       </Reveal>
+      {pendingDelete ? <UndoBar message="Ölçüm silindi" onUndo={undoDelete} bottom={tabSpace + spacing.md} testID="undo-bar" /> : null}
       <MeasureSheet ref={measureRef} profile={profile} defaults={{ weightKg: weighInDefault(summary), neckCm: latest?.neckCm ?? null, waistCm: latest?.waistCm ?? null, hipCm: latest?.hipCm ?? null }} />
     </Screen>
   );
@@ -117,12 +133,13 @@ interface BodyHeaderProps {
   goal: GoalView | undefined;
   report: WeeklyReportDTO | undefined;
   entries: BodyEntriesView | undefined;
+  rowCount: number;
   onAdd: () => void;
   onGoal: () => void;
   onReport: () => void;
 }
 
-function BodyHeader({ summary, trendsData, goal, report, entries, onAdd, onGoal, onReport }: BodyHeaderProps) {
+function BodyHeader({ summary, trendsData, goal, report, entries, rowCount, onAdd, onGoal, onReport }: BodyHeaderProps) {
   const goalWeight = goal?.goal?.status === "active" ? goal.goal.plan.targetWeightKg : null;
   return (
     <View style={styles.stack}>
@@ -147,7 +164,7 @@ function BodyHeader({ summary, trendsData, goal, report, entries, onAdd, onGoal,
           <View>
             <Text variant="title">Ölçümler</Text>
             <Text variant="caption" color="inkMuted">
-              {entries ? `${entries.entries.length} kayıt · sola kaydırıp silebilirsin` : " "}
+              {entries ? `${rowCount} kayıt · sola kaydırıp silebilirsin` : " "}
             </Text>
           </View>
           <Button label="Ölçüm ekle" variant="secondary" size="sm" icon="add" onPress={onAdd} testID="measure-open" />

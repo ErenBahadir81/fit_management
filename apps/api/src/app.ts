@@ -57,6 +57,9 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
       if (!origin || ctx.config.corsOrigins.includes(origin) || ctx.config.corsOrigins.includes("*")) cb(null, true);
       else cb(null, false);
     },
+    // @fastify/cors v11 defaults `methods` to the CORS-safelisted set (GET,HEAD,POST), so every
+    // browser PUT/PATCH/DELETE fails preflight. The API speaks all of them — say so explicitly.
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   });
   await app.register(rateLimit, {

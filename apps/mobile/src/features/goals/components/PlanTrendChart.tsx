@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { Circle, DashPathEffect, Group, Line as SkLine, Path } from "@shopify/react-native-skia";
 import { runOnJS, useAnimatedReaction, useDerivedValue, type SharedValue } from "react-native-reanimated";
 import { CartesianChart, Line, Scatter, useChartPressState, useLinePath } from "victory-native";
 import { dateTickLabels, niceDomain, ticks } from "../../../charts/chartMath";
+import { SvgLineChart } from "../../../charts/SvgLineChart";
 import { fmtDate, fmtNumber } from "../../../lib/format";
 import { haptic } from "../../../lib/haptics";
 import { useTheme } from "../../../theme/ThemeProvider";
@@ -20,6 +21,9 @@ export interface PlanTrendChartProps {
 }
 
 type Row = { x: number; dateKey: string; expected: number; actual: number | null; raw: number | null };
+
+/** Skia needs CanvasKit, which is not shipped for web — see `SvgLineChart`. */
+const SKIA = Platform.OS !== "web";
 
 /**
  * Expected (dashed) vs actual trend (solid) with faded weigh-ins, a "today" marker and the target
@@ -92,32 +96,53 @@ export function PlanTrendChart({ rows, targetWeightKg, todayKey, height = 200, t
           ))}
         </View>
         <View style={styles.canvas}>
-          <CartesianChart
-            data={data}
-            xKey="x"
-            yKeys={["expected", "actual", "raw"]}
-            domain={{ y: domainY }}
-            domainPadding={{ left: 8, right: 8, top: 8, bottom: 8 }}
-            chartPressState={state}
-            frame={{ lineWidth: 0 }}
-            xAxis={{ font: null, lineWidth: 0, tickCount: 0 }}
-            yAxis={[{ font: null, lineColor: colors.chartGrid, lineWidth: 1, tickValues: yTicks }]}
-          >
-            {({ points, chartBounds, yScale }) => (
-              <>
-                <SkLine p1={{ x: chartBounds.left, y: yScale(targetWeightKg) }} p2={{ x: chartBounds.right, y: yScale(targetWeightKg) }} color={colors.success} strokeWidth={1.5} opacity={0.8}>
-                  <DashPathEffect intervals={[6, 6]} />
-                </SkLine>
-                <DashedLine points={points.expected} color={colors.inkSubtle} />
-                {todayIndex >= 0 && points.expected[todayIndex] ? (
-                  <SkLine p1={{ x: points.expected[todayIndex].x, y: chartBounds.top }} p2={{ x: points.expected[todayIndex].x, y: chartBounds.bottom }} color={colors.border} strokeWidth={1} />
-                ) : null}
-                <Scatter points={points.raw} radius={2.5} color={colors.primary} opacity={0.3} animate={{ type: "timing", duration: 320 }} />
-                <Line points={points.actual} color={colors.primary} strokeWidth={2.5} curveType="monotoneX" connectMissingData={false} animate={{ type: "timing", duration: 320 }} />
-                {isActive && <Cursor x={state.x.position} y={state.y.actual.position} color={colors.primary} track={colors.border} />}
-              </>
-            )}
-          </CartesianChart>
+          {SKIA ? (
+              <CartesianChart
+                data={data}
+                xKey="x"
+                yKeys={["expected", "actual", "raw"]}
+                domain={{ y: domainY }}
+                domainPadding={{ left: 8, right: 8, top: 8, bottom: 8 }}
+                chartPressState={state}
+                frame={{ lineWidth: 0 }}
+                xAxis={{ font: null, lineWidth: 0, tickCount: 0 }}
+                yAxis={[{ font: null, lineColor: colors.chartGrid, lineWidth: 1, tickValues: yTicks }]}
+              >
+                {({ points, chartBounds, yScale }) => (
+                  <>
+                    <SkLine p1={{ x: chartBounds.left, y: yScale(targetWeightKg) }} p2={{ x: chartBounds.right, y: yScale(targetWeightKg) }} color={colors.success} strokeWidth={1.5} opacity={0.8}>
+                      <DashPathEffect intervals={[6, 6]} />
+                    </SkLine>
+                    <DashedLine points={points.expected} color={colors.inkSubtle} />
+                    {todayIndex >= 0 && points.expected[todayIndex] ? (
+                      <SkLine p1={{ x: points.expected[todayIndex].x, y: chartBounds.top }} p2={{ x: points.expected[todayIndex].x, y: chartBounds.bottom }} color={colors.border} strokeWidth={1} />
+                    ) : null}
+                    <Scatter points={points.raw} radius={2.5} color={colors.primary} opacity={0.3} animate={{ type: "timing", duration: 320 }} />
+                    <Line points={points.actual} color={colors.primary} strokeWidth={2.5} curveType="monotoneX" connectMissingData={false} animate={{ type: "timing", duration: 320 }} />
+                    {isActive && <Cursor x={state.x.position} y={state.y.actual.position} color={colors.primary} track={colors.border} />}
+                  </>
+                )}
+              </CartesianChart>
+          ) : (
+            <SvgLineChart
+              count={data.length}
+              height={height}
+              domainY={domainY}
+              gridColor={colors.chartGrid}
+              yTicks={yTicks}
+              refLines={[{ value: targetWeightKg, color: colors.success }]}
+              markerIndex={todayIndex}
+              markerColor={colors.border}
+              series={[
+                { values: data.map((d) => d.expected), color: colors.inkSubtle, width: 2, dashed: true, connectMissing: true },
+                { values: data.map((d) => d.raw), color: colors.primary, dots: true, dotRadius: 2.5, opacity: 0.3 },
+                { values: data.map((d) => d.actual), color: colors.primary, width: 2.5 },
+              ]}
+              activeIndex={active}
+              activeColor={colors.border}
+              onActiveIndexChange={setActive}
+            />
+          )}
         </View>
       </View>
       <View style={styles.xAxis}>

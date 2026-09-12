@@ -77,7 +77,13 @@ export function NutritionScreen() {
   const rows = useMemo(() => buildDayRows(day.data), [day.data]);
   const defaultMeal = useMemo(() => mealForHour(trHour()), []);
 
-  const closeSheet = useCallback(() => setSheet(null), []);
+  /**
+   * A sheet that is swapped for another one ("Ara" from the add menu) unmounts while its close
+   * animation is still running; gorhom then fires `onDismiss` for the *outgoing* sheet a beat
+   * later. Clearing the sheet unconditionally wiped the sheet that had just opened — which is
+   * why every entry of the add menu looked dead. Each sheet may only close itself.
+   */
+  const closeKind = useCallback((kind: NonNullable<SheetState>["kind"]) => setSheet((s) => (s?.kind === kind ? null : s)), []);
   const refresh = useCallback(() => {
     void day.refetch();
     void week.refetch();
@@ -212,10 +218,10 @@ export function NutritionScreen() {
       {tab === "day" ? <Fab onPress={() => openAdd(defaultMeal)} bottom={tabSpace + spacing.md} /> : null}
       {pending ? <UndoBar message={`${pending.name} silindi`} onUndo={onUndoDelete} bottom={tabSpace + spacing.md + (tab === "day" ? FAB_SIZE + spacing.md : 0)} /> : null}
 
-      {sheet?.kind === "add" ? <AddSheet meal={sheet.meal} onPick={onPickAction} onClose={closeSheet} /> : null}
-      {sheet?.kind === "search" ? <SearchSheet meal={sheet.meal} start={sheet.start} onAdd={onAddFood} onClose={closeSheet} adding={addEntry.isPending} /> : null}
+      {sheet?.kind === "add" ? <AddSheet meal={sheet.meal} onPick={onPickAction} onClose={() => closeKind("add")} /> : null}
+      {sheet?.kind === "search" ? <SearchSheet meal={sheet.meal} start={sheet.start} onAdd={onAddFood} onClose={() => closeKind("search")} adding={addEntry.isPending} /> : null}
       {sheet?.kind === "barcode" ? (
-        <BarcodeScanner meal={sheet.meal} adding={addEntry.isPending} onAdd={onAddFood} onManual={() => setSheet({ kind: "search", meal: sheet.meal, start: "manual" })} onClose={closeSheet} />
+        <BarcodeScanner meal={sheet.meal} adding={addEntry.isPending} onAdd={onAddFood} onManual={() => setSheet({ kind: "search", meal: sheet.meal, start: "manual" })} onClose={() => closeKind("barcode")} />
       ) : null}
       {sheet?.kind === "grams" ? (
         <GramsSheet
@@ -227,7 +233,7 @@ export function NutritionScreen() {
             updateEntry.mutate({ id, ...patch }, { onSuccess: () => void haptic.success() });
           }}
           onDelete={() => onDeleteEntry(sheet.entry)}
-          onClose={closeSheet}
+          onClose={() => closeKind("grams")}
         />
       ) : null}
       {sheet?.kind === "target" && (target.data || day.data) ? (
@@ -238,7 +244,7 @@ export function NutritionScreen() {
             setSheet(null);
             setTarget.mutate(input, { onSuccess: () => toast.show({ message: "Hedef güncellendi", kind: "success" }) });
           }}
-          onClose={closeSheet}
+          onClose={() => closeKind("target")}
         />
       ) : null}
     </Screen>
