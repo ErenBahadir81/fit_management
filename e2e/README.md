@@ -26,3 +26,17 @@ Environment: `CHROME_PATH`, `MOBILE_URL`, `ADMIN_URL`, `API_URL`, `E2E_USER`, `E
   the `refreshControl` element, so dropping children blanks the whole screen.
 - Reanimated entering animations set `position: absolute` on web; screen cards must stay in flow.
 - Tab routes must render content both via deep link and via the tab bar.
+
+## Training (`e2e/mobile-training.e2e.mjs`)
+
+`node e2e/mobile-training.e2e.mjs` drives the Program tab, the workout logger modal, recovery, the
+history list and the program editor button by button. Extra regressions it guards:
+
+- `@fastify/cors` v11 defaults `methods` to the CORS-safelisted set (`GET,HEAD,POST`), so every
+  browser `PUT`/`DELETE` died in preflight — saving the program editor and deleting a log failed
+  with nothing on screen. `apps/api/src/app.ts` now lists the methods explicitly.
+- The logger's horizontal pager must lay each pane out exactly one screen wide and auto-advance to
+  the next exercise once the last set of the current one is logged.
+- Note for anyone writing more of these: the query cache is persisted to localStorage and hydrated
+  synchronously with a 30 s `staleTime`, so a plain reload repaints the old data without hitting the
+  network. Drop `fitfloow\query.cache.v1` first when a test needs a real request (see `coldBoot`).

@@ -50,12 +50,21 @@ async function coldBoot(route = "/program") {
 
 const gotoProgram = () => coldBoot("/program");
 
-/** Puts the day back to "not logged yet" so the suite can be run twice in a row. */
+/**
+ * Puts the day back to "not logged yet" so the suite can be run twice in a row. `undo-last`
+ * invalidates six queries, so the card can flip back and forth for a moment — poll until the
+ * "start" action has actually settled instead of trusting the first render.
+ */
 async function undoTodayIfLogged() {
   if (await count("undo-today")) {
     await T("undo-today").click();
-    await wait(3000);
+    await wait(2500);
   }
+  for (let i = 0; i < 12; i++) {
+    if ((await count("undo-today")) === 0 && (await count("start-workout")) === 1) return true;
+    await wait(1000);
+  }
+  return false;
 }
 
 function expect(where, what, ok) {
@@ -117,10 +126,15 @@ if (await loginMobile(h, rec)) {
   await wait(1500);
   expect("training/jump", "jump sheet lists the cycle days", (await page.locator('[data-testid^="jump-day-"]').count()) > 1);
   const dayBefore = await text("current-day-card");
-  // Pick a day the pointer is not already on, so the assertion means something on a re-run.
-  const otherDay = await page.evaluate(
-    () => [...document.querySelectorAll('[data-testid^="jump-day-"]')].find((e) => e.getAttribute("aria-selected") !== "true")?.dataset.testid
-  );
+  // Pick a day the pointer is not already on — and not a rest day, since the rest card has no
+  // "Antrenmana başla" and the logger block below needs one.
+  // react-native-web drops `accessibilityState.selected` here, so the current day is identified by
+  // the spoken label ("…, şu anki gün") instead of aria-selected.
+  const otherDay = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('[data-testid^="jump-day-"]')];
+    const usable = rows.filter((e) => !/şu anki gün/.test(e.getAttribute("aria-label") ?? "") && !/Dinlenme/.test(e.innerText));
+    return (usable[0] ?? rows[1] ?? rows[0]).dataset.testid;
+  });
   await T(otherDay).click();
   await wait(3000);
   expect("training/jump", "picking a day moves the program pointer", (await text("current-day-card")) !== dayBefore);
@@ -129,6 +143,11 @@ if (await loginMobile(h, rec)) {
   await T("skip-day").first().click();
   await wait(1500);
   expect("training/skip", "confirm sheet opens with reasons", (await count("skip-sheet")) === 1 && (await count("skip-reason-Yorgunum")) === 1);
+  await T("skip-cancel").click();
+  await wait(1400);
+  expect("training/skip", '"Vazgeç" closes the sheet without skipping', (await T("skip-sheet").isVisible().catch(() => false)) === false && (await count("undo-today")) === 0);
+  await T("skip-day").first().click();
+  await wait(1500);
   await T("skip-reason-Yorgunum").click();
   await wait(300);
   await T("skip-confirm").click();
@@ -163,6 +182,22 @@ if (await loginMobile(h, rec)) {
   await T("undo-delete").click();
   await wait(2500);
   expect("training/swipe-delete", "undo brings the row back", (await page.locator('[data-testid^="history-row-"]').count()) > 0);
+
+  h.setWhere("training/sheet-delete");
+  await T(rows[0]).scrollIntoViewIfNeeded();
+  await wait(500);
+  await T(rows[0]).click();
+  await wait(1500);
+  await T("log-delete").click();
+  await wait(2000);
+  expect(
+    "training/sheet-delete",
+    '"Kaydı sil" closes the sheet and removes the row',
+    (await T("log-sheet").isVisible().catch(() => false)) === false && (await count("undo-bar")) === 1
+  );
+  await T("undo-delete").click();
+  await wait(2500);
+  expect("training/sheet-delete", "and that delete is undoable too", (await page.locator('[data-testid^="history-row-"]').count()) > 0);
 
   h.setWhere("training/undo-today");
   await undoTodayIfLogged();
@@ -204,6 +239,19 @@ if (await loginMobile(h, rec)) {
   await T("rest-timer").click({ force: true });
   await wait(900);
   expect("training/logger-set", "tapping the rest timer skips the rest", (await count("rest-timer")) === 0);
+
+  h.setWhere("training/logger-draft");
+  // Leaving with "Sakla ve çık" must keep the in-progress session on the device.
+  const loggedSoFar = await text("workout-progress");
+  await T("workout-close").click();
+  await wait(1600);
+  expect("training/logger-draft", "closing a started session asks what to do", (await count("leave-sheet")) === 1);
+  await T("leave-keep").click();
+  await wait(2800);
+  expect("training/logger-draft", '"Sakla ve çık" goes back to the program', (await count("current-day-card")) === 1);
+  await T("start-workout").click();
+  await wait(3200);
+  expect("training/logger-draft", "reopening resumes the saved draft", (await text("workout-progress")) === loggedSoFar);
 
   h.setWhere("training/logger-sets");
   const withOneMore = await text("workout-progress");
@@ -274,6 +322,11 @@ if (await loginMobile(h, rec)) {
   await T("workout-finish").click();
   await wait(1800);
   expect("training/logger-finish", "the finish sheet summarises the session", (await count("finish-sheet")) === 1);
+  await T("finish-cancel").click();
+  await wait(1500);
+  expect("training/logger-finish", '"Devam et" returns to logging', (await T("finish-sheet").isVisible().catch(() => false)) === false && (await count("complete-set")) === 1);
+  await T("workout-finish").click();
+  await wait(1800);
   await T("rpe-8").click();
   await wait(300);
   await T("finish-note").fill("e2e");
@@ -306,6 +359,23 @@ if (await loginMobile(h, rec)) {
   await T("edit-program").click();
   await wait(2000);
   expect("training/editor", "the editor sheet lists the cycle days", (await page.locator('[data-testid^="editor-day-"]').count()) > 1);
+
+  // "Vazgeç" must throw the local draft away, not quietly keep it for the next time.
+  await T("editor-day-0").click();
+  await wait(1200);
+  const setsBefore = await text("editor-sets-0");
+  await T("editor-sets-0-inc").click();
+  await wait(500);
+  await T("editor-cancel").click();
+  await wait(1800);
+  await T("edit-program").click();
+  await wait(1800);
+  await T("editor-day-0").click();
+  await wait(1200);
+  expect("training/editor", '"Vazgeç" discards the unsaved draft', (await text("editor-sets-0")) === setsBefore);
+  await T("editor-back").click();
+  await wait(1000);
+
   const orderBefore = await text("editor-days");
 
   // Drag the first day down one row (long-press activates the handle).
@@ -325,10 +395,21 @@ if (await loginMobile(h, rec)) {
   await T("editor-day-0").click();
   await wait(1500);
   expect("training/editor", "a day opens its own editor", (await count("editor-day")) === 1);
+  await T("editor-back").click();
+  await wait(1000);
+  expect("training/editor", '"Günler" goes back to the day list', (await count("editor-days")) === 1);
+  await T("editor-day-0").click();
+  await wait(1200);
+
   const exercisesBefore = await page.locator('[data-testid^="editor-exercise-"]').count();
   await T("editor-add-exercise").click();
   await wait(2000);
   expect("training/editor", "the exercise picker opens", (await count("editor-picker")) === 1);
+  await T("picker-back").click();
+  await wait(1000);
+  expect("training/editor", '"Geri" leaves the picker without adding', (await count("editor-day")) === 1 && (await page.locator('[data-testid^="editor-exercise-"]').count()) === exercisesBefore);
+  await T("editor-add-exercise").click();
+  await wait(1800);
   const picks = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="picker-item-"]')].map((e) => e.dataset.testid));
   expect("training/editor", `the picker lists ${picks.length} exercises`, picks.length > 0);
   await T(picks[0]).click();
@@ -371,7 +452,9 @@ if (await loginMobile(h, rec)) {
 
   h.setWhere("training/error");
   await page.unroute("**/api/v1/program");
-  // Expected 500s: they are the point of this block, not a defect.
+  // The next few "✗ API 500 GET /program" lines are the injected failure, not a defect — they are
+  // dropped from the problem list again once the retry state has been asserted.
+  console.log("  … injecting a failing GET /program, the 500s logged below are expected");
   const failed = rec.problems.length;
   await page.route("**/api/v1/program", (route) =>
     route.request().method() === "GET" ? route.fulfill({ status: 500, contentType: "application/json", body: '{"error":{"code":"BOOM","message":"nope"}}' }) : route.continue()

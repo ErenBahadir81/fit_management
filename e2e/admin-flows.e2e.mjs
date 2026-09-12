@@ -31,21 +31,43 @@ const goto = async (route, where) => {
 
 /* ---------------------------------------------------------------- login --- */
 
-{
-  h.setWhere("login/before-hydration");
-  // The whole point: with no JS the form must not fall back to a native GET submit, which
-  // would put the plaintext password in the URL, in history and in every access log.
-  await p.route("**/*.js", (r) => r.abort());
-  await p.goto(`${ADMIN_URL}/login`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-  await settle(1200);
-  check("login/before-hydration", "submit button is inert until React hydrates", await p.locator('button[type="submit"]').isDisabled());
-  await p.fill('input[name="username"]', USER.username);
-  await p.fill('input[name="password"]', USER.password);
-  await p.locator('input[name="password"]').press("Enter");
-  await settle(1500);
-  check("login/before-hydration", "Enter does not submit the password into the URL", !/password=/.test(p.url()));
-  await p.unroute("**/*.js");
+/**
+ * The failure cases below deliberately produce a 401 and a wall of blocked-script errors, so
+ * they run on their own page: the recorder attached to `p` would report that noise as defects.
+ */
+async function inScratchPage(fn) {
+  const ctx = await h.browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await ctx.newPage();
+  try {
+    await fn(page);
+  } finally {
+    await ctx.close();
+  }
 }
+
+await inScratchPage(async (page) => {
+  // With no JS the form must not fall back to a native GET submit, which would put the
+  // plaintext password in the URL, in history, in the referrer and in every access log.
+  await page.route("**/*.js", (r) => r.abort());
+  await page.goto(`${ADMIN_URL}/login`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.waitForTimeout(1500);
+  check("login/before-hydration", "submit button is inert until React hydrates", await page.locator('button[type="submit"]').isDisabled());
+  await page.fill('input[name="username"]', USER.username);
+  await page.fill('input[name="password"]', USER.password);
+  await page.locator('input[name="password"]').press("Enter");
+  await page.waitForTimeout(1500);
+  check("login/before-hydration", "Enter does not submit the password into the URL", !/password=/.test(page.url()));
+});
+
+await inScratchPage(async (page) => {
+  await page.goto(`${ADMIN_URL}/login`, { waitUntil: "networkidle", timeout: 60_000 });
+  await page.fill('input[name="username"]', USER.username);
+  await page.fill('input[name="password"]', "definitely-not-the-password");
+  await page.locator('button[type="submit"]').click();
+  await page.waitForTimeout(2500);
+  const body = await page.locator("body").innerText();
+  check("login/bad-password", "a wrong password shows an error and stays put", /Giriş yapılamadı/.test(body) && page.url().includes("/login"));
+});
 
 {
   h.setWhere("login/deep-link");
@@ -54,12 +76,6 @@ const goto = async (route, where) => {
   check("login/deep-link", "guard redirects with ?next=", p.url().includes("next=%2Fprograms"));
 
   await p.fill('input[name="username"]', USER.username);
-  await p.fill('input[name="password"]', "definitely-not-the-password");
-  await p.locator('button[type="submit"]').click();
-  await settle(2500);
-  const body = await h.text();
-  check("login/deep-link", "a wrong password shows an error and stays put", /Giriş yapılamadı/.test(body) && p.url().includes("/login"));
-
   await p.fill('input[name="password"]', USER.password);
   await p.locator('button[type="submit"]').click();
   await p.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 25_000 }).catch(() => {});
@@ -139,6 +155,18 @@ const goto = async (route, where) => {
   await p.fill('input[placeholder*="Ad veya"]', "eren");
   await settle(1600);
   check("users/search", "search filters the table", (await h.text()).includes("@eren") && !(await h.text()).includes("@inci"));
+
+  h.setWhere("users/detail");
+  await p.fill('input[placeholder*="Ad veya"]', "");
+  await settle(1500);
+  await p.locator('tbody a[href^="/users/"]').first().click();
+  await p.waitForURL(/\/users\/[^/]+$/, { timeout: 20_000 }).catch(() => {});
+  await settle(2000);
+  const detail = await h.text();
+  check("users/detail", "the detail page opens with the user's panels", /Rapor özeti/.test(detail) && /Son antrenmanlar/.test(detail));
+  await p.getByRole("link", { name: /Listeye dön/ }).click();
+  await settle(1800);
+  check("users/detail", "“Listeye dön” goes back to the list", p.url().endsWith("/users"));
 }
 
 /* -------------------------------------------------------------- muscles --- */
@@ -194,9 +222,17 @@ const goto = async (route, where) => {
   await p.getByRole("button", { name: /Yenilenme eğrisini göster/ }).first().click();
   await settle(1400);
   check("muscles/curve", "the recovery curve renders", (await p.locator("svg.recharts-surface").count()) > 0);
-  // A negative chart margin used to slice the first characters off "%100".
-  const ticks = await p.locator(".recharts-yAxis .recharts-cartesian-axis-tick text").allInnerTexts();
-  check("muscles/curve", "y-axis labels are not clipped", ticks.includes("%100"));
+  // A negative chart margin used to pull "%100" off the left edge of the SVG, which clips it.
+  // Playwright reports no innerText for SVG <text>, so this measures geometry instead.
+  const overflow = await p.evaluate(() =>
+    [...document.querySelectorAll("svg.recharts-surface")].flatMap((svg) => {
+      const box = svg.getBoundingClientRect();
+      return [...svg.querySelectorAll("text")]
+        .map((t) => ({ text: t.textContent, over: box.left - t.getBoundingClientRect().left }))
+        .filter((t) => t.over > 0.5);
+    })
+  );
+  check("muscles/curve", `y-axis labels are not clipped (${JSON.stringify(overflow)})`, overflow.length === 0);
 
   h.setWhere("muscles/delete-guard");
   await p.getByRole("button", { name: new RegExp(`${target} sil`) }).click();
@@ -364,7 +400,8 @@ const goto = async (route, where) => {
   await goto("/goals-settings", "goals/simulator");
   const dailyKcal = async () => {
     const lines = (await p.locator("main").innerText()).split("\n").map((s) => s.trim());
-    return lines[lines.findIndex((l) => /GÜNLÜK KALOR/i.test(l)) + 1];
+    const start = lines.findIndex((l) => /GÜNLÜK KALOR/i.test(l));
+    return lines.slice(start + 1).find(Boolean);
   };
   const original = await dailyKcal();
   await p.locator('input[aria-label="Kilo"]').fill("120");

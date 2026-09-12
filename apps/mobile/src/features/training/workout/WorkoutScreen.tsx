@@ -82,9 +82,17 @@ export function WorkoutScreen() {
     pager.current?.scrollTo({ x: activeIndex * width, animated: true });
   }, [activeIndex, width]);
 
+  // Which pane is actually on screen. The reducer only tracks exercises, but the cardio panes sit
+  // after them in the same pager, so the dots need their own notion of "where am I". Reset during
+  // render (not in an effect) whenever the reducer moves the active exercise.
+  const [pane, setPane] = useState({ index: activeIndex, syncedTo: activeIndex });
+  if (pane.syncedTo !== activeIndex) setPane({ index: activeIndex, syncedTo: activeIndex });
+  const visiblePane = pane.index;
+
   const onScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const index = Math.round(e.nativeEvent.contentOffset.x / Math.max(1, width));
+      setPane((p) => (p.index === index ? p : { ...p, index }));
       if (state && index !== state.activeIndex && index < (state.exercises.length || 1)) dispatch({ type: "focus", index });
     },
     [dispatch, state, width]
@@ -187,7 +195,8 @@ export function WorkoutScreen() {
           </Text>
         </View>
         <ProgressBar value={progress(state)} tone="primary" height={6} accessibilityLabel={`${done} / ${total} set tamam`} />
-        {state.exercises.length > 1 ? (
+        {/* One dot per pane — the cardio panes get one too, otherwise nothing hints they exist. */}
+        {paneCount > 1 ? (
           <View style={styles.dots}>
             {state.exercises.map((e, i) => (
               <View
@@ -196,12 +205,22 @@ export function WorkoutScreen() {
                 style={[
                   styles.dot,
                   {
-                    backgroundColor: i === state.activeIndex ? colors.primary : e.skipped ? colors.warning : e.sets.every((s) => s.done) ? colors.success : colors.border,
-                    width: i === state.activeIndex ? 18 : 6,
+                    backgroundColor: i === visiblePane ? colors.primary : e.skipped ? colors.warning : e.sets.every((s) => s.done) ? colors.success : colors.border,
+                    width: i === visiblePane ? 18 : 6,
                   },
                 ]}
               />
             ))}
+            {cardioSlots.map((slot, i) => {
+              const index = state.exercises.length + i;
+              return (
+                <View
+                  key={slot}
+                  testID={`pane-dot-${index}`}
+                  style={[styles.dot, { backgroundColor: index === visiblePane ? colors.primary : colors.border, width: index === visiblePane ? 18 : 6 }]}
+                />
+              );
+            })}
           </View>
         ) : null}
       </View>

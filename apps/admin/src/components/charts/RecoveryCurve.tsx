@@ -41,7 +41,7 @@ export function RecoveryCurve({ fullRecoveryHours, color = CHART.brand, height =
           <CartesianGrid stroke={CHART.grid} strokeDasharray="2 4" vertical={false} />
           <XAxis dataKey="hours" tickFormatter={(v: number) => `${num(v)}s`} minTickGap={20} {...axisProps} />
           {/* The %100 label needs the full width: a negative left margin used to slice its first characters off. */}
-          <YAxis domain={[0, 100]} ticks={[0, 70, 100]} tickFormatter={(v: number) => `%${v}`} width={36} {...axisProps} />
+          <YAxis domain={[0, 100]} ticks={[0, 70, 100]} tickFormatter={(v: number) => `%${v}`} width={42} {...axisProps} />
           <Tooltip
             cursor={{ stroke: CHART.grid }}
             content={({ active, payload }) =>
