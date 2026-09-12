@@ -288,9 +288,21 @@ await inScratchPage(async (page) => {
 /* ---------------------------------------------------- program templates --- */
 
 {
-  await goto("/programs", "programs/builder");
-  const href = await p.locator('a[href^="/programs/"]').first().getAttribute("href");
-  await goto(href, "programs/builder");
+  // Every edit below is destructive, so the run works on a throwaway copy and deletes it at
+  // the end — otherwise repeated runs pile changes onto the seeded template.
+  await goto("/programs", "programs/duplicate");
+  const hrefs = async () => new Set(await p.locator('a[href^="/programs/"]').evaluateAll((as) => as.map((a) => a.getAttribute("href"))));
+  const beforeCopy = await hrefs();
+  const source = [...beforeCopy][0];
+  const sourceName = await p.locator(`a[href="${source}"]`).first().innerText();
+
+  await p.locator(`[aria-label="${sourceName} kopyala"]`).first().click();
+  await settle(2600);
+  const afterCopy = await hrefs();
+  const copy = [...afterCopy].find((href) => !beforeCopy.has(href));
+  check("programs/duplicate", "duplicating adds a template to the list", Boolean(copy));
+
+  await goto(copy, "programs/builder");
   await settle(1500);
 
   const totalSets = async () => {
@@ -301,7 +313,7 @@ await inScratchPage(async (page) => {
   const dayExercises = () => p.locator('section[aria-label*="1. gün"] li').evaluateAll((els) => els.map((e) => e.innerText.split("\n")[0]));
 
   // Days live in a horizontal scroller — every day of the cycle must be reachable, not just
-  // the three that happen to fit.
+  // the three that happen to fit on screen.
   const scroller = p.locator(".ff-scroll-x").first();
   const geometry = await scroller.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
   const columns = await p.locator('section[aria-label*=". gün"]').count();
@@ -323,7 +335,7 @@ await inScratchPage(async (page) => {
   h.setWhere("programs/move");
   const movable = await p.locator('section[aria-label*="1. gün"] button[aria-label*="sonraki güne taşı"]').first().getAttribute("aria-label");
   const moved = movable.replace(/ sonraki güne taşı/, "");
-  await p.locator(`section[aria-label*="1. gün"] button[aria-label="${movable}"]`).click();
+  await p.locator(`section[aria-label*="1. gün"] button[aria-label="${movable}"]`).first().click();
   await settle(700);
   check("programs/move", "an exercise moves to the next day", !(await dayExercises()).includes(moved));
 
@@ -364,12 +376,10 @@ await inScratchPage(async (page) => {
   check("programs/save", "the unsaved banner clears after saving", !(await h.text()).includes("Kaydedilmemiş değişiklikler"));
 
   h.setWhere("programs/guard");
-  await p.locator('section[aria-label*="1. gün"] button[aria-label*="set sayısı"]').first().click();
+  const reps = p.locator('section[aria-label*="1. gün"] button[aria-label*="tekrar sayısı"]').first();
+  const repsLabel = (await reps.getAttribute("aria-label")).replace(/: .*/, "");
+  await reps.click();
   await settle(300);
-  await p.keyboard.press("Enter");
-  await p.locator('section[aria-label*="1. gün"] button[aria-label*="tekrar sayısı"]').first().click();
-  await settle(300);
-  const repsLabel = await p.locator('input[aria-label*="tekrar sayısı"]').getAttribute("aria-label");
   await p.locator(`input[aria-label="${repsLabel}"]`).fill("11");
   await p.keyboard.press("Enter");
   await settle(800);
@@ -382,16 +392,14 @@ await inScratchPage(async (page) => {
   await settle(700);
   check("programs/guard", "“Geri al” drops the draft", !(await h.text()).includes("Kaydedilmemiş değişiklikler"));
 
-  h.setWhere("programs/duplicate");
-  const listBefore = await (async () => {
-    await goto("/programs", "programs/duplicate");
-    return p.locator('a[href^="/programs/"]').count();
-  })();
-  await goto(href, "programs/duplicate");
-  await p.getByRole("button", { name: "Kopyala" }).click();
-  await settle(2600);
-  await goto("/programs", "programs/duplicate");
-  check("programs/duplicate", "a copy shows up in the list", (await p.locator('a[href^="/programs/"]').count()) > listBefore);
+  h.setWhere("programs/cleanup");
+  await goto("/programs", "programs/cleanup");
+  const copyName = await p.locator(`a[href="${copy}"]`).first().innerText();
+  await p.locator(`[aria-label="${copyName} sil"]`).first().click();
+  await settle(700);
+  await p.getByRole("button", { name: "Sil", exact: true }).click();
+  await settle(2400);
+  check("programs/cleanup", "a template can be deleted from the list", !(await hrefs()).has(copy));
 }
 
 /* ------------------------------------------------------- goal settings ---- */
