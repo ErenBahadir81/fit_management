@@ -28,7 +28,7 @@ export const qk = {
   template: (id: string) => ["admin", "template", id] as const,
   settings: ["admin", "settings"] as const,
   mascot: ["admin", "mascot-messages"] as const,
-  foods: (q?: { q?: string; source?: string }) => ["admin", "foods", q?.q ?? "", q?.source ?? ""] as const,
+  foods: (q?: { q?: string; source?: string; limit?: number }) => ["admin", "foods", q?.q ?? "", q?.source ?? "", q?.limit ?? 0] as const,
   scans: (limit: number) => ["admin", "scans", limit] as const,
 };
 
@@ -62,7 +62,8 @@ export const useSettings = () => useQuery({ queryKey: qk.settings, queryFn: () =
 
 export const useMascotMessages = () => useQuery({ queryKey: qk.mascot, queryFn: () => api.admin.mascotMessages() });
 
-export const useFoods = (q?: { q?: string; source?: string }) => useQuery({ queryKey: qk.foods(q), queryFn: () => api.admin.foods(q) });
+export const useFoods = (q?: { q?: string; source?: string; limit?: number }) =>
+  useQuery({ queryKey: qk.foods(q), queryFn: () => api.admin.foods(q), placeholderData: (prev) => prev });
 
 export const useScans = (limit = 40) => useQuery({ queryKey: qk.scans(limit), queryFn: () => api.admin.scans(limit) });
 

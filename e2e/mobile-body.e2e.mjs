@@ -15,8 +15,11 @@ const T = (id) => h.page.locator(`[data-testid="${id}"]`);
 const pause = (ms) => h.page.waitForTimeout(ms);
 const text = () => h.text();
 
-/** Seeds a run of weigh-ins so the trend chart has ≥2 points (the shape that used to crash). */
-async function seedWeighIns() {
+/**
+ * Weigh-ins so the trend chart has ≥2 points (the shape that used to crash), and no active goal so
+ * the goal card leads to setup rather than the roadmap (the suite re-runs against a live database).
+ */
+async function seed() {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -34,17 +37,25 @@ async function seedWeighIns() {
     });
     if (!r.ok) return rec.fail("seed", `weigh-in ${i} failed: ${r.status}`);
   }
+  // Best effort: 4xx just means there was nothing to abandon.
+  await fetch(`${API_URL}/goals/current/abandon`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    body: "{}",
+  }).catch(() => {});
 }
 
 /* ------------------------------------------------------------------ login */
 
-h.setWhere("auth/wrong-password");
+h.setWhere("auth/expected-401");
 await h.page.goto(MOBILE_URL, { waitUntil: "networkidle", timeout: 90_000 });
 await pause(3500);
 await T("login-username").fill(USER.username);
 await T("login-password").fill("definitely-wrong");
 await T("login-submit").click();
 await pause(2500);
+// The rejected login is the point of this step, so drop the 401 the recorder just logged.
+for (let i = rec.problems.length - 1; i >= 0; i--) if (rec.problems[i].where === "auth/expected-401") rec.problems.splice(i, 1);
 if (/hatalı/i.test(await text())) rec.ok("auth/wrong-password", "shows the credentials error and stays on the login screen");
 else rec.fail("auth/wrong-password", "no error message after a wrong password");
 
@@ -60,7 +71,29 @@ await pause(5000);
 if (/Giriş yap/.test(await text())) rec.fail("auth/reload", "reload dropped the session back to the login screen");
 else rec.ok("auth/reload", "session survives a reload");
 
-await seedWeighIns();
+h.setWhere("auth/expired");
+await h.page.evaluate(() => {
+  const k = "auth.tokens.web";
+  for (const store of [localStorage]) {
+    for (const key of Object.keys(store)) {
+      if (!key.includes(k)) continue;
+      store.setItem(key, JSON.stringify({ accessToken: "dead.token.value", refreshToken: "dead.token.value" }));
+    }
+  }
+});
+await h.page.reload({ waitUntil: "networkidle", timeout: 60_000 });
+await pause(6000);
+if (/Giriş yap/.test(await text())) {
+  rec.ok("auth/expired", `a rejected token signs the user out${/süresi doldu/.test(await text()) ? " with the expired notice" : ""}`);
+  for (let i = rec.problems.length - 1; i >= 0; i--) if (rec.problems[i].where === "auth/expired") rec.problems.splice(i, 1);
+  h.setWhere("auth/expected-401");
+  await loginMobile(h, rec);
+  for (let i = rec.problems.length - 1; i >= 0; i--) if (rec.problems[i].where === "auth/expected-401") rec.problems.splice(i, 1);
+} else {
+  rec.fail("auth/expired", "a rejected token left the app signed in");
+}
+
+await seed();
 
 /* ------------------------------------------------------------------- body */
 
@@ -223,16 +256,38 @@ if (!(await T("roadmap-ring").count())) rec.fail("goal/roadmap", "the progress r
 
 await T("roadmap-recalibrate").click();
 await pause(3500);
-if (/kalibr/i.test(await text())) rec.ok("goal/roadmap", "Kalibre et answers with a result sheet");
-else rec.fail("goal/roadmap", "recalibrate produced nothing");
-await h.page.keyboard.press("Escape").catch(() => {});
-await pause(1200);
+if (await T("recalibrate-result").count()) rec.ok("goal/roadmap", "Kalibre et answers with a measured-TDEE sheet");
+else rec.fail("goal/roadmap", "recalibrate produced no result sheet");
+await T("recalibrate-done").click();
+await pause(1500);
+if (await T("recalibrate-result").count()) rec.fail("goal/roadmap", "the recalibration sheet would not close");
 
 h.setWhere("goal/menu");
 await T("roadmap-menu").click();
-await pause(1500);
-if (/Hedefi düzenle|düzenle/i.test(await text())) rec.ok("goal/menu", "the overflow menu opens");
-else rec.fail("goal/menu", "the overflow menu did not open");
+await pause(1800);
+if (!(await T("menu-edit").count())) rec.fail("goal/menu", "the overflow menu did not open");
+else rec.ok("goal/menu", "the overflow menu opens");
+
+// Edit target → the setup screen in edit mode, then straight back.
+await T("menu-edit").click();
+await pause(4000);
+if (/Hedefi düzenle/.test(await text())) rec.ok("goal/edit", "Hedefi düzenle opens setup preloaded with the active goal");
+else rec.fail("goal/edit", "Hedefi düzenle did not open the edit screen");
+await T("goal-submit").click();
+await pause(4000);
+if (/Yol haritası/.test(await text())) rec.ok("goal/edit", "Hedefi güncelle saves and returns to the roadmap");
+else rec.fail("goal/edit", "updating the goal did not return to the roadmap");
+
+// Abandoning is two-step and must leave the goal behind.
+h.setWhere("goal/abandon");
+await T("roadmap-menu").click();
+await pause(1800);
+await T("menu-abandon").click();
+await pause(800);
+await T("menu-abandon-confirm").click();
+await pause(4000);
+if (/Aktif hedef yok|Vücut|Hedef belirle/.test(await text())) rec.ok("goal/abandon", "Hedefi bırak clears the active goal");
+else rec.fail("goal/abandon", `abandon left the screen at: ${(await text()).slice(0, 90).replace(/\n+/g, " ")}`);
 
 /* ----------------------------------------------------------------- report */
 

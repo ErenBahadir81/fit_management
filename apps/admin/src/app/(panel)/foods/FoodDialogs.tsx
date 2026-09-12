@@ -157,6 +157,7 @@ export function ImportFoodsDialog({ open, onClose }: { open: boolean; onClose: (
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<"off" | "usda">("off");
   const [results, setResults] = useState<FoodDTO[]>([]);
+  const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const importFoods = useImportFoods({
@@ -169,9 +170,15 @@ export function ImportFoodsDialog({ open, onClose }: { open: boolean; onClose: (
       return;
     }
     setError(null);
-    const res = await importFoods.mutateAsync({ query: query.trim(), source, limit: 5 });
+    setSearched(false);
+    // Upstream search is best effort (see the API's off.ts): an unreachable or empty index
+    // resolves with zero foods, and reporting that as a success was a lie.
+    const res = await importFoods.mutateAsync({ query: query.trim(), source, limit: 5 }).catch(() => null);
+    if (!res) return;
     setResults(res.foods);
-    toast.success(`${res.foods.length} besin içe aktarıldı`, source === "off" ? "Open Food Facts" : "USDA");
+    setSearched(true);
+    if (res.foods.length === 0) toast.push({ tone: "info", title: "Sonuç bulunamadı", description: source === "off" ? "Open Food Facts" : "USDA" });
+    else toast.success(`${res.foods.length} besin içe aktarıldı`, source === "off" ? "Open Food Facts" : "USDA");
   };
 
   return (
@@ -214,8 +221,12 @@ export function ImportFoodsDialog({ open, onClose }: { open: boolean; onClose: (
             compact
             mascot={false}
             icon={<Download className="size-5" aria-hidden />}
-            title="Henüz sonuç yok"
-            description="Bir terim yazıp içe aktar; eklenen besinler aşağıda listelenir."
+            title={searched ? "Sonuç bulunamadı" : "Henüz sonuç yok"}
+            description={
+              searched
+                ? `“${query.trim()}” için ${source === "off" ? "Open Food Facts" : "USDA"} bir şey döndürmedi. Başka bir terim dene ya da besini elle ekle.`
+                : "Bir terim yazıp içe aktar; eklenen besinler aşağıda listelenir."
+            }
           />
         ) : (
           <ul className="divide-y divide-line rounded-lg border border-line">

@@ -6,6 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { zLoginInput } from "@fitfloow/core";
 import { api } from "@/lib/api";
 import { errorMessage } from "@/lib/queries";
+import { useIsClient } from "@/lib/theme";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 import { Callout } from "@/components/ui/States";
@@ -20,6 +21,11 @@ interface FieldErrors {
 
 export function LoginForm({ next = "/" }: { next?: string }) {
   const router = useRouter();
+  // Until React has hydrated, `onSubmit` cannot run: a click or an Enter key would fall
+  // through to the browser's native GET submit and put the plaintext password in the URL
+  // (and in history, the referrer and every access log). Disabling the only submit button
+  // also suppresses implicit submission, so the form simply cannot fire early.
+  const hydrated = useIsClient();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -85,7 +91,15 @@ export function LoginForm({ next = "/" }: { next?: string }) {
         />
       </Field>
 
-      <Button type="submit" variant="primary" size="lg" loading={pending} className="mt-1 w-full" iconRight={<ArrowRight className="size-4" />}>
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        loading={pending}
+        disabled={!hydrated}
+        className="mt-1 w-full"
+        iconRight={<ArrowRight className="size-4" />}
+      >
         {pending ? "Giriş yapılıyor…" : "Giriş yap"}
       </Button>
 

@@ -5,7 +5,7 @@ import { ACTIVITY_TR, WEEKDAYS_TR, zAdminCreateUserInput, zAdminUpdateUserInput,
 import { errorMessage, useCreateUser, useUpdateUser } from "@/lib/queries";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
-import { Field, Input, NumberInput, Select, Switch } from "@/components/ui/Field";
+import { Field, Input, NumberInput, Select } from "@/components/ui/Field";
 import { Drawer } from "@/components/ui/Overlay";
 import { Callout } from "@/components/ui/States";
 
@@ -21,7 +21,6 @@ interface Draft {
   birthDate: string;
   activityLevel: "sedentary" | "light" | "moderate" | "active" | "veryActive";
   measurementDay: number;
-  mascotEnabled: boolean;
 }
 
 function draftFrom(user: AdminUserDTO | null): Draft {
@@ -35,7 +34,6 @@ function draftFrom(user: AdminUserDTO | null): Draft {
     birthDate: user?.birthDate ?? "",
     activityLevel: user?.activityLevel ?? "moderate",
     measurementDay: user?.measurementDay ?? 0,
-    mascotEnabled: user?.mascotEnabled ?? true,
   };
 }
 
@@ -194,13 +192,9 @@ export function UserDrawer({ open, onClose, user }: { open: boolean; onClose: ()
           </Field>
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-line bg-surface-2 px-3.5 py-3">
-          <div>
-            <p className="text-[13px] font-medium text-ink">Floo mesajları</p>
-            <p className="mt-0.5 text-xs text-muted">Maskot motivasyon metinlerini göster.</p>
-          </div>
-          <Switch checked={draft.mascotEnabled} onChange={(v) => set("mascotEnabled", v)} label="Floo mesajları" />
-        </div>
+        {/* There used to be a "Floo mesajları" switch here. `zAdminCreateUserInput` has no
+            mascotEnabled field, so the flag was dropped on every save — a control that looked
+            like a setting and silently did nothing. The user owns it from the mobile app. */}
       </form>
     </Drawer>
   );

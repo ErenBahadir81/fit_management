@@ -20,11 +20,20 @@ import { FoodDialog, ImportFoodsDialog } from "./FoodDialogs";
 
 const SOURCE_TR: Record<FoodDTO["source"], string> = { seed: "Çekirdek", off: "OFF", usda: "USDA", user: "Kullanıcı", admin: "Yönetici" };
 
+/** The API caps `/admin/foods` at 200 rows and offers no offset, so the list grows in pages of 50. */
+const PAGE_SIZE = 50;
+const MAX_ROWS = 200;
+
 export default function FoodsPage() {
   const [query, setQuery] = useState("");
   const [source, setSource] = useState("");
+  const [limit, setLimit] = useState(PAGE_SIZE);
   const debounced = useDebounced(query);
-  const { data, isLoading, isError, error, refetch } = useFoods({ q: debounced || undefined, source: source || undefined });
+  const { data, isLoading, isError, error, refetch, isFetching } = useFoods({
+    q: debounced || undefined,
+    source: source || undefined,
+    limit,
+  });
 
   const [dialog, setDialog] = useState<{ open: boolean; food: FoodDTO | null; seq: number }>({ open: false, food: null, seq: 0 });
   const [importOpen, setImportOpen] = useState(false);
@@ -41,6 +50,8 @@ export default function FoodsPage() {
   });
 
   const foods = data?.foods ?? [];
+  const total = data?.total ?? foods.length;
+  const canLoadMore = foods.length >= limit && limit < MAX_ROWS;
   const open = (food: FoodDTO | null) => setDialog((d) => ({ open: true, food, seq: d.seq + 1 }));
 
   const patchMacro = (food: FoodDTO, field: "kcal" | "protein" | "carbs" | "fat", raw: string) => {
@@ -71,8 +82,24 @@ export default function FoodsPage() {
         description="100 gram başına değerler. Takma adlar fotoğraf taramasındaki model etiketleriyle eşleşir."
         actions={
           <>
-            <SearchInput value={query} onChange={setQuery} placeholder="Besin, takma ad…" className="w-56" />
-            <Select value={source} onChange={(e) => setSource(e.target.value)} aria-label="Kaynağa göre filtrele" className="w-36">
+            <SearchInput
+              value={query}
+              onChange={(v) => {
+                setQuery(v);
+                setLimit(PAGE_SIZE);
+              }}
+              placeholder="Besin, takma ad…"
+              className="w-56"
+            />
+            <Select
+              value={source}
+              onChange={(e) => {
+                setSource(e.target.value);
+                setLimit(PAGE_SIZE);
+              }}
+              aria-label="Kaynağa göre filtrele"
+              className="w-36"
+            >
               <option value="">Tüm kaynaklar</option>
               {Object.entries(SOURCE_TR).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -228,10 +255,20 @@ export default function FoodsPage() {
       </Card>
 
       {!isLoading && foods.length > 0 && (
-        <p className="mt-3 text-xs text-subtle">
-          {foods.length} besin{data?.total && data.total > foods.length ? ` (toplam ${int(data.total)})` : ""} · hücrelere tıklayarak
-          düzenleyebilirsin
-        </p>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-subtle">
+            {foods.length} besin{total > foods.length ? ` (toplam ${int(total)})` : ""} · hücrelere tıklayarak düzenleyebilirsin
+          </p>
+          {/* Without this the list stopped dead at the first 50 of 417 with no way forward. */}
+          {total > foods.length &&
+            (canLoadMore ? (
+              <Button size="sm" onClick={() => setLimit((l) => Math.min(MAX_ROWS, l + PAGE_SIZE))} loading={isFetching}>
+                Daha fazla göster
+              </Button>
+            ) : (
+              <p className="text-xs text-subtle">En fazla {MAX_ROWS} satır listelenir — kalanına aramayla ulaş.</p>
+            ))}
+        </div>
       )}
 
       <FoodDialog key={dialog.seq} open={dialog.open} food={dialog.food} onClose={() => setDialog((d) => ({ ...d, open: false }))} />

@@ -49,7 +49,7 @@ export function RoadmapChart({
       </div>
       <div style={{ height }} className="w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+          <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id={`rm-${uid}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={CHART.brand} stopOpacity={0.26} />
@@ -58,7 +58,8 @@ export function RoadmapChart({
             </defs>
             <CartesianGrid stroke={CHART.grid} strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="week" tickFormatter={(v: number) => `${v}. hf`} minTickGap={20} {...axisProps} />
-            <YAxis yAxisId="kg" domain={[Math.floor(lo - pad), Math.ceil(hi + pad)]} width={44} tickFormatter={(v: number) => num(v)} {...axisProps} />
+            {/* Three-digit weights need the whole axis width; a negative left margin clipped the leading digit. */}
+            <YAxis yAxisId="kg" domain={[Math.floor(lo - pad), Math.ceil(hi + pad)]} width={38} tickFormatter={(v: number) => num(v)} {...axisProps} />
             <YAxis yAxisId="kcal" orientation="right" width={48} tickFormatter={(v: number) => int(v)} {...axisProps} />
             <Tooltip
               cursor={{ stroke: CHART.grid }}

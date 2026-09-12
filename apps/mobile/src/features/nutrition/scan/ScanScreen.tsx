@@ -190,7 +190,12 @@ export function ScanScreen() {
         </Animated.View>
       ) : null}
 
-      {showResults ? (
+      {/*
+        One sheet at a time. Stacking the search sheet on top left gorhom's "switch" stack unable to
+        restore the minimised results sheet on web, so the user came back to a bare photo with their
+        whole scan gone. Swapping them keeps the state and re-presents the results on the way back.
+      */}
+      {showResults && !searchOpen ? (
         <Sheet open enablePanDownToClose={false}>
           <ScanResults
             items={state.items}

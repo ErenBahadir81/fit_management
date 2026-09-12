@@ -172,10 +172,17 @@ function MuscleRow({
       <div className={cx("ff-card overflow-hidden", !muscle.active && "opacity-60")}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3">
           <div className="flex w-16 shrink-0 items-center gap-1">
+            {/* Focusable, so it must also work from the keyboard: the arrow keys move the row
+                the same way dragging does, instead of leaving a dead tab stop behind. */}
             <button
               type="button"
-              aria-label={`${muscle.name} sırasını sürükleyerek değiştir`}
+              aria-label={`${muscle.name} sırasını değiştir: sürükle ya da yukarı/aşağı ok tuşlarını kullan`}
               onPointerDown={(e) => controls.start(e)}
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+                e.preventDefault();
+                onMove(muscle.key, e.key === "ArrowUp" ? -1 : 1);
+              }}
               className="cursor-grab touch-none rounded p-1 text-subtle transition-colors hover:text-ink active:cursor-grabbing"
             >
               <GripVertical className="size-4" aria-hidden />

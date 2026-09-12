@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Platform, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { WEEKDAYS_TR_SHORT, keyWeekday } from "@fitfloow/core";
 import { haptic } from "../../../lib/haptics";
 import { todayKey } from "../../../lib/dates";
@@ -11,6 +11,8 @@ import { Text } from "../../../ui/Text";
 const ITEM_W = 52;
 const GAP = spacing.sm;
 const STEP = ITEM_W + GAP;
+/** How long the strip must sit still before a web swipe counts as settled (no momentum events). */
+const WEB_SETTLE_MS = 140;
 
 export interface DayPagerProps {
   /** Ascending date keys, oldest first. */
@@ -46,21 +48,46 @@ export function DayPager({ days, selected, onSelect, loggedKeys, testID = "nutri
     scroller.current?.scrollTo({ x: index * STEP, animated: true });
   }, [index, width]);
 
-  const onMomentumEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const i = Math.round(e.nativeEvent.contentOffset.x / STEP);
+  const settleAt = useCallback(
+    (offsetX: number) => {
+      const i = Math.round(offsetX / STEP);
       const key = days[Math.min(Math.max(i, 0), days.length - 1)];
       settling.current = false;
-      if (key && key !== selected) {
+      if (!key) return;
+      if (key !== selected) {
         void haptic.select();
         onSelect(key);
+      } else {
+        scroller.current?.scrollTo({ x: i * STEP, animated: true }); // snap back onto the cell
       }
     },
     [days, onSelect, selected]
   );
+
+  const onMomentumEnd = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => settleAt(e.nativeEvent.contentOffset.x), [settleAt]);
   const onBeginDrag = useCallback(() => {
     settling.current = true;
   }, []);
+
+  /**
+   * react-native-web's ScrollView only ever emits `onScroll` — `onMomentumScrollEnd` and
+   * `onScrollEndDrag` never fire and `snapToInterval` is ignored — so on web the swipe selected
+   * nothing at all. Settle the strip ourselves once it has stopped moving.
+   */
+  const webSettle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (webSettle.current) clearTimeout(webSettle.current);
+  }, []);
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (Platform.OS !== "web") return;
+      const x = e.nativeEvent.contentOffset.x;
+      settling.current = true;
+      if (webSettle.current) clearTimeout(webSettle.current);
+      webSettle.current = setTimeout(() => settleAt(x), WEB_SETTLE_MS);
+    },
+    [settleAt]
+  );
 
   const contentStyle = useMemo(() => ({ paddingHorizontal: sidePad, gap: GAP }), [sidePad]);
 
@@ -75,6 +102,8 @@ export function DayPager({ days, selected, onSelect, loggedKeys, testID = "nutri
         contentOffset={initialOffset}
         onScrollBeginDrag={onBeginDrag}
         onMomentumScrollEnd={onMomentumEnd}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         contentContainerStyle={contentStyle}
         accessibilityLabel="Gün seçici"
       >

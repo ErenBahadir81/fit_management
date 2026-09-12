@@ -106,6 +106,14 @@ export function DayColumn({
                 onPatch={(patch) => onPatchExercise(exIndex, patch)}
                 onRemove={() => onRemoveExercise(exIndex)}
                 onMove={(delta) => onMoveExercise(exIndex, delta)}
+                onReorderWithinDay={(delta) => {
+                  const target = exIndex + delta;
+                  if (target < 0 || target >= day.exercises.length) return;
+                  const next = [...day.exercises];
+                  const [item] = next.splice(exIndex, 1);
+                  next.splice(target, 0, item);
+                  onReorderExercises(next);
+                }}
               />
             ))}
           </Reorder.Group>
@@ -165,6 +173,7 @@ function ExerciseCard({
   onPatch,
   onRemove,
   onMove,
+  onReorderWithinDay,
 }: {
   exercise: ExerciseTargetDTO;
   dayIndex: number;
@@ -173,6 +182,7 @@ function ExerciseCard({
   onPatch: (patch: Partial<ExerciseTargetDTO>) => void;
   onRemove: () => void;
   onMove: (delta: number) => void;
+  onReorderWithinDay: (delta: number) => void;
 }) {
   const controls = useDragControls();
 
@@ -180,10 +190,17 @@ function ExerciseCard({
     <Reorder.Item value={exercise} dragListener={false} dragControls={controls} transition={spring} as="li" className="list-none">
       <div className="rounded-lg border border-line bg-surface-2 px-2 py-1.5">
         <div className="flex items-center gap-1">
+          {/* Keyboard equivalent of the drag: without it this is a focusable button that does
+              nothing, and the only way to order a day was the mouse. */}
           <button
             type="button"
-            aria-label={`${exercise.name} sırasını sürükle`}
+            aria-label={`${exercise.name} sırasını değiştir: sürükle ya da yukarı/aşağı ok tuşlarını kullan`}
             onPointerDown={(e) => controls.start(e)}
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+              e.preventDefault();
+              onReorderWithinDay(e.key === "ArrowUp" ? -1 : 1);
+            }}
             className="cursor-grab touch-none rounded p-0.5 text-subtle transition-colors hover:text-ink active:cursor-grabbing"
           >
             <GripVertical className="size-3.5" aria-hidden />

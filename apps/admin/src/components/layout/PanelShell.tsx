@@ -91,7 +91,9 @@ export function PageHeader({
         <h1 className="text-display font-semibold text-ink">{title}</h1>
         {description && <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-muted">{description}</p>}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {/* `shrink-0` here made the row as wide as every action laid end to end, so /foods and
+          /exercises scrolled the whole page sideways on a phone. Let it shrink and wrap. */}
+      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }

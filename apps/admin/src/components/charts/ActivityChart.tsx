@@ -26,7 +26,7 @@ export function ActivityChart({ data }: { data: Point[] }) {
       </div>
       <div className="h-56 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
+          <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
               {SERIES.map((s) => (
                 <linearGradient key={s.key} id={`${uid}-${s.key}`} x1="0" y1="0" x2="0" y2="1">
@@ -37,7 +37,7 @@ export function ActivityChart({ data }: { data: Point[] }) {
             </defs>
             <CartesianGrid stroke={CHART.grid} strokeDasharray="2 4" vertical={false} />
             <XAxis dataKey="dateKey" tickFormatter={(v: string) => dateShort(v)} minTickGap={24} {...axisProps} />
-            <YAxis width={40} allowDecimals={false} {...axisProps} />
+            <YAxis width={28} allowDecimals={false} {...axisProps} />
             <Tooltip
               cursor={{ stroke: CHART.grid, strokeWidth: 1 }}
               content={({ active, payload, label }) =>

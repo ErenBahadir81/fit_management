@@ -31,7 +31,7 @@ export function RecoveryCurve({ fullRecoveryHours, color = CHART.brand, height =
   return (
     <div style={{ height }} className="w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: -26 }}>
+        <AreaChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id={`rc-${uid}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.3} />
@@ -40,7 +40,8 @@ export function RecoveryCurve({ fullRecoveryHours, color = CHART.brand, height =
           </defs>
           <CartesianGrid stroke={CHART.grid} strokeDasharray="2 4" vertical={false} />
           <XAxis dataKey="hours" tickFormatter={(v: number) => `${num(v)}s`} minTickGap={20} {...axisProps} />
-          <YAxis domain={[0, 100]} ticks={[0, 70, 100]} tickFormatter={(v: number) => `%${v}`} width={44} {...axisProps} />
+          {/* The %100 label needs the full width: a negative left margin used to slice its first characters off. */}
+          <YAxis domain={[0, 100]} ticks={[0, 70, 100]} tickFormatter={(v: number) => `%${v}`} width={36} {...axisProps} />
           <Tooltip
             cursor={{ stroke: CHART.grid }}
             content={({ active, payload }) =>

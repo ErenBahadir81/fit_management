@@ -93,14 +93,20 @@ describe("BodyScreen", () => {
     expect(qc.getQueryData<BodyTrends>(BODY_KEYS.trends(90))?.points.some((p) => p.dateKey === TODAY)).toBe(false);
   });
 
-  test("a history row can be deleted through its accessibility action (swipe alternative)", async () => {
+  test("a history row deleted through its accessibility action hides and offers undo before the request fires", async () => {
     await renderUI(<BodyScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getAllByTestId(/^entry-row-/).length).toBe(6));
     const first = screen.getAllByTestId(/^entry-row-/)[0];
     const id = String(first.props.testID).replace("entry-row-", "");
     await fireEvent(first, "accessibilityAction", { nativeEvent: { actionName: "delete" } });
     await waitFor(() => expect(screen.getAllByTestId(/^entry-row-/).length).toBe(5));
-    await waitFor(() => expect(api.fake.bodyEntries.some((e) => e.id === id)).toBe(false));
+    await waitFor(() => expect(screen.getByTestId("undo-bar")).toBeTruthy());
+
+    // The undo window has not elapsed, so the DELETE has not been sent yet.
+    expect(api.fake.bodyEntries.some((e) => e.id === id)).toBe(true);
+    await fireEvent.press(screen.getByTestId("undo-delete"));
+    await waitFor(() => expect(screen.getAllByTestId(/^entry-row-/).length).toBe(6));
+    expect(api.fake.bodyEntries.some((e) => e.id === id)).toBe(true);
   });
 
   test("goal / report links route into the modal flows and 'Ölçüm ekle' opens the sheet", async () => {
