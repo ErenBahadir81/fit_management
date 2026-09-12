@@ -32,7 +32,11 @@ PIDS+=($!)
 wait_for "http://127.0.0.1:$MOBILE_PORT/" "mobile web" 60 || exit 1
 
 status=0
-echo "▶ mobile checks";  MOBILE_URL="http://127.0.0.1:$MOBILE_PORT" node "$ROOT/e2e/mobile.e2e.mjs" || status=1
-echo "▶ training checks"; MOBILE_URL="http://127.0.0.1:$MOBILE_PORT" API_URL="http://127.0.0.1:$API_PORT/api/v1" node "$ROOT/e2e/mobile-training.e2e.mjs" || status=1
-echo "▶ admin checks";   ADMIN_URL="http://127.0.0.1:$ADMIN_PORT"  node "$ROOT/e2e/admin.e2e.mjs"  || status=1
+export MOBILE_URL="http://127.0.0.1:$MOBILE_PORT"
+export ADMIN_URL="http://127.0.0.1:$ADMIN_PORT"
+export API_URL="http://127.0.0.1:$API_PORT/api/v1"
+for spec in mobile mobile-training mobile-nutrition mobile-body admin admin-flows; do
+  echo "▶ $spec"
+  node "$ROOT/e2e/$spec.e2e.mjs" || status=1
+done
 exit $status
