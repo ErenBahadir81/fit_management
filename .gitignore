@@ -18,5 +18,5 @@ apps/vision/.pytest_cache
 apps/vision/models
 .DS_Store
 *.tsbuildinfo
-apps/mobile/dist-web
+apps/mobile/dist-web*
 e2e/artifacts
