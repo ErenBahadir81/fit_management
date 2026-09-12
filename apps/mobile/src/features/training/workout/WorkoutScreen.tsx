@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, StyleSheet, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Platform, ScrollView, StyleSheet, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import type { ExerciseDTO } from "@fitfloow/core";
@@ -89,13 +89,41 @@ export function WorkoutScreen() {
   if (pane.syncedTo !== activeIndex) setPane({ index: activeIndex, syncedTo: activeIndex });
   const visiblePane = pane.index;
 
-  const onScrollEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const index = Math.round(e.nativeEvent.contentOffset.x / Math.max(1, width));
+  const settleOn = useCallback(
+    (index: number) => {
       setPane((p) => (p.index === index ? p : { ...p, index }));
       if (state && index !== state.activeIndex && index < (state.exercises.length || 1)) dispatch({ type: "focus", index });
     },
-    [dispatch, state, width]
+    [dispatch, state]
+  );
+
+  const onScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => settleOn(Math.round(e.nativeEvent.contentOffset.x / Math.max(1, width))),
+    [settleOn, width]
+  );
+
+  /**
+   * react-native-web's ScrollView never fires `onMomentumScrollEnd` — `ScrollViewBase` only wires
+   * `onScroll` — so on web the pager never told the screen which exercise the user had swiped to:
+   * "Seti tamamla" kept logging against the pane they had left, and then snapped back to it.
+   *
+   * So settle on `onScroll` instead, but only once the ticks stop (the same trick RNW uses for its
+   * own scroll-end) and only on a page boundary. Acting on every tick would be wrong twice over: a
+   * mid-swipe tick would steal focus, and the *first* tick of the auto-advance animation still
+   * reports the old pane, which would bounce the pager straight back.
+   */
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => void (settleTimer.current && clearTimeout(settleTimer.current)), []);
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const x = e.nativeEvent.contentOffset.x;
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      settleTimer.current = setTimeout(() => {
+        const index = Math.round(x / Math.max(1, width));
+        if (Math.abs(x - index * width) <= 2) settleOn(index);
+      }, 140);
+    },
+    [settleOn, width]
   );
 
   const pending = state ? nextPending(state) : null;
@@ -231,6 +259,8 @@ export function WorkoutScreen() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScrollEnd}
+        onScroll={Platform.OS === "web" ? onScroll : undefined}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         testID="workout-pager"
         style={styles.pager}

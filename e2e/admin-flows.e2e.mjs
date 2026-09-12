@@ -544,14 +544,17 @@ await inScratchPage(async (page) => {
   await goto("/settings", "settings/save");
   const mascotName = p.locator("main input:not([type])").first();
   const original = await mascotName.inputValue();
-  await mascotName.fill("A1Floo");
+  // Always a real change, even if an earlier aborted run left the probe value behind.
+  const probe = original === "Floo" ? "A1Floo" : "Floo";
+  await mascotName.fill(probe);
   await settle(600);
   await p.getByRole("button", { name: /^Kaydet$/ }).click();
   await settle(2400);
   await p.reload({ waitUntil: "networkidle" });
   await settle(1600);
-  check("settings/save", "a settings change survives a reload", (await p.locator("main input:not([type])").first().inputValue()) === "A1Floo");
+  check("settings/save", "a settings change survives a reload", (await p.locator("main input:not([type])").first().inputValue()) === probe);
   await p.locator("main input:not([type])").first().fill(original);
+  await settle(500);
   await p.getByRole("button", { name: /^Kaydet$/ }).click();
   await settle(2200);
 

@@ -15,6 +15,8 @@
  *     each other (`assertScreenHealthy` checks for that).
  *   - The horizontal pager in the logger must lay panes out one screen wide and auto-advance to the
  *     next exercise once the last set of the current one is logged.
+ *   - The pager dots only covered the exercises, so on a run/swim day nothing on screen said the
+ *     cardio pane existed — the only way to find it was to swipe past the last exercise and hope.
  *
  * Run: `node e2e/mobile-training.e2e.mjs` with MOBILE_URL / API_URL pointing at a running stack.
  */
@@ -217,6 +219,36 @@ if (await loginMobile(h, rec)) {
   });
   // One pane per screen: FlashList/flex regressions collapse these to a fraction of the viewport.
   expect("training/logger", "each pane is exactly one screen wide", geo.widths.length > 0 && geo.widths.every((w) => Math.abs(w - geo.pagerWidth) <= 2));
+  // A cardio pane used to have no dot, so nothing on screen said it was there at all.
+  const dots = await page.locator('[data-testid^="pane-dot-"]').count();
+  expect("training/logger", "every pane is represented in the pager dots", dots === (geo.widths.length > 1 ? geo.widths.length : 0));
+
+  h.setWhere("training/logger-swipe");
+  // react-native-web never fires `onMomentumScrollEnd`, so swiping used to leave the screen
+  // pointing at the pane you left: "Seti tamamla" logged a set on the wrong exercise, and the
+  // pager snapped straight back. Swipe to pane 1 and check the screen follows.
+  if (geo.widths.length > 1) {
+    const pagerBox = await T("workout-pager").boundingBox();
+    await page.mouse.move(pagerBox.x + pagerBox.width / 2, pagerBox.y + pagerBox.height / 2);
+    await page.mouse.wheel(geo.pagerWidth, 0);
+    await wait(1800);
+    const settled = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="workout-pager"]');
+      const dots = [...document.querySelectorAll('[data-testid^="pane-dot-"]')].map((e) => Math.round(e.getBoundingClientRect().width));
+      return { left: Math.round(el.scrollLeft), dots };
+    });
+    expect("training/logger-swipe", "the pager stays on the pane the user swiped to", settled.left >= geo.pagerWidth - 2);
+    expect("training/logger-swipe", "and the dots follow the visible pane", settled.dots[1] > settled.dots[0]);
+    await T("complete-set").click();
+    await wait(1200);
+    expect("training/logger-swipe", "a set logged after a swipe lands on the visible exercise", (await count("set-done-1-0")) === 1 && (await count("set-done-0-0")) === 0);
+    // Undo that set (tapping a done row un-logs it) and put the session back on the first pane.
+    await T("set-done-1-0").click({ force: true });
+    await wait(1000);
+    expect("training/logger-swipe", "tapping a completed set un-logs it", (await count("set-done-1-0")) === 0);
+    await page.mouse.wheel(-geo.pagerWidth, 0);
+    await wait(1800);
+  }
 
   h.setWhere("training/logger-steppers");
   const repsBefore = await text("reps-0");
