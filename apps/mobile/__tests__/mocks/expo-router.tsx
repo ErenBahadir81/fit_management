@@ -13,6 +13,8 @@ export const mockRouter = {
 };
 export const router = mockRouter;
 export const useRouter = () => mockRouter;
+/** Screens are always focused under test; TabScene uses this to decide whether to render on web. */
+export const useIsFocused = () => true;
 export const useFocusEffect = (cb: () => void | (() => void)) => React.useEffect(cb, []);
 export const useLocalSearchParams = () => ({});
 export const useGlobalSearchParams = () => ({});

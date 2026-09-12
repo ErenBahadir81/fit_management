@@ -11,6 +11,9 @@ export default function TabsLayout() {
   const reduce = useReducedMotion();
   return (
     <Tabs
+      // Web: inactive scenes stay mounted and painted, so switching tabs stacks screens on top of
+      // each other. Detaching them is what actually removes the previous screen from the page.
+      detachInactiveScreens
       tabBar={(props) => <RouterTabBar {...props} />}
       screenOptions={{
         headerShown: false,

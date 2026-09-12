@@ -3,7 +3,9 @@
   "version": "2.0.0",
   "private": true,
   "packageManager": "pnpm@10.33.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "pnpm -r --workspace-concurrency=1 run test",
     "test:core": "pnpm --filter @fitfloow/core test",
@@ -20,7 +22,10 @@
     "dev:mobile": "pnpm --filter @fitfloow/mobile start",
     "dev:vision": "bash scripts/dev-vision.sh",
     "seed": "pnpm --filter @fitfloow/api seed",
-    "legacy": "bash scripts/legacy.sh"
+    "legacy": "bash scripts/legacy.sh",
+    "e2e": "bash scripts/e2e.sh",
+    "e2e:mobile": "node e2e/mobile.e2e.mjs",
+    "e2e:admin": "node e2e/admin.e2e.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"
