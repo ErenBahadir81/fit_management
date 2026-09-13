@@ -6,13 +6,23 @@
 import { DAY_MS } from "../time/index";
 
 
+/**
+ * One logged set. `weightKg` arrived in 2.1 — pre-2.1 sets simply do not have the field, and
+ * `null` means bodyweight or "not recorded". Never read a missing load as 0 kg.
+ */
+export interface SetEntryLike {
+  reps?: number;
+  rir?: number | null;
+  weightKg?: number | null;
+}
+
 /** A logged exercise. `muscles` accepts the v2 `{key, load}` shape and the v1 `string[]` shape. */
 export interface StrengthEntryLike {
   name?: string;
   muscles?: ReadonlyArray<{ key: string; load?: number } | string>;
   skipped?: boolean;
   metric?: string;
-  sets?: ReadonlyArray<unknown>;
+  sets?: ReadonlyArray<SetEntryLike>;
 }
 
 export interface CardioEntryLike {

@@ -5,6 +5,7 @@ import type { HydratedDocument } from "mongoose";
 import { User, toUserDTO, type UserDoc } from "../../models/user";
 import { AppError } from "../../lib/errors";
 import type { AppConfig } from "../../config";
+import { isDuplicateKeyError } from "./users.service";
 
 const DAY_MS = 86_400_000;
 
@@ -29,6 +30,41 @@ export async function issueRefreshToken(user: HydratedDocument<UserDoc>, config:
   });
   await user.save();
   return token;
+}
+
+/**
+ * C3 — self-service sign-up. The username uniqueness check races the unique index, so the
+ * duplicate-key error is caught and turned into the same clean Turkish 409; the client should
+ * never see a Mongo error. New accounts start with `onboardingCompleted: false`.
+ */
+export async function register(
+  app: FastifyInstance,
+  config: AppConfig,
+  input: { username: string; password: string; displayName: string; email?: string | null },
+  device: string | null
+) {
+  const username = input.username.toLowerCase();
+  if (await User.exists({ username })) throw AppError.conflict("Bu kullanıcı adı alınmış");
+
+  let user: HydratedDocument<UserDoc>;
+  try {
+    user = await User.create({
+      username,
+      displayName: input.displayName.trim(),
+      email: input.email ?? null,
+      passwordHash: await hashPassword(input.password),
+      role: "user",
+      onboardingCompleted: false,
+      lastSeenAt: new Date(),
+    });
+  } catch (e) {
+    if (isDuplicateKeyError(e)) throw AppError.conflict("Bu kullanıcı adı alınmış");
+    throw e;
+  }
+
+  const refreshToken = await issueRefreshToken(user, config, device);
+  const accessToken = app.signAccessToken({ id: String(user._id), role: user.role });
+  return { accessToken, refreshToken, user: toUserDTO(user) };
 }
 
 export async function login(app: FastifyInstance, config: AppConfig, username: string, password: string, device: string | null) {

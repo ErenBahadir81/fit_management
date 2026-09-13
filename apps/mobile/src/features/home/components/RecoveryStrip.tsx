@@ -35,7 +35,7 @@ export function RecoveryStrip({ recovery, onPress }: { recovery: HomeDTO["recove
             {recovery.readyCount} kas hazır · {recovery.fatiguedCount} yorgun
           </Text>
         </View>
-        <Icon name="chevron-forward" size={18} color="inkSubtle" />
+        <Icon icon="forward" size={18} color="inkSubtle" />
       </View>
       <View style={styles.chips}>
         {recovery.top.map((m) => (

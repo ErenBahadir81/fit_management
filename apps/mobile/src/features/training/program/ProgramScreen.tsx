@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { List, type ListRenderItem } from "../../../ui/List";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import type { MuscleDTO, ScheduleEntry, Weekday, WorkoutLogDTO } from "@fitfloow/core";
 import { todayKey } from "../../../lib/dates";
 import { useUndoWindow } from "../../../lib/useUndoWindow";
@@ -21,9 +21,11 @@ import { useToast } from "../../../ui/Toast";
 import { UndoBar } from "../../../ui/UndoBar";
 import { useSession } from "../../auth/session";
 import { RecoveryPanel } from "../recovery/RecoveryPanel";
+import { doneSets, restoreDraft, totalSets } from "../lib/logger";
 import { groupLogsByWeek, stripItems, type StripItem } from "../lib/present";
 import { useDeleteWorkout, useJumpTo, useMuscles, useProgram, useSkipDay, useUndoLast, useWorkouts } from "../queries";
-import { CurrentDayCard } from "./CurrentDayCard";
+import { readDraft } from "../workout/useWorkoutSession";
+import { CurrentDayCard, type ResumeState } from "./CurrentDayCard";
 import { HistoryRow } from "./HistoryRow";
 import { JumpSheet } from "./JumpSheet";
 import { LogDetailSheet } from "./LogDetailSheet";
@@ -153,6 +155,15 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
     [logs, showLog, view]
   );
 
+  /* --- a session the user walked out of: the MMKV draft, read straight off the device --- */
+  // Backing out of the logger without finishing invalidates no query, so this tab has to look for
+  // itself: once when the program lands (during render, the React-sanctioned way to derive state
+  // from a prop change) and again every time the tab regains focus.
+  const dayOrder = view?.current?.day?.order ?? null;
+  const [resume, setResume] = useState<{ forDay: number | null; value: ResumeState | null }>(() => ({ forDay: dayOrder, value: readResumeFor(dayOrder) }));
+  if (resume.forDay !== dayOrder) setResume({ forDay: dayOrder, value: readResumeFor(dayOrder) });
+  useFocusEffect(useCallback(() => setResume({ forDay: dayOrder, value: readResumeFor(dayOrder) }), [dayOrder]));
+
   const start = useCallback(() => router.push("/(modals)/workout"), [router]);
   const confirmSkip = useCallback(
     (reason: string | undefined) => {
@@ -196,6 +207,7 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
                       day={currentDay}
                       todayLog={view.todayLog}
                       weekNumber={view.program.weekNumber}
+                      resume={resume.value}
                       busy={busy}
                       onStart={start}
                       onSkip={skipSheet.present}
@@ -226,7 +238,7 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
         </Reveal>
       </View>
     ),
-    [tab, onTab, view, hasProgram, editorSheet.present, selected, onSelectDay, currentDay, busy, start, skipSheet.present, jumpSheet.present, onUndoToday, showLog, sessionCount]
+    [tab, onTab, view, hasProgram, editorSheet.present, selected, onSelectDay, currentDay, resume.value, busy, start, skipSheet.present, jumpSheet.present, onUndoToday, showLog, sessionCount]
   );
 
   const renderItem = useCallback<ListRenderItem<Row>>(
@@ -279,6 +291,15 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
       {view ? <ProgramEditorSheet sheetRef={editorSheet.ref} program={view.program} onClose={editorSheet.dismiss} /> : null}
     </Screen>
   );
+}
+
+/** How far into today's session the stored draft got, or `null` when there is nothing to resume. */
+function readResumeFor(dayOrder: number | null): ResumeState | null {
+  if (dayOrder === null) return null;
+  const draft = restoreDraft(readDraft(), { dayOrder, dateKey: todayKey() });
+  if (!draft) return null;
+  const done = doneSets(draft);
+  return done > 0 ? { doneSets: done, totalSets: totalSets(draft) } : null;
 }
 
 const keyOf = (row: Row) => row.key;

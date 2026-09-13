@@ -54,7 +54,7 @@ export const MealAddRow = memo(function MealAddRow({ meal, onPress }: { meal: Me
       minTarget={false}
       style={[styles.section, styles.add, styles.bottom, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
     >
-      <Icon name="add-circle-outline" size={18} color="primary" />
+      <Icon icon="add" size={18} color="primary" />
       <Text variant="label" color="primary">
         Ekle
       </Text>

@@ -2,7 +2,8 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing, type Tone } from "../theme/tokens";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { resolveGlyph, type IconGlyph } from "./icons";
 import { Pressable, type PressableProps } from "./Pressable";
 import { Text } from "./Text";
 
@@ -10,7 +11,7 @@ export interface ChipProps extends Omit<PressableProps, "children" | "style"> {
   label: string;
   selected?: boolean;
   tone?: Tone;
-  icon?: IconName;
+  icon?: IconGlyph;
   /** Small colored dot (e.g. muscle color). */
   dot?: string;
   size?: "sm" | "md";
@@ -24,11 +25,14 @@ export function Chip({ label, selected, tone = "neutral", icon, dot, size = "md"
   const bg = selected ? colors.primary : soft;
   const color = selected ? colors.onPrimary : fg;
   const h = size === "sm" ? 30 : 38;
+  // The pill stays short on purpose — a 44 pt-tall chip looks wrong in a filter row — so the touch
+  // target makes up the difference in hit slop rather than in height.
+  const slop = Math.ceil((spacing.touch - h) / 2);
 
   const body = (
     <View style={[styles.row, { height: h, paddingHorizontal: size === "sm" ? spacing.md : spacing.lg, backgroundColor: bg }]}>
       {dot && <View style={[styles.dot, { backgroundColor: dot }]} />}
-      {icon && <Icon name={icon} size={size === "sm" ? 14 : 16} color={color} />}
+      {icon && <Icon name={resolveGlyph(icon)} size={size === "sm" ? 14 : 16} color={color} />}
       <Text variant="label" style={{ color }} numberOfLines={1}>
         {label}
       </Text>
@@ -50,6 +54,7 @@ export function Chip({ label, selected, tone = "neutral", icon, dot, size = "md"
       disabled={disabled}
       haptic="select"
       minTarget={false}
+      hitSlop={rest.hitSlop ?? { top: slop, bottom: slop, left: 4, right: 4 }}
       accessibilityState={{ selected: Boolean(selected), disabled: Boolean(disabled) }}
       accessibilityLabel={rest.accessibilityLabel ?? label}
       style={styles.wrap}

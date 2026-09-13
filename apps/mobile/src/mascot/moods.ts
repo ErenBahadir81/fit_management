@@ -1,58 +1,161 @@
-import type { Mood } from "@fitfloow/core";
+import type { Mood as CoreMood } from "@fitfloow/core";
+import { GAZE_RADIUS } from "./flooGeometry";
 
-export type { Mood };
+/**
+ * Every face Floo can pull. The first six are the moods the API can send (`@fitfloow/core`'s
+ * `Mood`); the last four are local — screens reach for them directly when they know better than the
+ * message catalogue does (a finished workout is `proud`, a PR is `hype`).
+ */
+export const FLOO_MOODS = ["happy", "cheer", "think", "sleepy", "flex", "worried", "proud", "sad", "hype", "curious"] as const;
+export type FlooMood = (typeof FLOO_MOODS)[number];
 
-/** Pose targets per mood. All numbers are in Floo's 100×120 SVG space (degrees for angles). */
+/**
+ * Compile-time guarantee that every mood the server can send is one Floo can actually draw. If core
+ * grows a mood and this file does not, the build breaks here rather than at runtime with a blank face.
+ */
+type Renderable<A extends B, B> = A;
+export type Mood = Renderable<CoreMood, FlooMood>;
+
+/**
+ * Pose targets, all in Floo's 200 × 240 SVG space (degrees for angles, pixels for offsets).
+ * Every field is spring-interpolated between moods, so any two poses blend into something sensible.
+ */
 export interface Pose {
-  /** Eye height multiplier 0..1 (1 = wide open). */
+  /** Upper-lid opening, 0 (shut) … 1 (wide). */
   eyeOpen: number;
-  /** Pupil drift. */
-  eyeX: number;
-  eyeY: number;
-  /** Brow rotation (+ = inner ends down → worried; − = raised). Mirrored for the right brow. */
+  /** Lower lid pushing up, 0 … 1. This is what separates a polite smile from a real one. */
+  eyeSquint: number;
+  /** Pupil drift from centre; kept inside `gazeRadius`. */
+  gazeX: number;
+  gazeY: number;
+  gazeRadius?: number;
+  /** Brow rotation, + = inner ends down (worried), − = inner ends up (raised). Mirrored right. */
   browTilt: number;
-  /** Brow vertical offset (− = raised). */
+  /** Brow vertical offset, − = raised. */
   browY: number;
-  /** Mouth control-point offset: + smile, − frown. */
-  mouth: number;
-  /** Mouth half-width. */
-  mouthW: number;
-  /** Arm rotations (deg) around the shoulders; − lifts the left arm, + lifts the right. */
+  /** Middle of the mouth relative to its corners: + smiles, − frowns. */
+  mouthCurve: number;
+  /** Gap between the lips. */
+  mouthOpen: number;
+  mouthHalfWidth: number;
+  /** Blush opacity, 0 … 1. */
+  cheeks: number;
+  /** Arm rotation about the shoulders (deg); − raises the left arm, + raises the right. */
   armL: number;
   armR: number;
-  /** Vertical hop in px (positive = up). */
+  /** How far off the ground, in px. */
   hop: number;
-  /** Whole-body tilt in degrees. */
+  /** Whole-body tilt (deg). */
   tilt: number;
-  /** Cheek blush opacity 0..1. */
-  cheeks: number;
-  /** Flame-tip sway amplitude multiplier. */
+  /** Pose squash: + wide and flat, − tall and thin. Area-preserving (see `volumePreservingScale`). */
+  squash: number;
+  /** Amplitude multiplier for the secondary motion (tip curl, scarf tails). */
   sway: number;
+  /** Idle breathing rate multiplier — a sleepy Floo breathes slower than a hyped one. */
+  tempo: number;
 }
 
-export const MOOD_POSE: Record<Mood, Pose> = {
-  happy: { eyeOpen: 1, eyeX: 0, eyeY: 0, browTilt: 0, browY: 0, mouth: 8, mouthW: 9, armL: -20, armR: 20, hop: 0, tilt: 0, cheeks: 0.7, sway: 1 },
-  cheer: { eyeOpen: 1, eyeX: 0, eyeY: -1, browTilt: -6, browY: -3, mouth: 13, mouthW: 12, armL: -150, armR: 150, hop: 10, tilt: -3, cheeks: 1, sway: 1.6 },
-  think: { eyeOpen: 0.85, eyeX: 3, eyeY: -2, browTilt: -10, browY: -2, mouth: 1, mouthW: 6, armL: -10, armR: 95, hop: 0, tilt: 4, cheeks: 0.3, sway: 0.6 },
-  sleepy: { eyeOpen: 0.22, eyeX: 0, eyeY: 1, browTilt: 4, browY: 2, mouth: 3, mouthW: 5, armL: 8, armR: -8, hop: 0, tilt: 8, cheeks: 0.3, sway: 0.35 },
-  flex: { eyeOpen: 0.9, eyeX: 0, eyeY: 0, browTilt: 8, browY: -1, mouth: 10, mouthW: 10, armL: -20, armR: 125, hop: 2, tilt: -5, cheeks: 0.8, sway: 1.3 },
-  worried: { eyeOpen: 1, eyeX: -2, eyeY: 0, browTilt: 16, browY: -2, mouth: -6, mouthW: 8, armL: -5, armR: 5, hop: 0, tilt: 2, cheeks: 0.2, sway: 0.5 },
+export const MOOD_POSE: Record<FlooMood, Pose> = {
+  happy: {
+    eyeOpen: 1, eyeSquint: 0.15, gazeX: 0, gazeY: 0,
+    browTilt: 0, browY: 0,
+    mouthCurve: 10, mouthOpen: 5, mouthHalfWidth: 21,
+    cheeks: 0.7, armL: -8, armR: 8, hop: 0, tilt: 0, squash: 0, sway: 1, tempo: 1,
+  },
+  cheer: {
+    eyeOpen: 0.95, eyeSquint: 0.5, gazeX: 0, gazeY: -1,
+    browTilt: -8, browY: -4,
+    mouthCurve: 15, mouthOpen: 13, mouthHalfWidth: 24,
+    cheeks: 1, armL: -145, armR: 145, hop: 12, tilt: -3, squash: -0.05, sway: 1.7, tempo: 1.4,
+  },
+  think: {
+    eyeOpen: 0.85, eyeSquint: 0.1, gazeX: 4, gazeY: -3,
+    browTilt: -9, browY: -2,
+    mouthCurve: 3, mouthOpen: 4, mouthHalfWidth: 14,
+    cheeks: 0.3, armL: -8, armR: 118, hop: 0, tilt: 5, squash: 0.02, sway: 0.6, tempo: 0.8,
+  },
+  sleepy: {
+    eyeOpen: 0.14, eyeSquint: 0, gazeX: 0, gazeY: 1.5,
+    browTilt: 5, browY: 3,
+    mouthCurve: 4, mouthOpen: 4, mouthHalfWidth: 12,
+    cheeks: 0.3, armL: 8, armR: -8, hop: 0, tilt: 9, squash: 0.05, sway: 0.3, tempo: 0.55,
+  },
+  flex: {
+    eyeOpen: 0.9, eyeSquint: 0.35, gazeX: 0, gazeY: 0,
+    browTilt: 9, browY: -1,
+    mouthCurve: 11, mouthOpen: 8, mouthHalfWidth: 22,
+    cheeks: 0.85, armL: -22, armR: 128, hop: 2, tilt: -5, squash: 0.04, sway: 1.2, tempo: 1.1,
+  },
+  worried: {
+    eyeOpen: 1, eyeSquint: 0, gazeX: -2.5, gazeY: 0.5,
+    browTilt: -16, browY: -3,
+    mouthCurve: -7, mouthOpen: 4, mouthHalfWidth: 18,
+    cheeks: 0.2, armL: -5, armR: 5, hop: 0, tilt: 2, squash: 0.02, sway: 0.5, tempo: 0.9,
+  },
+  proud: {
+    eyeOpen: 0.7, eyeSquint: 0.45, gazeX: 0, gazeY: -1,
+    browTilt: -3, browY: -6,
+    mouthCurve: 9, mouthOpen: 4, mouthHalfWidth: 19,
+    cheeks: 0.75, armL: -22, armR: 22, hop: 1, tilt: 0, squash: -0.06, sway: 0.9, tempo: 0.95,
+  },
+  sad: {
+    eyeOpen: 0.8, eyeSquint: 0, gazeX: 0, gazeY: 3.5,
+    browTilt: -13, browY: 4,
+    mouthCurve: -10, mouthOpen: 4, mouthHalfWidth: 17,
+    cheeks: 0.15, armL: 12, armR: -12, hop: 0, tilt: 3, squash: 0.07, sway: 0.35, tempo: 0.7,
+  },
+  hype: {
+    eyeOpen: 1, eyeSquint: 0.2, gazeX: 0, gazeY: -2,
+    browTilt: -12, browY: -7,
+    mouthCurve: 13, mouthOpen: 14, mouthHalfWidth: 26,
+    cheeks: 1, armL: -165, armR: 165, hop: 16, tilt: 0, squash: -0.08, sway: 2, tempo: 1.7,
+  },
+  curious: {
+    eyeOpen: 1, eyeSquint: 0, gazeX: 5, gazeY: -1,
+    browTilt: -6, browY: -4,
+    mouthCurve: 5, mouthOpen: 5, mouthHalfWidth: 14,
+    cheeks: 0.45, armL: -12, armR: 26, hop: 0, tilt: 11, squash: 0.02, sway: 0.8, tempo: 1,
+  },
 };
 
-export const MOOD_LABEL_TR: Record<Mood, string> = {
+export const MOOD_LABEL_TR: Record<FlooMood, string> = {
   happy: "mutlu",
   cheer: "coşkulu",
   think: "düşünceli",
   sleepy: "uykulu",
   flex: "güçlü",
   worried: "endişeli",
+  proud: "gururlu",
+  sad: "üzgün",
+  hype: "heyecanlı",
+  curious: "meraklı",
 };
 
+export { GAZE_RADIUS };
+
+/**
+ * Floo's palette. Violet body (the brand primary), amber knit for the scarf and boots — the warm
+ * accent stops the character reading as a plain UI blob and ties back to the `warning` token family.
+ */
 export const FLOO_COLORS = {
-  bodyStart: "#6D5DF6",
-  bodyEnd: "#8B7CFF",
-  cheeks: "#FFB4C6",
-  eyes: "#0F141C",
+  /** Body gradient, light rim → core → shaded base. */
+  bodyLight: "#A79AFF",
+  bodyMid: "#7E6DFA",
+  bodyDeep: "#5A46D8",
+  /** Warm bounce light on the shaded side, so the base does not read as dead purple. */
+  bounce: "#8E7BFF",
+  rim: "#D8D2FF",
   highlight: "#FFFFFF",
-  arm: "#5A4AE3",
+  eye: "#141A26",
+  /** Reflected light in the lower half of the iris. */
+  eyeLift: "#3A3F52",
+  mouth: "#2A1030",
+  tongue: "#F2708C",
+  cheeks: "#FF9DB4",
+  mitten: "#6455E8",
+  scarf: "#F5A524",
+  scarfAlt: "#FFF0D6",
+  boot: "#D98A12",
+  bootDark: "#A6650A",
+  shadow: "#3B2E7A",
 } as const;

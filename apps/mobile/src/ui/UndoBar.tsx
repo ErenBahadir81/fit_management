@@ -37,7 +37,7 @@ export function UndoBar({ message, onUndo, bottom, icon = "trash-outline", actio
         <Text variant="label" style={styles.text} numberOfLines={1}>
           {message}
         </Text>
-        <Chip label={actionLabel} tone="primary" size="sm" icon="arrow-undo-outline" onPress={onUndo} accessibilityLabel="Silmeyi geri al" testID="undo-delete" />
+        <Chip label={actionLabel} tone="primary" size="sm" icon="undo" onPress={onUndo} accessibilityLabel="Silmeyi geri al" testID="undo-delete" />
       </View>
     </Animated.View>
   );

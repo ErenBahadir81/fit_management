@@ -43,7 +43,7 @@ export function QuickWeighIn({ summary }: { summary: BodySummary }) {
   return (
     <Card variant="muted" style={styles.min} testID="quick-weighin">
       <View style={styles.head}>
-        <Icon name="scale-outline" size={16} color={todays ? "success" : "primary"} />
+        <Icon icon="weighIn" size={16} color={todays ? "success" : "primary"} />
         <Text variant="label" color="inkMuted" tabular>
           {todays ? `Bugün tartıldın · ${fmtKg(todays.weightKg)}` : "Bugünkü tartı"}
         </Text>

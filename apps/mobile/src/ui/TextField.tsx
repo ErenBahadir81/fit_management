@@ -4,7 +4,8 @@ import Animated, { FadeIn, FadeOut, interpolateColor, useAnimatedStyle, useShare
 import { useTheme } from "../theme/ThemeProvider";
 import { timing } from "../theme/motion";
 import { radii, spacing } from "../theme/tokens";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { resolveGlyph, type IconGlyph } from "./icons";
 import { Pressable } from "./Pressable";
 import { Text } from "./Text";
 
@@ -12,7 +13,7 @@ export interface TextFieldProps extends Omit<TextInputProps, "style"> {
   label: string;
   error?: string | null;
   hint?: string;
-  icon?: IconName;
+  icon?: IconGlyph;
   secure?: boolean;
   /** Trailing unit, e.g. "kg". */
   unit?: string;
@@ -37,7 +38,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
         {label}
       </Text>
       <Animated.View style={[styles.field, { backgroundColor: colors.surface }, border, !editable && { opacity: 0.6 }]}>
-        {icon && <Icon name={icon} size={18} color="inkSubtle" />}
+        {icon && <Icon name={resolveGlyph(icon)} size={18} color="inkSubtle" />}
         <TextInput
           ref={ref}
           {...rest}

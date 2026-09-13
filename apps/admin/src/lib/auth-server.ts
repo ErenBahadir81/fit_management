@@ -9,6 +9,8 @@ export const DEMO_ADMIN: UserDTO = {
   id: "usr_eren",
   username: "eren",
   displayName: "Eren Yılmaz",
+  email: null,
+  onboardingCompleted: true,
   role: "admin",
   gender: "male",
   heightCm: 183,

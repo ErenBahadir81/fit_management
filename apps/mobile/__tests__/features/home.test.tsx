@@ -26,7 +26,7 @@ describe("HomeScreen", () => {
     expect(screen.getByText("Antrenmana başla")).toBeTruthy();
     expect(screen.getByTestId("home-calorie-ring")).toBeTruthy();
     expect(screen.getByText(/kalan/)).toBeTruthy();
-    expect(screen.getByTestId("home-goal-card")).toBeTruthy();
+    expect(screen.getByTestId("home-goal-hero")).toBeTruthy();
     expect(screen.getByTestId("home-recovery")).toBeTruthy();
     expect(screen.getByTestId("home-floo")).toBeTruthy();
   });
@@ -47,8 +47,31 @@ describe("HomeScreen", () => {
     expect(mockRouter.push).toHaveBeenCalledWith("/(tabs)/program");
     await fireEvent.press(screen.getByTestId("home-calorie-card"));
     expect(mockRouter.push).toHaveBeenCalledWith("/(tabs)/nutrition");
-    await fireEvent.press(screen.getByTestId("home-goal-card"));
-    expect(mockRouter.push).toHaveBeenCalledWith("/(tabs)/body");
+    await fireEvent.press(screen.getByTestId("home-goal-hero"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/(modals)/goal/roadmap");
+  });
+
+  test("the goal is the anchor: where you are, where you land, when, and whether today moved you", async () => {
+    await renderUI(<HomeScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("home-goal-hero")).toBeTruthy());
+    const home = await createFakeApi({ latencyMs: 0, signedIn: true }).reports.home();
+    expect(screen.getByTestId("home-goal-ring").props.accessibilityValue).toMatchObject({ now: Math.round(home.goal!.percentComplete) });
+    expect(screen.getByTestId("home-goal-date")).toBeTruthy();
+    expect(screen.getByTestId("home-goal-where").props.children.join("")).toMatch(/kaldı/);
+    // "did today move me toward it" is answered in words, not left to arithmetic
+    expect(screen.getByTestId("home-goal-today")).toBeTruthy();
+    // and the goal comes before the day's work
+    expect(screen.getByTestId("home-goal-hero")).toBeTruthy();
+  });
+
+  test("with no goal the hero becomes the invitation, at full weight", async () => {
+    const api = createFakeApi({ latencyMs: 0, signedIn: true });
+    await api.goals.abandon();
+    setApi(api);
+    await renderUI(<HomeScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByText("Nereye gidiyoruz?")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("home-set-goal"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/(modals)/goal/setup");
   });
 
   test("shows a retry state when the request fails and no cache exists", async () => {

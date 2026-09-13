@@ -180,6 +180,18 @@ describe("PATCH /goals/current", () => {
     void user;
   });
 
+  it("changing only the target keeps the pace the user chose", async () => {
+    const { headers } = await withMeasurement();
+    const created = await t.app.inject({ method: "POST", url: `${api}/goals`, headers, payload: { targetBodyFatPct: 8, profile: "conservative" } });
+    expect(created.json().goal.profile).toBe("conservative");
+
+    const res = await t.app.inject({ method: "PATCH", url: `${api}/goals/current`, headers, payload: { targetBodyFatPct: 7 } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().goal.targetBodyFatPct).toBe(7);
+    expect(res.json().goal.profile).toBe("conservative");
+    expect(res.json().goal.plan.profile).toBe("conservative");
+  });
+
   it("404s without an active goal", async () => {
     const { headers } = await withMeasurement();
     const res = await t.app.inject({ method: "PATCH", url: `${api}/goals/current`, headers, payload: { targetBodyFatPct: 10 } });

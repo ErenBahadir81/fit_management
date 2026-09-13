@@ -36,7 +36,7 @@ export function GramsSheet({ entry, onSave, onDelete, onClose, saving }: GramsSh
           testID="grams-sheet-delete"
           label="Sil"
           variant="danger"
-          icon="trash-outline"
+          icon="delete"
           onPress={onDelete}
           full
         />

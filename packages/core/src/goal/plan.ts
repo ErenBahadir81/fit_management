@@ -9,6 +9,7 @@ import type { GoalPlan, GoalWarning, Macros, RoadmapWeek } from "../schemas/goal
 import type { GoalSettings } from "../schemas/settings";
 import { shiftKey } from "../time/index";
 import { round } from "../utils/index";
+import { goalMilestones, goalSummaryTr } from "./milestones";
 import { dailyTargetFor, safeWeeklyRate } from "./rate";
 import { bmrFor, fatFractionFor, macrosFor, tdeeFor } from "./tdee";
 
@@ -143,7 +144,7 @@ export function computeGoalPlan(input: GoalEngineInput): GoalPlan {
   const totalLossKg = roadmap.length > 0 ? cumulativeLossKg : 0;
   const avgWeightKg = (weightKg + (reachable ? targetWeightKg : weightKg)) / 2;
 
-  return {
+  const base = {
     fatToLoseKg: round(fatToLoseKg, 2),
     totalLossKg: round(totalLossKg, 2),
     targetWeightKg: round(reachable ? targetWeightKg : weightKg, 2),
@@ -167,6 +168,9 @@ export function computeGoalPlan(input: GoalEngineInput): GoalPlan {
     roadmap,
     warnings: [...warnings],
   };
+
+  /* C4 — the same plan, said out loud. */
+  return { ...base, milestones: goalMilestones(roadmap, totalLossKg), summaryTr: goalSummaryTr(base) };
 }
 
 /** TDEE implied by a roadmap week (daily target + the week's deficit spread over 7 days). */

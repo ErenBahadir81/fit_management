@@ -22,16 +22,17 @@ import { useSheet } from "../../ui/Sheet";
 import { Skeleton, SkeletonGroup } from "../../ui/Skeleton";
 import { Text } from "../../ui/Text";
 import { useBodyTrends } from "../body/useBody";
-import { ON_TRACK_TR } from "../home/components/GoalCard";
 import { CountUp } from "../reports/components/CountUp";
 import { PlanTrendChart } from "./components/PlanTrendChart";
 import { RecalibrateSheet, RoadmapMenuSheet } from "./components/RoadmapSheets";
 import { RoadmapWeekRow, WEEK_ROW_HEIGHT } from "./components/RoadmapWeekRow";
 import { planChartRows, roadmapRows, type RoadmapRow } from "./goalMath";
+import { ON_TRACK_TR, milestonesOf, summaryOf } from "./goalIntent";
+import { MilestoneSpine } from "./components/MilestoneSpine";
 import { useAbandonGoal, useCompleteGoal, useGoalView, useRecalibrateGoal } from "./useGoal";
 
 const fmt0 = (v: number) => fmtNumber(v, 0);
-const HEIGHTS = { header: 196, chart: 316, recal: 132 } as const;
+const HEIGHTS = { header: 224, milestones: 300, chart: 316, recal: 132 } as const;
 
 /** Roadmap: progress header, expected-vs-actual chart, recalibration, week list, overflow menu. */
 export function RoadmapScreen() {
@@ -158,6 +159,9 @@ function RoadmapHeader({ goal, progress, chart, today, onRecalibrate, recalibrat
               </View>
             </View>
           </View>
+          <Text variant="body" color="inkMuted" tabular testID="roadmap-summary">
+            {summaryOf(goal.plan)}
+          </Text>
           {progress ? (
             <View style={[styles.expected, { backgroundColor: colors.surfaceMuted }]}>
               <Mini label="Trend kilo" value={fmtKg(progress.actualWeightKg)} />
@@ -168,6 +172,19 @@ function RoadmapHeader({ goal, progress, chart, today, onRecalibrate, recalibrat
         </Card>
       </Entry>
       <Entry index={1}>
+        <Card testID="roadmap-milestones">
+          <View style={styles.sectionHead}>
+            <Text variant="title">Duraklar</Text>
+            <Text variant="caption" color="inkMuted">
+              yolun dörtte biri, yarısı, dörtte üçü, sonu
+            </Text>
+          </View>
+          <View style={styles.spine}>
+            <MilestoneSpine milestones={milestonesOf(goal.plan, today)} todayKey={today} variant="full" testID="roadmap-spine" />
+          </View>
+        </Card>
+      </Entry>
+      <Entry index={2}>
         <Card style={styles.chartCard}>
           <Text variant="title" style={styles.cardTitle}>
             Beklenen ve gerçek
@@ -175,7 +192,7 @@ function RoadmapHeader({ goal, progress, chart, today, onRecalibrate, recalibrat
           <PlanTrendChart rows={chart} targetWeightKg={goal.plan.targetWeightKg} todayKey={today} testID="plan-chart" />
         </Card>
       </Entry>
-      <Entry index={2}>
+      <Entry index={3}>
         <Card variant="muted" style={styles.recal}>
           <View style={styles.recalTexts}>
             <Text variant="bodyStrong">Yeniden kalibre et</Text>
@@ -183,10 +200,10 @@ function RoadmapHeader({ goal, progress, chart, today, onRecalibrate, recalibrat
               {goal.tdeeOverride ? `Ölçülen harcama ${fmtInt(goal.tdeeOverride)} kcal kullanılıyor` : `Formül harcaması ${fmtInt(goal.plan.tdee)} kcal. Gerçek verinle ölçelim mi?`}
             </Text>
           </View>
-          <Button label="Kalibre et" variant="secondary" size="sm" icon="analytics-outline" onPress={onRecalibrate} loading={recalibrating} testID="roadmap-recalibrate" />
+          <Button label="Kalibre et" variant="secondary" size="sm" icon="progress" onPress={onRecalibrate} loading={recalibrating} testID="roadmap-recalibrate" />
         </Card>
       </Entry>
-      <Entry index={3}>
+      <Entry index={4}>
         <View style={styles.sectionHead}>
           <Text variant="title">Haftalar</Text>
           <Text variant="caption" color="inkMuted">
@@ -215,6 +232,7 @@ function RoadmapSkeleton() {
   return (
     <SkeletonGroup testID="roadmap-skeleton" style={[styles.stack, { paddingHorizontal: spacing.gutter }]}>
       <Skeleton height={HEIGHTS.header} radius={radii.card} />
+      <Skeleton height={HEIGHTS.milestones} radius={radii.card} />
       <Skeleton height={HEIGHTS.chart} radius={radii.card} />
       <Skeleton height={HEIGHTS.recal} radius={radii.card} />
       {[0, 1, 2, 3].map((i) => (
@@ -238,5 +256,6 @@ const styles = StyleSheet.create({
   cardTitle: { marginBottom: spacing.sm },
   recal: { minHeight: HEIGHTS.recal, flexDirection: "row", alignItems: "center", gap: spacing.md },
   recalTexts: { flex: 1, gap: 2 },
-  sectionHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
+  sectionHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
+  spine: { marginTop: spacing.lg },
 });

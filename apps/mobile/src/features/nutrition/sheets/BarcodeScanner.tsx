@@ -132,7 +132,7 @@ export function BarcodeScanner({ meal: initialMeal, onAdd, onManual, onClose, ad
                 {phase.code} için kayıt bulamadım. Değerleri elle girebilirsin.
               </Text>
               <View style={styles.actions}>
-                <Button label="Elle gir" icon="create-outline" onPress={onManual} full />
+                <Button label="Elle gir" icon="edit" onPress={onManual} full />
                 <Button label="Tekrar tara" variant="secondary" onPress={() => setPhase({ kind: "scanning" })} full />
               </View>
             </Surface>

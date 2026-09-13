@@ -29,4 +29,7 @@ export const STORAGE_KEYS = {
   webTokens: "auth.tokens.web",
   /** In-progress workout draft (cleared on finish, discard and sign-out). */
   workoutDraft: "training.workout.draft.v1",
+  restPrefs: "training.rest.prefs.v1",
+  /** First-run answers, kept so a crash mid-signup does not cost the whole flow. */
+  onboardingDraft: "onboarding.draft.v1",
 } as const;

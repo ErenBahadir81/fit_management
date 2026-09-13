@@ -92,6 +92,27 @@ describe("Chip", () => {
     expect(onPress).toHaveBeenCalled();
     expect(screen.getByText("Hazır")).toBeTruthy();
   });
+
+  /**
+   * A chip's pill is deliberately shorter than the 44 pt floor — a 44 pt-tall pill looks wrong in a
+   * filter row. The *target* still has to reach it, so the shortfall is made up with hit slop.
+   */
+  test("an interactive chip reaches the 44 pt touch target through hit slop", async () => {
+    await renderUI(
+      <>
+        <Chip label="Küçük" size="sm" onPress={() => {}} testID="small" />
+        <Chip label="Normal" onPress={() => {}} testID="medium" />
+      </>
+    );
+    for (const [id, pill] of [
+      ["small", 30],
+      ["medium", 38],
+    ] as const) {
+      const slop = screen.getByTestId(id).props.hitSlop;
+      const vertical = typeof slop === "number" ? slop : (slop?.top ?? 0);
+      expect(pill + vertical * 2).toBeGreaterThanOrEqual(44);
+    }
+  });
 });
 
 describe("ProgressBar / Ring / StatTile / ListRow", () => {

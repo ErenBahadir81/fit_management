@@ -12,7 +12,7 @@ import { Icon, type IconName } from "../../../ui/Icon";
 import { ProgressBar } from "../../../ui/ProgressBar";
 import { Ring } from "../../../ui/Ring";
 import { Text } from "../../../ui/Text";
-import { ON_TRACK_TR } from "../../home/components/GoalCard";
+import { ON_TRACK_TR } from "../../goals/goalIntent";
 import { deficitBars, deficitSentence, scoreTone, scoreWord, trainingRatio, weekLabel } from "../reportMath";
 import { REPORT_HEIGHTS } from "../ReportSkeleton";
 import { CountUp } from "./CountUp";
@@ -188,7 +188,7 @@ export function GoalDistanceCard({ report, onPress }: { report: WeeklyReportDTO;
       <Card variant="muted" onPress={onPress} style={styles.goal} testID="report-goal">
         <View style={styles.trainRow}>
           <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
-            <Icon name="flag-outline" size={18} color="primary" />
+            <Icon icon="goal" size={18} color="primary" />
           </View>
           <View style={styles.trainTexts}>
             <Text variant="heading">Hedef belirle</Text>
@@ -196,7 +196,7 @@ export function GoalDistanceCard({ report, onPress }: { report: WeeklyReportDTO;
               Hedef olunca bu kart mesafeyi ve tahmini tarihi gösterir.
             </Text>
           </View>
-          <Icon name="chevron-forward" size={18} color="inkSubtle" />
+          <Icon icon="forward" size={18} color="inkSubtle" />
         </View>
       </Card>
     );

@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type { AppContext } from "../../context";
 import { authRoutes } from "./auth.routes";
+import { onboardingRoutes } from "./onboarding.routes";
+import { energyRoutes } from "./energy.routes";
 import { catalogRoutes } from "./catalog.routes";
 import { adminUsersRoutes } from "./admin.users.routes";
 import { adminSettingsRoutes } from "./admin.settings.routes";
@@ -17,6 +19,8 @@ import { adminSystemRoutes } from "./admin.system.routes";
  */
 export async function registerPlatformModule(app: FastifyInstance, ctx: AppContext) {
   await app.register(authRoutes, { config: ctx.config });
+  await app.register(async (scope) => onboardingRoutes(scope, ctx));
+  await app.register(async (scope) => energyRoutes(scope, ctx));
   await app.register(catalogRoutes);
   await app.register(adminUsersRoutes, { ctx });
   await app.register(adminSettingsRoutes, { ctx });

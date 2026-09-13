@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { File as FsFile } from "expo-file-system";
 
 /**
  * expo-camera is a native module: on web we bundle but never mount it, and the flows fall back to
@@ -17,14 +18,21 @@ export function scanFileFrom(uri: string): { uri: string; name: string; type: st
 }
 
 /**
- * What actually goes into the multipart body. React Native's `FormData` understands
- * `{uri,name,type}`; a browser does not — it stringifies the object to "[object Object]" and the
- * API rejects the upload. On web the picked `blob:`/`data:` URI is therefore read back into a real
- * `File` first.
+ * What actually goes into the multipart body — a part Expo's `fetch` knows how to encode.
+ *
+ * Expo's fetch assembles the body itself (`expo/src/winter/fetch/convertFormData.ts`) and accepts
+ * only a string, a `Blob`, or an object exposing `bytes()`. React Native's classic `{uri,name,type}`
+ * file object is none of those, so it throws "Unsupported FormDataPart implementation" *while the
+ * body is built* — before a socket is opened, which makes a broken upload look like a dropped
+ * connection. On native we therefore hand over an `expo-file-system` `File`, which carries
+ * `bytes()`, `name` and `type` (the latter two keep it a *file* part, so the API's `req.file()`
+ * still sees it). On web the picked `blob:`/`data:` URI is read back into a real `File`.
  */
-export async function scanUploadFrom(uri: string): Promise<{ uri: string; name: string; type: string } | File> {
-  const file = scanFileFrom(uri);
-  if (Platform.OS !== "web") return file;
-  const blob = await (await fetch(uri)).blob();
-  return new File([blob], file.name, { type: blob.type || file.type });
+export async function scanUploadFrom(uri: string): Promise<Blob> {
+  const meta = scanFileFrom(uri);
+  if (Platform.OS === "web") {
+    const blob = await (await fetch(uri)).blob();
+    return new File([blob], meta.name, { type: blob.type || meta.type });
+  }
+  return new FsFile(uri);
 }

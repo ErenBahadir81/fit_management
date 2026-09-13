@@ -10,7 +10,11 @@ export const zActivityLevel = z.enum(["sedentary", "light", "moderate", "active"
 export const zWeekday = z.number().int().min(0).max(6);
 export const zMeal = z.enum(["breakfast", "lunch", "dinner", "snack"]);
 export const zGoalProfile = z.enum(["conservative", "optimal", "aggressive"]);
-export const zMood = z.enum(["happy", "cheer", "think", "sleepy", "flex", "worried"]);
+/**
+ * Every face Floo can pull. The last four arrived with the wider emotion set — keep this list in
+ * step with `FLOO_MOODS` in the app, which asserts at compile time that it can draw all of them.
+ */
+export const zMood = z.enum(["happy", "cheer", "think", "sleepy", "flex", "worried", "proud", "sad", "hype", "curious"]);
 export const zOnTrack = z.enum(["ahead", "onTrack", "behind", "stalled"]);
 export const zPositive = z.number().positive().finite();
 export const zNonNeg = z.number().min(0).finite();
@@ -42,6 +46,33 @@ export const GOAL_PROFILE_TR: Record<GoalProfile, string> = {
   optimal: "Optimal",
   aggressive: "Agresif",
 };
+
+/**
+ * Peel `.default(...)` off a field, wherever it sits under `.optional()` / `.nullable()`.
+ * `unwrap()` is typed against zod's internal base class, hence the casts.
+ */
+function withoutDefault(field: z.ZodType): z.ZodType {
+  if (field instanceof z.ZodDefault) return withoutDefault(field.unwrap() as z.ZodType);
+  if (field instanceof z.ZodOptional) return withoutDefault(field.unwrap() as z.ZodType).optional();
+  if (field instanceof z.ZodNullable) return withoutDefault(field.unwrap() as z.ZodType).nullable();
+  return field;
+}
+
+/**
+ * A PATCH body derived from a create schema: every field optional, every default removed.
+ *
+ * Use this instead of `.partial()`. zod's `.partial()` makes fields optional but *keeps* their
+ * `.default(...)`s, so `PATCH { name }` parses into every other field's default and the route
+ * `$set`s them — turning "rename this" into "reset everything else". Validation is unchanged;
+ * only the defaults go.
+ */
+export function patchOf<T extends z.ZodObject<z.ZodRawShape>>(
+  schema: T
+): z.ZodObject<{ [K in keyof T["shape"]]: z.ZodOptional<T["shape"][K]> }> {
+  const shape: Record<string, z.ZodType> = {};
+  for (const [key, field] of Object.entries(schema.shape)) shape[key] = withoutDefault(field as z.ZodType).optional();
+  return z.object(shape) as unknown as z.ZodObject<{ [K in keyof T["shape"]]: z.ZodOptional<T["shape"][K]> }>;
+}
 
 /** Standard API error envelope. */
 export const zApiError = z.object({

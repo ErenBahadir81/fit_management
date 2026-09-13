@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zActivityLevel, zDateKey, zGoalProfile, zId, zIso, zOnTrack } from "./common";
+import { patchOf, zActivityLevel, zDateKey, zGoalProfile, zId, zIso, zOnTrack } from "./common";
 
 export const zMacros = z.object({
   calories: z.number(),
@@ -35,6 +35,18 @@ export const zGoalWarning = z.enum([
 ]);
 export type GoalWarning = z.infer<typeof zGoalWarning>;
 
+/** C4 — a quarter of the way, half way, three quarters, done. */
+export const zGoalMilestone = z.object({
+  /** 0.25 / 0.5 / 0.75 / 1 of the total weight to lose. */
+  fraction: z.number(),
+  dateKey: z.string(),
+  weightKg: z.number(),
+  bodyFatPct: z.number(),
+  /** e.g. "4 hafta sonra" */
+  etaLabelTr: z.string(),
+});
+export type GoalMilestone = z.infer<typeof zGoalMilestone>;
+
 export const zGoalPlan = z.object({
   fatToLoseKg: z.number(),
   totalLossKg: z.number(),
@@ -57,6 +69,9 @@ export const zGoalPlan = z.object({
   startKey: z.string(),
   targetDate: z.string(),
   roadmap: z.array(zRoadmapWeek),
+  milestones: z.array(zGoalMilestone).default([]),
+  /** One sentence: "17 Ocak'ta ~78 kg ve %12 yağ oranındasın — 14 hafta, günde 1.850 kcal." */
+  summaryTr: z.string().default(""),
   warnings: z.array(zGoalWarning),
 });
 export type GoalPlan = z.infer<typeof zGoalPlan>;
@@ -88,7 +103,7 @@ export const zGoalInput = z.object({
   profile: zGoalProfile.default("optimal"),
 });
 export type GoalInput = z.infer<typeof zGoalInput>;
-export const zGoalUpdate = zGoalInput.partial();
+export const zGoalUpdate = patchOf(zGoalInput);
 
 export const zGoalProgress = z.object({
   daysElapsed: z.number().int(),

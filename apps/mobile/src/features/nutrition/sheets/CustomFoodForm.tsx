@@ -50,7 +50,7 @@ export function CustomFoodForm({ onContinue, onBack }: { onContinue: (name: stri
       <View style={styles.head}>
         {onBack ? (
           <Pressable testID="custom-food-back" onPress={onBack} haptic="select" minTarget={false} accessibilityLabel="Geri" style={styles.back}>
-            <Icon name="chevron-back" size={20} color="inkMuted" />
+            <Icon icon="back" size={20} color="inkMuted" />
           </Pressable>
         ) : null}
         <View style={styles.grow}>

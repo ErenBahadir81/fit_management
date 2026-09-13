@@ -281,7 +281,7 @@ function CameraStage({ cameraRef, granted, canAskAgain, onRequest, onShutter, on
 
       <View style={styles.controls}>
         <Pressable testID="scan-gallery" onPress={onGallery} haptic="select" accessibilityLabel="Galeriden seç" style={[styles.sideBtn, { backgroundColor: colors.surfaceMuted }]}>
-          <Icon name="images-outline" size={22} color="ink" />
+          <Icon icon="photo" size={22} color="ink" />
         </Pressable>
 
         {live ? (
@@ -297,7 +297,7 @@ function CameraStage({ cameraRef, granted, canAskAgain, onRequest, onShutter, on
             <View style={[styles.shutterCore, { backgroundColor: colors.onPrimary }]} />
           </Pressable>
         ) : (
-          <Button testID="scan-gallery-primary" label="Galeriden seç" icon="images-outline" onPress={onGallery} />
+          <Button testID="scan-gallery-primary" label="Galeriden seç" icon="photo" onPress={onGallery} />
         )}
 
         <View style={styles.sideBtn} />

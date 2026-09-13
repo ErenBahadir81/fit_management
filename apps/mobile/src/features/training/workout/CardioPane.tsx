@@ -7,9 +7,9 @@ import { Button } from "../../../ui/Button";
 import { Chip } from "../../../ui/Chip";
 import { Icon } from "../../../ui/Icon";
 import { Pressable } from "../../../ui/Pressable";
-import { Stepper } from "../../../ui/Stepper";
 import { Text } from "../../../ui/Text";
 import { cardioTotals, pace, type CardioSlot, type LoggerCardio } from "../lib/logger";
+import { NumberField } from "./NumberField";
 
 export interface CardioPaneProps {
   slot: CardioSlot;
@@ -30,13 +30,13 @@ export function CardioPane({ slot, cardio, width, onSegment, onAdd, onRemove }: 
 
   return (
     <View style={[styles.pane, { width }]} testID={`cardio-pane-${slot}`}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.head}>
           <Text variant="display">{slot === "run" ? "Koşu" : "Yüzme"}</Text>
           <View style={styles.chips}>
-            <Chip label={`Hedef ${fmtNumber(cardio.targetKm, 1)} km`} size="sm" icon="navigate-outline" />
-            <Chip label={`${cardio.targetMin} dk`} size="sm" icon="time-outline" />
-            {targetPace !== null ? <Chip label={`${fmtNumber(targetPace, 2)} dk/km`} size="sm" icon="speedometer-outline" /> : null}
+            <Chip label={`Hedef ${fmtNumber(cardio.targetKm, 1)} km`} size="sm" icon="distance" />
+            <Chip label={`${cardio.targetMin} dk`} size="sm" icon="duration" />
+            {targetPace !== null ? <Chip label={`${fmtNumber(targetPace, 2)} dk/km`} size="sm" icon="pace" /> : null}
           </View>
         </View>
 
@@ -55,21 +55,36 @@ export function CardioPane({ slot, cardio, width, onSegment, onAdd, onRemove }: 
                 </Text>
                 {cardio.segments.length > 1 ? (
                   <Pressable onPress={() => onRemove(segment.id)} minTarget={false} testID={`segment-remove-${i}`} accessibilityLabel={`${i + 1}. bölümü sil`} style={styles.remove}>
-                    <Icon name="close" size={18} color="danger" />
+                    <Icon icon="close" size={18} color="danger" />
                   </Pressable>
                 ) : null}
               </View>
-              <View style={styles.field}>
-                <Text variant="caption" color="inkMuted">
-                  km
-                </Text>
-                <Stepper value={segment.km} onChange={(v) => onSegment(segment.id, { km: v })} min={0} max={200} step={0.1} label="Mesafe" testID={`segment-km-${i}`} />
-              </View>
-              <View style={styles.field}>
-                <Text variant="caption" color="inkMuted">
-                  dakika
-                </Text>
-                <Stepper value={segment.min} onChange={(v) => onSegment(segment.id, { min: v })} min={0} max={600} step={1} label="Süre" testID={`segment-min-${i}`} />
+              {/* Same rule as a set: the number is the target, the ± is the convenience. */}
+              <View style={styles.fields}>
+                <NumberField
+                  value={segment.km}
+                  onChange={(v) => onSegment(segment.id, { km: v ?? 0 })}
+                  unit="km"
+                  label="Mesafe"
+                  min={0}
+                  max={200}
+                  step={0.5}
+                  decimals={2}
+                  style={styles.field}
+                  testID={`segment-km-${i}`}
+                />
+                <NumberField
+                  value={segment.min}
+                  onChange={(v) => onSegment(segment.id, { min: v ?? 0 })}
+                  unit="dk"
+                  label="Süre"
+                  min={0}
+                  max={600}
+                  step={1}
+                  decimals={0}
+                  style={styles.field}
+                  testID={`segment-min-${i}`}
+                />
               </View>
             </View>
           ))}
@@ -104,6 +119,7 @@ const styles = StyleSheet.create({
   segments: { gap: spacing.md },
   segment: { gap: spacing.md, padding: spacing.lg, borderRadius: radii.card, borderWidth: StyleSheet.hairlineWidth },
   segmentHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  field: { gap: spacing.xs },
+  fields: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  field: { flex: 1 },
   remove: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
 });

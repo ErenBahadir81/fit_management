@@ -1,13 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { zLoginInput, zUpdateMeInput, zChangePasswordInput } from "@fitfloow/core";
+import { zLoginInput, zRegisterInput, zUpdateMeInput, zChangePasswordInput } from "@fitfloow/core";
 import bcrypt from "bcryptjs";
 import { User, toUserDTO } from "../../models/user";
 import { invalidateAllWeeklyReports } from "../../models/goal";
 import { AppError } from "../../lib/errors";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "../../lib/auth";
 import type { AppConfig } from "../../config";
-import { hashPassword, login, revokeRefreshToken, rotateRefreshToken } from "./auth.service";
+import { hashPassword, login, register, revokeRefreshToken, rotateRefreshToken } from "./auth.service";
 
 const zRefreshBody = z.object({ refreshToken: z.string().optional() }).default({});
 
@@ -22,6 +22,13 @@ export const LOGIN_RATE_LIMIT = {
   keyGenerator: (req: { ip: string }) => `login:${req.ip}`,
 };
 
+/** Sign-up gets the same treatment as login, in its own bucket so the two cannot starve each other. */
+export const REGISTER_RATE_LIMIT = {
+  max: 20,
+  timeWindow: "1 minute",
+  keyGenerator: (req: { ip: string }) => `register:${req.ip}`,
+};
+
 export async function authRoutes(app: FastifyInstance, opts: { config: AppConfig }) {
   const { config } = opts;
   const cookieOpts = {
@@ -30,6 +37,26 @@ export async function authRoutes(app: FastifyInstance, opts: { config: AppConfig
     sameSite: "lax" as const,
     secure: config.COOKIE_SECURE,
   };
+
+  /** C3 — the only way into the app that does not need an admin. Same response shape as login. */
+  app.post(
+    "/auth/register",
+    {
+      schema: { body: zRegisterInput, querystring: z.object({ cookie: z.string().optional() }) },
+      config: { rateLimit: REGISTER_RATE_LIMIT },
+    },
+    async (req, reply) => {
+      const input = req.body as z.infer<typeof zRegisterInput>;
+      const device = (req.headers["user-agent"] ?? "").slice(0, 120) || null;
+      const result = await register(app, config, input, device);
+      const q = req.query as { cookie?: string };
+      if (q.cookie === "1") {
+        reply.setCookie(ACCESS_COOKIE, result.accessToken, { ...cookieOpts, maxAge: config.ACCESS_TTL_MIN * 60 });
+        reply.setCookie(REFRESH_COOKIE, result.refreshToken, { ...cookieOpts, maxAge: config.REFRESH_TTL_DAYS * 86400, path: "/api/v1/auth" });
+      }
+      return result;
+    }
+  );
 
   app.post(
     "/auth/login",

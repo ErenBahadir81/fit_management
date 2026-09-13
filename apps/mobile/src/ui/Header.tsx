@@ -2,12 +2,13 @@ import React from "react";
 import { StyleSheet, View, type ViewProps } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing } from "../theme/tokens";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { resolveGlyph, type IconGlyph } from "./icons";
 import { Pressable } from "./Pressable";
 import { Text } from "./Text";
 
 export interface HeaderAction {
-  icon: IconName;
+  icon: IconGlyph;
   onPress: () => void;
   label: string;
   testID?: string;
@@ -35,7 +36,7 @@ function IconButton({ action }: { action: HeaderAction }) {
       haptic="select"
       style={[styles.iconBtn, { backgroundColor: colors.surfaceMuted }]}
     >
-      <Icon name={action.icon} size={20} color="ink" />
+      <Icon name={resolveGlyph(action.icon)} size={20} color="ink" />
     </Pressable>
   );
 }

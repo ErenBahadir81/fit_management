@@ -49,7 +49,7 @@ export async function computeAutoTarget(ctx: AppContext, userId: string): Promis
   const uid = new Types.ObjectId(userId);
   const [goal, body, user, settings] = await Promise.all([
     Goal.findOne({ userId: uid, status: "active" }).lean(),
-    BodyEntry.findOne({ userId: uid }).sort({ date: -1 }).lean(),
+    BodyEntry.findOne({ userId: uid }).sort({ date: -1, _id: -1 }).lean(),
     User.findById(uid).lean(),
     getSettings(),
   ]);

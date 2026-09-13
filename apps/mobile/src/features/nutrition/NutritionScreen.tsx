@@ -21,6 +21,7 @@ import { useTabBarSpace } from "../../ui/TabBar";
 import { useToast } from "../../ui/Toast";
 import { UndoBar } from "../../ui/UndoBar";
 import { CalorieHero } from "./components/CalorieHero";
+import { EnergyCard } from "./components/EnergyCard";
 import { DayPager } from "./components/DayPager";
 import { Fab, FAB_SIZE } from "./components/Fab";
 import { EntryRow, MealAddRow, MealEmptyRow, MealHeaderRow } from "./components/MealRows";
@@ -151,15 +152,24 @@ export function NutritionScreen() {
   );
   const listStyle = useMemo(() => ({ paddingHorizontal: spacing.gutter, paddingTop: spacing.lg, paddingBottom: tabSpace + spacing.huge }), [tabSpace]);
   const weekStyle = useMemo(() => [styles.weekContent, { paddingBottom: tabSpace + spacing.huge }], [tabSpace]);
+  const goSetGoal = useCallback(() => router.push("/(modals)/goal/setup"), [router]);
+  const goBody = useCallback(() => router.push("/(tabs)/body"), [router]);
+  /* The ring says how much is left today; the energy card says where that number came from. */
   const listHeader = useMemo(
     () =>
       day.data ? (
-        <Entry index={0}>
-          <CalorieHero day={day.data} onPressTarget={openTarget} />
+        <View>
+          <Entry index={0}>
+            <CalorieHero day={day.data} onPressTarget={openTarget} />
+          </Entry>
           <View style={styles.heroGap} />
-        </Entry>
+          <Entry index={1}>
+            <EnergyCard onSetGoal={goSetGoal} onAddMeasurement={goBody} />
+          </Entry>
+          <View style={styles.heroGap} />
+        </View>
       ) : null,
-    [day.data, openTarget]
+    [day.data, goBody, goSetGoal, openTarget]
   );
 
   if (day.isError && !day.data) {
@@ -179,7 +189,7 @@ export function NutritionScreen() {
         <Header title="Beslenme" subtitle={fmtDate(dateKey, "weekday")} right={{ icon: "options-outline", label: "Hedef", onPress: openTarget, testID: "open-target" }} />
         <View style={styles.tabs}>
           <Segmented testID="nutrition-tabs" style={styles.grow} options={TABS} value={tab} onChange={setTab} />
-          {dateKey !== today ? <Chip testID="jump-today" label="Bugün" tone="primary" icon="today-outline" onPress={jumpToday} /> : null}
+          {dateKey !== today ? <Chip testID="jump-today" label="Bugün" tone="primary" icon="today" onPress={jumpToday} /> : null}
         </View>
         {tab === "day" ? <DayPager days={days} selected={dateKey} onSelect={setDateKey} loggedKeys={loggedKeys} /> : null}
       </View>
@@ -240,6 +250,7 @@ export function NutritionScreen() {
         <TargetSheet
           target={target.data ?? day.data!.target}
           saving={setTarget.isPending}
+          onExplain={() => closeKind("target")}
           onSave={(input) => {
             setSheet(null);
             setTarget.mutate(input, { onSuccess: () => toast.show({ message: "Hedef güncellendi", kind: "success" }) });

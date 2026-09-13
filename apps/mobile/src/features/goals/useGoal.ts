@@ -6,6 +6,7 @@ import { describeError } from "../../lib/errors";
 import { haptic } from "../../lib/haptics";
 import { useToast } from "../../ui/Toast";
 import { HOME_QUERY_KEY } from "../home/useHome";
+import { ENERGY_KEY } from "../nutrition/components/EnergyCard";
 import { REPORT_KEYS } from "../reports/useReport";
 
 export const GOAL_KEY = ["goal"] as const;
@@ -66,6 +67,8 @@ function useGoalMutationEffects() {
     void qc.invalidateQueries({ queryKey: ["mascot"] });
     // The daily calorie target derives from the goal plan; the day/week views embed it.
     void qc.invalidateQueries({ queryKey: ["nutrition-target"] });
+    // The energy card's BMR/maintenance/deficit breakdown is derived from the goal.
+    void qc.invalidateQueries({ queryKey: ENERGY_KEY });
     void qc.invalidateQueries({ queryKey: ["nutrition-day"] });
     void qc.invalidateQueries({ queryKey: ["nutrition-week"] });
   };

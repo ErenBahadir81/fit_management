@@ -53,7 +53,8 @@ Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`ti
 
 ### Text & icons
 - **`Text`** `{ variant, color (token), tone ("primary|success|warning|danger|neutral"), tabular, align, weight }` — dynamic type capped at 130 %.
-- **`Icon`** `{ name: IconName (Ionicons), size=20, color: token|raw }`.
+- **`Icon`** `{ icon?: AppIcon, active?, name?: IconName, size=20, color: token|raw }` — **name a concept, not a glyph**: `<Icon icon="goal" />`, not `<Icon name="flag-outline" />`.
+- **`src/ui/icons.ts`** — the semantic layer. `APP_ICONS` maps app concepts (`home program nutrition body profile · goal roadmap milestone pace lose maintain gain eta progress · weighIn measure height gender birthday activity trend · meal calories protein carbs fat energy deficit scan estimate online barcode photo camera · workout rest streak recovery skip start duration volume · username password displayName email logout theme mascot settings demo · report chart calendar today recent award · add minus edit delete close back forward expand next previous undo more refresh search check done warning info tip privacy`) to a glyph + its filled twin. **One visual weight: every glyph is an Ionicons outline, and filled is reserved for the active tab** — `__tests__/ui/icons.test.tsx` enforces both. The composite primitives (`Button`, `Chip`, `ListRow`, `Header`, `EmptyState`, `StatTile`, `TextField`) take `icon?: IconGlyph` = a concept *or* a raw glyph, so raw names still compile; prefer the concept, and add a new concept to the map rather than reaching for a glyph at the call site.
 
 ### Pressables
 - **`Pressable`** `{ haptic: "tap"|"select"|"medium"|"none", scaleTo=0.97, minTarget=true, disabled }` — role=button, 44 pt min height, `accessibilityState.disabled`. Base of every interactive element. Don't use RN `Pressable`/`TouchableOpacity` directly.
@@ -66,6 +67,8 @@ Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`ti
 - **`Stepper`** `{ value, onChange, step, min, max, format, size }` — −/+ with clamp, press-and-hold repeat, tabular value. Test ids: `${testID}-dec/-inc`.
 - **`Segmented<T>`** `{ options: {value,label}[], value, onChange, size }` — spring pill indicator, role=tablist/tab, test ids `${testID}-${value}`.
 - **`Toggle`** `{ value, onChange }` — role=switch, `checked` state, animated track colour.
+- **`WheelPicker<T>`** `{ options: {value,label}[], value, onChange, label }` — snapping 44 pt column, one `onChange` + one selection tick per settle, `role=adjustable` with increment/decrement, and every row directly tappable. `WHEEL_ROW_HEIGHT` / `WHEEL_HEIGHT` exported.
+- **`DatePicker`** `{ value: dateKey|null, onChange, label, minYear?, maxYear? }` — day / Turkish month / year as three wheels. A day that does not exist in the new month clamps, so it can never emit an impossible date. Use this for any date input; **never a text field asking for `YYYY-AA-GG`**.
 
 ### Progress
 - **`ProgressBar`** `{ value 0..1, tone, height=8, label?, valueLabel? }` — spring-animated width, role=progressbar with `accessibilityValue`.
@@ -84,6 +87,16 @@ Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`ti
 - **`UndoBar`** `{ message, onUndo, bottom }` — "Silindi · Geri al" bar above the tab bar; pair with `useUndoWindow(onCommit)` from `src/lib` (5 s window, commits on expiry / replacement / unmount, never on undo).
 - **`ListRefreshControl`** `{ refreshing, onRefresh }` — themed pull-to-refresh for FlashList / ScrollView screens.
 - **`TabBar`** / **`RouterTabBar`** — floating pill bar, spring indicator, selection haptic. `TAB_ITEMS` defines the 5 tabs; `useTabBarSpace()` gives the bottom clearance for custom scroll containers.
+
+## The goal, shared (`src/features/goals`)
+The goal decision is one component used in two places, so onboarding and in-app setup cannot drift:
+- **`goalIntent.ts`** (pure) — `INTENT_OPTIONS` (`lose | maintain | gain`), `PACE_OPTIONS`, `ON_TRACK_TR`, `milestonesOf(plan)` / `summaryOf(plan)` (C4, with a local fallback for plans cached before it), `dateLocativeTr` ("17 Ocak'ta"), `etaBetweenTr(from,to)`, `maintenanceEnergy(body)` / `gainCalories(maintenance)`.
+- **`components/GoalChooserSection`** — intent → target → pace → consequence. Rendered by `GoalSetupScreen` *and* onboarding step 5.
+- **`components/PlanOutcome`** — "what that choice means", arrival **date** as the hero. `components/MilestoneSpine` — the four quarter-points, `compact` (inside the violet card) or `full` (the roadmap's spine).
+- **`useLocalPlan.usePlansByPace`** — all three paces computed on device, so the pace picker shows each option's real arrival date and daily calories.
+
+## Onboarding (`src/features/onboarding`)
+One route (`app/(onboarding)`), one draft, one step machine. `model.ts` owns the steps, the per-field errors and the `POST /onboarding` payload; `draft.ts` writes everything except the password to MMKV after every change, so a crash resumes where it left off. The root layout gates on `needsOnboarding(user)` (`api.ts`) — strictly `onboardingCompleted === false`, so an account cached before the field existed is never sent back through the flow.
 
 ## Mascot (`src/mascot`)
 - **`Floo`** `{ mood: "happy"|"cheer"|"think"|"sleepy"|"flex"|"worried", size: "s"(56)|"m"(96)|"l"(160)|number, animate=true }` — SVG flame-drop; idle breathing, random blink (3–5 s), flame-tip sway; mood = spring pose transition (`MOOD_POSE`). Set `animate={false}` in lists.

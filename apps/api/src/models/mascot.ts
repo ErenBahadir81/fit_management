@@ -1,10 +1,10 @@
 import mongoose, { Schema, model, type Model, type Types } from "mongoose";
-import type { MascotTemplateDTO } from "@fitfloow/core";
+import { zMood, type MascotTemplateDTO, type Mood } from "@fitfloow/core";
 
 export interface MascotMessageDoc {
   _id: Types.ObjectId;
   key: string;
-  mood: "happy" | "cheer" | "think" | "sleepy" | "flex" | "worried";
+  mood: Mood;
   variants: string[];
   active: boolean;
   createdAt: Date;
@@ -14,7 +14,9 @@ export interface MascotMessageDoc {
 const MascotMessageSchema = new Schema<MascotMessageDoc>(
   {
     key: { type: String, required: true, unique: true },
-    mood: { type: String, enum: ["happy", "cheer", "think", "sleepy", "flex", "worried"], default: "happy" },
+    // Driven by core so the two can never disagree: a mood added to `zMood` is storable the
+    // same day, instead of failing validation at seed time.
+    mood: { type: String, enum: zMood.options, default: "happy" },
     variants: { type: [String], default: [] },
     active: { type: Boolean, default: true },
   },

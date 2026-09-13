@@ -17,7 +17,7 @@ export function Fab({ onPress, bottom, testID = "nutrition-fab" }: { onPress: ()
       <Pressable testID={testID} onPress={onPress} haptic="medium" minTarget={false} accessibilityLabel="Öğün ekle" style={[styles.fab, shadows.primary]}>
         <LinearGradient colors={[...colors.gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         <View style={styles.center}>
-          <Icon name="add" size={30} color={colors.onPrimary} />
+          <Icon icon="add" size={30} color={colors.onPrimary} />
         </View>
       </Pressable>
     </Animated.View>

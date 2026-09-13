@@ -149,10 +149,11 @@ export async function adminUsersRoutes(app: FastifyInstance, opts: { ctx: AppCon
     const [dto, program, latestBody, goal, lastWorkouts] = await Promise.all([
       toAdminUserDTO(user),
       Program.findOne({ userId: user._id }),
-      BodyEntry.findOne({ userId: user._id }).sort({ date: -1 }),
-      // Active goal first, otherwise the most recent one.
-      Goal.findOne({ userId: user._id, status: "active" }).then((g) => g ?? Goal.findOne({ userId: user._id }).sort({ createdAt: -1 })),
-      WorkoutLog.find({ userId: user._id }).sort({ date: -1 }).limit(5),
+      BodyEntry.findOne({ userId: user._id }).sort({ date: -1, _id: -1 }),
+      // Active goal first, otherwise the most recent one. `_id` breaks the tie: two goals created
+      // in the same millisecond share a `createdAt`, and without it "most recent" is a coin flip.
+      Goal.findOne({ userId: user._id, status: "active" }).then((g) => g ?? Goal.findOne({ userId: user._id }).sort({ createdAt: -1, _id: -1 })),
+      WorkoutLog.find({ userId: user._id }).sort({ date: -1, _id: -1 }).limit(5),
     ]);
     const weekKey = weekKeyFor(trDateKey(ctx.now()), (user.measurementDay ?? 0) as Weekday);
     return {

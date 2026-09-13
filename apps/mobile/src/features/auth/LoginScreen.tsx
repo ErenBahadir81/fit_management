@@ -100,7 +100,7 @@ export function LoginScreen() {
               if (errors.username) setErrors((e) => ({ ...e, username: undefined }));
             }}
             error={errors.username}
-            icon="person-outline"
+            icon="username"
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="username"
@@ -118,7 +118,7 @@ export function LoginScreen() {
               if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
             }}
             error={errors.password}
-            icon="lock-closed-outline"
+            icon="password"
             secure
             autoComplete="password"
             textContentType="password"
@@ -136,15 +136,18 @@ export function LoginScreen() {
       </Animated.View>
       {env.fakeApi && (
         <View style={styles.demo}>
-          <Chip label="Demo: eren / eren123" tone="primary" icon="sparkles" onPress={() => {
+          <Chip label="Demo: eren / eren123" tone="primary" icon="demo" onPress={() => {
             setUsername("eren");
             setPassword("eren123");
           }} />
         </View>
       )}
-      <Text variant="caption" color="inkSubtle" align="center">
-        Hesabın yoksa yöneticinle iletişime geç.
-      </Text>
+      <View style={styles.signUp}>
+        <Text variant="body" color="inkMuted" align="center">
+          Henüz hesabın yok mu?
+        </Text>
+        <Button label="Hesap oluştur" variant="ghost" full onPress={() => router.replace("/(onboarding)")} testID="login-register" />
+      </View>
     </Screen>
   );
 }
@@ -154,4 +157,5 @@ const styles = StyleSheet.create({
   hero: { alignItems: "center", gap: spacing.sm },
   card: { gap: spacing.lg },
   demo: { alignItems: "center" },
+  signUp: { gap: spacing.xs },
 });

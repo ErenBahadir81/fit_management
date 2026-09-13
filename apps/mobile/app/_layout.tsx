@@ -8,6 +8,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useSession } from "../src/features/auth/session";
+import { needsOnboarding } from "../src/features/onboarding/api";
 import { AppQueryProvider } from "../src/lib/queryClient";
 import { ThemeProvider, useTheme } from "../src/theme";
 import { ToastProvider } from "../src/ui/Toast";
@@ -37,7 +38,11 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const status = useSession((s) => s.status);
+  const user = useSession((s) => s.user);
   const { colors, isDark } = useTheme();
+  // A brand-new account owes us the first-run flow before it may see the tabs. Only an explicit
+  // `false` counts, so an account from a server that predates the field is never sent back through it.
+  const inOnboarding = status === "signedIn" && needsOnboarding(user);
 
   useEffect(() => {
     void useSession.getState().boot();
@@ -52,9 +57,13 @@ function RootNavigator() {
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false, animation: "fade", contentStyle: { backgroundColor: colors.bg } }}>
-        <Stack.Protected guard={status === "signedIn"}>
+        <Stack.Protected guard={status === "signedIn" && !inOnboarding}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(modals)" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }} />
+        </Stack.Protected>
+        {/* Reachable while signed out (welcome + sign-up) and while an account is still incomplete. */}
+        <Stack.Protected guard={status === "signedOut" || inOnboarding}>
+          <Stack.Screen name="(onboarding)" />
         </Stack.Protected>
         <Stack.Protected guard={status === "signedOut"}>
           <Stack.Screen name="(auth)" />

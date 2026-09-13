@@ -104,14 +104,34 @@ describe("admin users", () => {
   it("falls back to the most recent goal when none is active", async () => {
     const { headers } = await asAdmin(t);
     const u = await createUser({ username: "eskihedef" });
-    await Goal.create({ userId: u._id, status: "abandoned", targetBodyFatPct: 20, profile: "optimal", start: {}, plan: {} });
+    const old = await Goal.create({ userId: u._id, status: "abandoned", targetBodyFatPct: 20, profile: "optimal", start: {}, plan: {} });
     const latest = await Goal.create({ userId: u._id, status: "completed", targetBodyFatPct: 15, profile: "optimal", start: {}, plan: {} });
-    await Goal.updateOne({ _id: latest._id }, { $set: { createdAt: new Date("2027-01-01T00:00:00Z") } });
+    // Mongoose treats `createdAt` as immutable and silently drops it from an update, so backdating
+    // has to go through the raw driver — otherwise this test proves nothing.
+    await Goal.collection.updateOne({ _id: old._id }, { $set: { createdAt: new Date("2020-01-01T00:00:00Z") } });
 
     const list = await t.app.inject({ method: "GET", url: `${API}/admin/users?q=eskihedef`, headers });
     expect(list.json().users[0].goalStatus).toBe("completed");
     const overview = await t.app.inject({ method: "GET", url: `${API}/admin/users/${u._id}/overview`, headers });
     expect(overview.json().goal.id).toBe(String(latest._id));
+  });
+
+  it("picks the same goal every time when two were created in the same millisecond", async () => {
+    const { headers } = await asAdmin(t);
+    const u = await createUser({ username: "beraberlik" });
+    const first = await Goal.create({ userId: u._id, status: "abandoned", targetBodyFatPct: 20, profile: "optimal", start: {}, plan: {} });
+    const second = await Goal.create({ userId: u._id, status: "completed", targetBodyFatPct: 15, profile: "optimal", start: {}, plan: {} });
+    const sameInstant = new Date("2026-05-05T10:00:00Z");
+    await Goal.collection.updateMany({ userId: u._id }, { $set: { createdAt: sameInstant } });
+
+    // Sorting on `createdAt` alone leaves this a coin flip; the newer _id has to break the tie.
+    for (let i = 0; i < 3; i++) {
+      const overview = await t.app.inject({ method: "GET", url: `${API}/admin/users/${u._id}/overview`, headers });
+      expect(overview.json().goal.id).toBe(String(second._id));
+      expect(overview.json().goal.id).not.toBe(String(first._id));
+    }
+    const list = await t.app.inject({ method: "GET", url: `${API}/admin/users?q=beraberlik`, headers });
+    expect(list.json().users[0].goalStatus).toBe("completed");
   });
 
   it("creates a user that can log in, and rejects a duplicate username with CONFLICT", async () => {

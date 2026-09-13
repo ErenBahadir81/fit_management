@@ -11,5 +11,8 @@ export * from "./program";
 export * from "./cardio";
 export * from "./stats";
 
+/* C1 (set weight) — load actually moved, Σ reps × weightKg. */
+export * from "./tonnage";
+
 /* B1 (platform/admin program templates) — planned volume per cycle. */
 export * from "./templateVolume";

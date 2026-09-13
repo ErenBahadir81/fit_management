@@ -8,19 +8,24 @@ import {
   DEFAULT_GOAL_SETTINGS,
   DEFAULT_MASCOT_MESSAGES,
   ageFromBirthDate,
+  autoDietTarget,
+  bmrFor,
   bodyComposition,
   buildWeeklyReport,
   computeGoalPlan,
   computeGoalProgress,
   ewmaTrend,
   latestTrendWeight,
+  pickRoadmapWeek,
   recalibrateTdee,
   round,
   shiftKey,
   summarizeWeeklyReport,
+  tdeeFor,
   type BodyEntryDTO,
   type BodyPoint,
   type DayIntake,
+  type EnergyDTO,
   type GoalDTO,
   type GoalPlan,
   type GoalProfile,
@@ -217,4 +222,48 @@ export function reportFor(input: ReportInput): WeeklyReportDTO {
 
 export function summaryFor(report: WeeklyReportDTO): WeeklyReportSummary {
   return summarizeWeeklyReport(report);
+}
+
+/**
+ * C3 — `GET /me/energy`, mirroring the API exactly: expenditure from the goal engine's own
+ * `bmrFor` / `tdeeFor`, the daily target from `autoDietTarget`. With no measurement there is no
+ * lean mass, so there is no honest maintenance figure and therefore no deficit to claim.
+ */
+export function energyFor(today: string, user: UserDTO, entry: BodyEntryDTO | null, goal: GoalDTO | null): EnergyDTO {
+  const activityLevel = user.activityLevel ?? "moderate";
+  const activityMultiplier = SETTINGS.activityMultipliers[activityLevel] ?? 1.55;
+  const leanMassKg = entry ? round(entry.leanMassKg, 2) : null;
+
+  const week = goal?.status === "active" ? pickRoadmapWeek(goal.plan.roadmap ?? [], today) : null;
+  const macros = week?.macros ?? (goal?.status === "active" ? goal.plan.macros : null);
+  const target = autoDietTarget({
+    goalMacros: macros ?? null,
+    maintenance: leanMassKg ? { leanMassKg, activityMultiplier } : null,
+  });
+
+  const bmr =
+    entry && leanMassKg
+      ? bmrFor({
+          sex: entry.gender ?? user.gender,
+          weightKg: entry.weightKg,
+          heightCm: entry.heightCm || user.heightCm || 175,
+          leanMassKg,
+          age: ageOf(user, today),
+          settings: SETTINGS,
+        }).bmr
+      : 0;
+  const tdee = bmr > 0 ? tdeeFor(bmr, activityLevel, SETTINGS) : 0;
+  const maintenanceCalories = tdee > 0 ? round(tdee) : target.calories;
+
+  return {
+    bmr: round(bmr),
+    tdee: round(tdee),
+    maintenanceCalories,
+    targetCalories: target.calories,
+    dailyDeficit: round(maintenanceCalories - target.calories),
+    derivedFrom: target.derivedFrom ?? "default",
+    activityLevel,
+    activityMultiplier,
+    leanMassKg,
+  };
 }

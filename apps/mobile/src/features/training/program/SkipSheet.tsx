@@ -32,7 +32,7 @@ export function SkipSheet({ sheetRef, dayTitle, busy, onConfirm, onCancel }: Ski
         </View>
         <SheetActions>
           <Button label="Vazgeç" variant="ghost" onPress={onCancel} style={styles.grow} testID="skip-cancel" />
-          <Button label="Atla" variant="secondary" icon="play-skip-forward" loading={busy} onPress={() => onConfirm(reason ?? undefined)} style={styles.grow} testID="skip-confirm" />
+          <Button label="Atla" variant="secondary" icon="skip" loading={busy} onPress={() => onConfirm(reason ?? undefined)} style={styles.grow} testID="skip-confirm" />
         </SheetActions>
       </View>
     </Sheet>

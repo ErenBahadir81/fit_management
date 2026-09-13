@@ -5,9 +5,15 @@
  * so a screen can render completely blank while 331 jest tests stay green. Anything that must be
  * true in a real browser belongs here.
  */
-import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
+import { createRequire } from "node:module";
 
-export const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+// Resolve Playwright from wherever it actually lives (repo, global, or the npx cache) instead of a
+// hardcoded path — this suite has to run on the Linux CI box and on a developer's Mac.
+const require = createRequire(import.meta.url);
+const { chromium } = require("playwright");
+
+/** Only pinned when the environment says so; otherwise Playwright picks its own browser. */
+export const CHROME = process.env.CHROME_PATH ?? null;
 export const MOBILE_URL = process.env.MOBILE_URL ?? "http://127.0.0.1:8082";
 export const ADMIN_URL = process.env.ADMIN_URL ?? "http://127.0.0.1:3000";
 export const API_URL = process.env.API_URL ?? "http://127.0.0.1:4000";
@@ -36,7 +42,7 @@ export function createRecorder() {
 
 /** Launches a browser and wires console/page/network failures into the recorder. */
 export async function open({ rec, viewport = { width: 420, height: 900 }, context = {} }) {
-  const browser = await chromium.launch({ executablePath: CHROME });
+  const browser = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
   const ctx = await browser.newContext({ viewport, ...context });
   const page = await ctx.newPage();
   const state = { where: "boot" };

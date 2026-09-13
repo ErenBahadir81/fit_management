@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import type { Mood } from "@fitfloow/core";
+import { MOOD_LABEL_TR, type Mood } from "@fitfloow/core";
 import { cx } from "@/lib/cx";
 
 /**
@@ -163,14 +163,8 @@ function Brows({ mood }: { mood: Mood }) {
   );
 }
 
-export const MOOD_TR: Record<Mood, string> = {
-  happy: "Mutlu",
-  cheer: "Coşkulu",
-  think: "Düşünceli",
-  sleepy: "Uykulu",
-  flex: "Kaslı",
-  worried: "Endişeli",
-};
+/** Turkish mood names. Sourced from core so a new mood can never leave this table incomplete. */
+export const MOOD_TR: Record<Mood, string> = { ...MOOD_LABEL_TR };
 
 /** Floo with a speech bubble — used on the dashboard and the mascot preview. */
 export function FlooBubble({ mood = "happy", text, size = 56 }: { mood?: Mood; text: string; size?: number }) {

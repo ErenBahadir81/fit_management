@@ -11,6 +11,7 @@ import type {
   CreateMealEntryInput,
   DashboardDTO,
   DietTargetDTO,
+  EnergyDTO,
   ExerciseDTO,
   ExerciseInput,
   FoodDTO,
@@ -21,6 +22,7 @@ import type {
   GoalPreview,
   GoalView,
   HomeDTO,
+  LastPerformance,
   LoginResponse,
   MascotMessage,
   MascotTemplateDTO,
@@ -28,6 +30,8 @@ import type {
   MealEntryDTO,
   MuscleDTO,
   NutritionDayView,
+  OnboardingInput,
+  OnboardingResponse,
   ProgramDTO,
   ProgramInput,
   ProgramTemplateDTO,
@@ -35,6 +39,7 @@ import type {
   ProgramView,
   Recalibration,
   RecoveryView,
+  RegisterInput,
   ScanResultDTO,
   SettingsDTO,
   SystemHealth,
@@ -80,6 +85,13 @@ export function createApiClient(options: ApiClientOptions) {
         if (!cookie && tokens) await tokens.setTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
         return res;
       },
+      /** C3 — sign-up. Same response as login, so it signs the new account straight in. */
+      async register(input: RegisterInput): Promise<LoginResponse> {
+        const cookie = options.authMode === "cookie";
+        const res = await r<LoginResponse>(`/auth/register${cookie ? "?cookie=1" : ""}`, { body: input, auth: false });
+        if (!cookie && tokens) await tokens.setTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
+        return res;
+      },
       async refresh(refreshToken?: string): Promise<AuthTokens> {
         const rt = refreshToken ?? (await tokens?.getRefreshToken()) ?? undefined;
         const res = await r<AuthTokens>("/auth/refresh", { body: rt ? { refreshToken: rt } : {}, auth: false });
@@ -101,6 +113,13 @@ export function createApiClient(options: ApiClientOptions) {
       update: (input: UpdateMeInput) => r<{ user: UserDTO }>("/me", { method: "PATCH", body: input }),
       changePassword: (currentPassword: string, newPassword: string) =>
         r<void>("/me/password", { method: "PATCH", body: { currentPassword, newPassword } }),
+      /** C3 — what the body burns vs. what the plan asks for ("yaklaşık kalori ihtiyacın"). */
+      energy: () => r<EnergyDTO>("/me/energy"),
+    },
+
+    onboarding: {
+      /** C3 — the one-time questionnaire. Safe to call twice. */
+      complete: (input: OnboardingInput) => r<OnboardingResponse>("/onboarding", { body: input }),
     },
 
     catalog: {
@@ -124,6 +143,8 @@ export function createApiClient(options: ApiClientOptions) {
       deleteWorkout: (id: string) => r<void>(`/workouts/${id}`, { method: "DELETE" }),
       recovery: () => r<RecoveryView>("/recovery"),
       stats: (weeks = 8) => r<TrainingStats>("/training/stats", { query: { weeks } }),
+      /** "Last time you did this" — `{ dateKey: null, sets: [] }` when never logged, never a 404. */
+      lastPerformance: (name: string) => r<LastPerformance>(`/training/exercises/${encodeURIComponent(name)}/last`),
     },
 
     body: {

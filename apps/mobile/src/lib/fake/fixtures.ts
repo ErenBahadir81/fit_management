@@ -6,6 +6,9 @@ import {
   bodyComposition,
   bodyFatCategory,
   ewma,
+  goalMilestones,
+  goalSummaryTr,
+  logTonnageKg,
   navyBodyFat,
   round,
   shiftKey,
@@ -68,7 +71,9 @@ export function makeUser(): UserDTO {
     id: "u_eren",
     username: "eren",
     displayName: "Eren",
+    email: "eren@fitfloow.app",
     role: "user",
+    onboardingCompleted: true,
     gender: "male",
     heightCm: 180,
     birthDate: "1996-04-12",
@@ -134,6 +139,28 @@ export function makeProgram(today: string): ProgramDTO {
   };
 }
 
+/**
+ * Working load per exercise (C1). `null` is bodyweight or mobility work — the demo has to show
+ * both, because "no load" is a real answer and must never render as 0 kg.
+ */
+const WORKING_KG: Record<string, number | null> = {
+  "Bench Press": 72.5,
+  "Barbell Row": 65,
+  "Overhead Press": 42.5,
+  Squat: 100,
+  "Romanian Deadlift": 85,
+  "Pull-up": null,
+  "Dumbbell Curl": 14,
+  Plank: null,
+};
+
+/** Load for `name` in `weekNumber` — a slow, believable progression of 1.25 kg per week. */
+function workingKg(name: string, weekNumber: number): number | null {
+  const base = WORKING_KG[name];
+  if (base == null) return null;
+  return round(Math.max(base * 0.7, base - 1.25 * (6 - weekNumber)), 1);
+}
+
 export function makeLog(day: DayDTO, dateKey: string, weekNumber: number, isOffDay = false): WorkoutLogDTO {
   const r = rng(dateKey.length + weekNumber);
   return {
@@ -156,7 +183,11 @@ export function makeLog(day: DayDTO, dateKey: string, weekNumber: number, isOffD
           source: "planned" as const,
           skipped: false,
           metric: e.metric,
-          sets: Array.from({ length: e.targetSets }, () => ({ reps: e.targetReps - Math.floor(r() * 2), rir: e.targetRIR })),
+          sets: Array.from({ length: e.targetSets }, () => ({
+            reps: e.targetReps - Math.floor(r() * 2),
+            rir: e.targetRIR,
+            weightKg: workingKg(e.name, weekNumber),
+          })),
         })),
     run: day.run && !isOffDay ? { segments: [{ km: day.run.targetKm, min: day.run.targetMin + 2 }], totalKm: day.run.targetKm, totalMin: day.run.targetMin + 2, targetKm: day.run.targetKm, targetMin: day.run.targetMin } : null,
     swim: null,
@@ -267,7 +298,14 @@ export function makeTrainingStats(today: string, logs: WorkoutLogDTO[], measurem
     const ls = logs.filter((l) => keys.includes(l.dateKey) && !l.isOffDay);
     const volumeByMuscle: Record<string, number> = {};
     for (const v of weeklyVolume(logs, weekKey)) volumeByMuscle[v.key] = v.done;
-    out.push({ weekKey, sessions: ls.length, sets: ls.reduce((a, l) => a + l.strength.reduce((b, s) => b + s.sets.length, 0), 0), cardioKm: round(ls.reduce((a, l) => a + (l.run?.totalKm ?? 0), 0), 1), volumeByMuscle });
+    out.push({
+      weekKey,
+      sessions: ls.length,
+      sets: ls.reduce((a, l) => a + l.strength.reduce((b, s) => b + s.sets.length, 0), 0),
+      cardioKm: round(ls.reduce((a, l) => a + (l.run?.totalKm ?? 0), 0), 1),
+      tonnageKg: round(ls.reduce((a, l) => a + logTonnageKg(l), 0), 1),
+      volumeByMuscle,
+    });
   }
   return { weeks: out, streakDays: 3, totalSessions: logs.filter((l) => !l.isOffDay).length };
 }
@@ -403,7 +441,7 @@ export function makePlan(start: BodyEntryDTO, targetBf: number, profile: GoalDTO
     });
     w = end;
   }
-  return {
+  const plan: Omit<GoalPlan, "milestones" | "summaryTr"> = {
     fatToLoseKg: fatToLose,
     totalLossKg: totalLoss,
     targetWeightKg: targetWeight,
@@ -427,6 +465,8 @@ export function makePlan(start: BodyEntryDTO, targetBf: number, profile: GoalDTO
     roadmap,
     warnings: weeks > 40 ? ["LONG_HORIZON"] : [],
   };
+  // C4 — built by the same core helpers the API uses, so the demo says the same sentence.
+  return { ...plan, milestones: goalMilestones(roadmap, totalLoss), summaryTr: goalSummaryTr(plan) };
 }
 
 export function makeGoal(today: string, entries: BodyEntryDTO[]): GoalDTO {

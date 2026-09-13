@@ -4,18 +4,19 @@ import type { DayDTO } from "@fitfloow/core";
 import { fmtNumber } from "../../../lib/format";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
-import { Icon, type IconName } from "../../../ui/Icon";
+import { Icon } from "../../../ui/Icon";
+import type { AppIcon } from "../../../ui/icons";
 import { Pressable } from "../../../ui/Pressable";
 import { Sheet, type SheetRef } from "../../../ui/Sheet";
 import { Text } from "../../../ui/Text";
 import { dayCounts } from "../lib/present";
 
-const KIND_ICON: Record<DayDTO["kind"], IconName> = {
-  strength: "barbell-outline",
-  run: "walk-outline",
-  swim: "water-outline",
-  stretch: "body-outline",
-  rest: "bed-outline",
+const KIND_ICON: Record<DayDTO["kind"], AppIcon> = {
+  strength: "strength",
+  run: "run",
+  swim: "swim",
+  stretch: "stretch",
+  rest: "rest",
 };
 
 export interface JumpSheetProps {
@@ -50,7 +51,7 @@ export function JumpSheet({ sheetRef, days, currentIndex, onSelect }: JumpSheetP
                 style={[styles.row, { backgroundColor: current ? colors.primarySoft : colors.surfaceMuted }]}
               >
                 <View style={[styles.icon, { backgroundColor: colors.surface }]}>
-                  <Icon name={KIND_ICON[day.kind]} size={18} color={current ? "primary" : "inkMuted"} />
+                  <Icon icon={KIND_ICON[day.kind]} size={18} color={current ? "primary" : "inkMuted"} />
                 </View>
                 <View style={styles.texts}>
                   <Text variant="bodyStrong" numberOfLines={1}>
@@ -60,7 +61,7 @@ export function JumpSheet({ sheetRef, days, currentIndex, onSelect }: JumpSheetP
                     {meta}
                   </Text>
                 </View>
-                {current ? <Icon name="ellipse" size={10} color="primary" /> : <Icon name="chevron-forward" size={18} color="inkSubtle" />}
+                {current ? <Icon name="ellipse" size={10} color="primary" /> : <Icon icon="forward" size={18} color="inkSubtle" />}
               </Pressable>
             );
           })}

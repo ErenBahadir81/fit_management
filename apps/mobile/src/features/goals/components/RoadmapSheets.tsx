@@ -78,9 +78,9 @@ export const RoadmapMenuSheet = forwardRef<SheetRef, RoadmapMenuSheetProps>(func
   const [confirm, setConfirm] = useState(false);
   return (
     <Sheet ref={ref} title="Hedef" onDismiss={() => setConfirm(false)}>
-      <ListRow label="Hedefi düzenle" hint="Yağ oranı veya tempo değiştir; başlangıç korunur" icon="create-outline" onPress={onEdit} testID="menu-edit" />
-      <ListRow label="Tamamlandı olarak işaretle" hint="Hedefe ulaştıysan planı kapat" icon="trophy-outline" onPress={onComplete} testID="menu-complete" />
-      <ListRow label="Hedefi bırak" hint="Plan silinmez, geçmişte kalır" icon="close-circle-outline" destructive chevron={false} onPress={() => setConfirm(true)} testID="menu-abandon" />
+      <ListRow label="Hedefi düzenle" hint="Yağ oranı veya tempo değiştir; başlangıç korunur" icon="edit" onPress={onEdit} testID="menu-edit" />
+      <ListRow label="Tamamlandı olarak işaretle" hint="Hedefe ulaştıysan planı kapat" icon="award" onPress={onComplete} testID="menu-complete" />
+      <ListRow label="Hedefi bırak" hint="Plan silinmez, geçmişte kalır" icon="close" destructive chevron={false} onPress={() => setConfirm(true)} testID="menu-abandon" />
       {confirm ? (
         <SheetActions>
           <Button label="Vazgeç" variant="ghost" onPress={() => setConfirm(false)} style={styles.flex} />

@@ -1,14 +1,14 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import type { MuscleDTO, WorkoutLogDTO } from "@fitfloow/core";
-import { fmtDate, fmtDuration, fmtNumber } from "../../../lib/format";
+import { fmtDate, fmtDuration, fmtInt, fmtNumber } from "../../../lib/format";
 import { spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { Chip } from "../../../ui/Chip";
 import { Divider } from "../../../ui/Divider";
 import { Sheet, type SheetRef } from "../../../ui/Sheet";
 import { Text } from "../../../ui/Text";
-import { logSummary } from "../lib/present";
+import { logSummary, type LoggedSet } from "../lib/present";
 
 export interface LogDetailSheetProps {
   sheetRef: React.RefObject<SheetRef | null>;
@@ -33,11 +33,12 @@ export function LogDetailSheet({ sheetRef, log, muscles, onDelete }: LogDetailSh
             </Text>
 
             <View style={styles.chips}>
-              {s.sets > 0 ? <Chip label={`${s.sets} set`} size="sm" icon="layers-outline" /> : null}
+              {s.tonnageKg > 0 ? <Chip label={`${fmtInt(s.tonnageKg)} kg`} size="sm" icon="strength" tone="primary" /> : null}
+              {s.sets > 0 ? <Chip label={`${s.sets} set`} size="sm" icon="sets" /> : null}
               {s.reps > 0 ? <Chip label={`${fmtNumber(s.reps, 0)} tekrar`} size="sm" /> : null}
-              {s.km > 0 ? <Chip label={`${fmtNumber(s.km, 1)} km`} size="sm" icon="navigate-outline" /> : null}
-              {s.pace !== null ? <Chip label={`${fmtNumber(s.pace, 2)} dk/km`} size="sm" icon="speedometer-outline" /> : null}
-              {log.durationMin ? <Chip label={fmtDuration(log.durationMin)} size="sm" icon="time-outline" /> : null}
+              {s.km > 0 ? <Chip label={`${fmtNumber(s.km, 1)} km`} size="sm" icon="distance" /> : null}
+              {s.pace !== null ? <Chip label={`${fmtNumber(s.pace, 2)} dk/km`} size="sm" icon="pace" /> : null}
+              {log.durationMin ? <Chip label={fmtDuration(log.durationMin)} size="sm" icon="duration" /> : null}
               {log.rpe ? <Chip label={`RPE ${log.rpe}`} size="sm" tone="primary" /> : null}
             </View>
 
@@ -68,7 +69,7 @@ export function LogDetailSheet({ sheetRef, log, muscles, onDelete }: LogDetailSh
                     </View>
                     {e.sets.length > 0 ? (
                       <Text variant="caption" color="inkMuted" tabular>
-                        {e.sets.map((set) => `${set.reps}${e.metric === "time" ? " sn" : ""}${set.rir !== null ? ` (RIR ${set.rir})` : ""}`).join(" · ")}
+                        {(e.sets as readonly LoggedSet[]).map((set) => setText(set, e.metric === "time")).join(" · ")}
                       </Text>
                     ) : null}
                   </View>
@@ -93,12 +94,18 @@ export function LogDetailSheet({ sheetRef, log, muscles, onDelete }: LogDetailSh
             ) : null}
 
             <Divider />
-            <Button label="Kaydı sil" variant="danger" icon="trash-outline" onPress={() => onDelete(log)} testID="log-delete" />
+            <Button label="Kaydı sil" variant="danger" icon="delete" onPress={() => onDelete(log)} testID="log-delete" />
           </>
         ) : null}
       </View>
     </Sheet>
   );
+}
+
+/** "60 kg × 8 (RIR 2)" — or just the reps for the bodyweight and pre-2.1 sets. */
+function setText(set: LoggedSet, isTime: boolean): string {
+  const work = typeof set.weightKg === "number" ? `${fmtNumber(set.weightKg, set.weightKg % 1 === 0 ? 0 : 1)} kg × ${set.reps}` : `${set.reps}${isTime ? " sn" : ""}`;
+  return set.rir !== null ? `${work} (RIR ${set.rir})` : work;
 }
 
 const styles = StyleSheet.create({

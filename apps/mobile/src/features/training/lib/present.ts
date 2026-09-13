@@ -19,7 +19,7 @@ import {
   type Weekday,
   type WorkoutLogDTO,
 } from "@fitfloow/core";
-import { fmtDate } from "../../../lib/format";
+import { fmtDate, fmtInt, fmtNumber } from "../../../lib/format";
 import type { Tone } from "../../../theme/tokens";
 
 /* ------------------------------- week strip ------------------------------- */
@@ -156,6 +156,8 @@ export function groupLogsByWeek(logs: readonly WorkoutLogDTO[], measurementDay: 
 export interface LogSummary {
   sets: number;
   reps: number;
+  /** Σ reps × kg. `0` for bodyweight days and for logs written before loads existed (C1). */
+  tonnageKg: number;
   muscles: { key: string; sets: number }[];
   duration: number | null;
   km: number;
@@ -164,15 +166,29 @@ export interface LogSummary {
   isOffDay: boolean;
 }
 
+/**
+ * One logged set as it comes back from the API. `weightKg` is optional here on purpose: pre-2.1
+ * logs simply do not carry it, and a missing load is bodyweight/unknown, never zero kilos (C1).
+ */
+export interface LoggedSet {
+  reps: number;
+  rir: number | null;
+  weightKg?: number | null;
+}
+
 /** Everything a history row / detail sheet shows about one log. */
 export function logSummary(log: WorkoutLogDTO): LogSummary {
   const muscles = new Map<string, number>();
   let sets = 0;
   let reps = 0;
+  let tonnageKg = 0;
   for (const e of log.strength ?? []) {
     if (e.skipped) continue;
     sets += e.sets.length;
-    for (const s of e.sets) reps += s.reps;
+    for (const s of e.sets as readonly LoggedSet[]) {
+      reps += s.reps;
+      if (typeof s.weightKg === "number") tonnageKg += s.reps * s.weightKg;
+    }
     for (const m of e.muscles) muscles.set(m.key, round((muscles.get(m.key) ?? 0) + e.sets.length * m.load, 1));
   }
   const km = round((log.run?.totalKm ?? 0) + (log.swim?.totalKm ?? 0), 2);
@@ -180,6 +196,7 @@ export function logSummary(log: WorkoutLogDTO): LogSummary {
   return {
     sets,
     reps,
+    tonnageKg: round(tonnageKg, 1),
     muscles: [...muscles.entries()].map(([key, s]) => ({ key, sets: s })).sort((a, b) => b.sets - a.sets),
     duration: log.durationMin,
     km,
@@ -187,6 +204,72 @@ export function logSummary(log: WorkoutLogDTO): LogSummary {
     pace: km > 0 && min > 0 ? round(min / km, 2) : null,
     isOffDay: log.isOffDay,
   };
+}
+
+/* ---------------------- "how did that go vs last time" --------------------- */
+
+/** The newest earlier session of the same cycle day. Off-days never count as a comparison. */
+export function findLastSameDay(logs: readonly WorkoutLogDTO[], dayOrder: number, exceptDateKey: string): WorkoutLogDTO | null {
+  return (
+    [...(logs ?? [])]
+      .filter((l) => !l.isOffDay && l.dayOrder === dayOrder && l.dateKey < exceptDateKey)
+      .sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1))[0] ?? null
+  );
+}
+
+export interface SessionCompare {
+  /** The session compared against, or `null` the first time this cycle day is logged. */
+  previousDateKey: string | null;
+  previousTonnageKg: number;
+  previousSets: number;
+  deltaKg: number;
+  deltaSets: number;
+  /** One plain sentence. Never a verdict — it reports, it does not grade. */
+  summaryTr: string;
+}
+
+/** Today's session against the last time this cycle day came round. */
+export function compareToLast(current: { tonnageKg: number; sets: number }, previous: WorkoutLogDTO | null): SessionCompare {
+  if (!previous) {
+    return { previousDateKey: null, previousTonnageKg: 0, previousSets: 0, deltaKg: 0, deltaSets: 0, summaryTr: "Bu günün ilk kaydı — bundan sonrası buna göre ölçülecek." };
+  }
+  const before = logSummary(previous);
+  const deltaKg = round(current.tonnageKg - before.tonnageKg, 1);
+  const deltaSets = current.sets - before.sets;
+  const lifted = current.tonnageKg > 0 || before.tonnageKg > 0;
+
+  let summaryTr: string;
+  if (lifted && Math.abs(deltaKg) >= 0.5) {
+    summaryTr = deltaKg > 0 ? `Geçen seferden ${fmtInt(deltaKg)} kg fazla kaldırdın.` : `Geçen seferin ${fmtInt(-deltaKg)} kg altında kaldın.`;
+  } else if (lifted) {
+    summaryTr = `Geçen seferle aynı hacim: ${fmtInt(current.tonnageKg)} kg.`;
+  } else if (deltaSets === 0) {
+    summaryTr = `Geçen seferle aynı: ${current.sets} set.`;
+  } else {
+    summaryTr = deltaSets > 0 ? `Geçen seferden ${deltaSets} set fazla.` : `Geçen seferden ${-deltaSets} set az.`;
+  }
+
+  return { previousDateKey: previous.dateKey, previousTonnageKg: before.tonnageKg, previousSets: before.sets, deltaKg, deltaSets, summaryTr };
+}
+
+/** What the API's `training.lastPerformance(name)` hands back (C1). */
+export interface LastPerformance {
+  dateKey: string | null;
+  sets: readonly LoggedSet[];
+}
+
+/**
+ * "60 kg × 8, 8, 6" — the one line above the active set that says what to beat.
+ * Falls back to per-set loads when they varied, and to bare reps for bodyweight work.
+ */
+export function lastPerformanceLabel(perf: LastPerformance | null | undefined): string | null {
+  const sets = perf?.sets ?? [];
+  if (sets.length === 0) return null;
+  const loads = sets.map((s) => (typeof s.weightKg === "number" ? s.weightKg : null));
+  if (loads.every((w) => w === null)) return `${sets.map((s) => fmtNumber(s.reps, 0)).join(", ")} tekrar`;
+  const first = loads[0];
+  if (first !== null && loads.every((w) => w === first)) return `${fmtNumber(first, first % 1 === 0 ? 0 : 1)} kg × ${sets.map((s) => fmtNumber(s.reps, 0)).join(", ")}`;
+  return `${sets.map((s, i) => `${loads[i] === null ? "—" : fmtNumber(loads[i], loads[i]! % 1 === 0 ? 0 : 1)}×${fmtNumber(s.reps, 0)}`).join(", ")} kg`;
 }
 
 /* ------------------------------- program day ------------------------------ */

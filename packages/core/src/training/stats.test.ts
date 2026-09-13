@@ -84,6 +84,17 @@ describe("buildTrainingStats", () => {
     expect(stats.totalSessions).toBe(1);
   });
 
+  it("reports weekly tonnage, treating pre-2.1 sets as no load rather than 0 kg lifted", () => {
+    const loaded = { name: "squat", muscles: [{ key: "quads", load: 1 }], sets: [{ reps: 5, rir: 2, weightKg: 100 }, { reps: 5, rir: 1, weightKg: 100 }] };
+    const stats = buildTrainingStats({
+      ...base,
+      measurementDay: 0,
+      logs: [log(TODAY, [loaded]), log("2026-09-09", [ex("chest", 4)])],
+    });
+    expect(stats.weeks[2].tonnageKg).toBe(1000);
+    expect(stats.weeks[1].tonnageKg).toBe(0);
+  });
+
   it("ignores logs older than the requested window", () => {
     const stats = buildTrainingStats({ ...base, weeks: 1, measurementDay: 0, logs: [log("2026-08-20", [ex("chest", 5)])] });
     expect(stats.weeks).toHaveLength(1);

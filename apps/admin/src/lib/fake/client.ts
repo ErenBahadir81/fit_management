@@ -82,6 +82,8 @@ const toUser = (u: AdminUserDTO): UserDTO => ({
   id: u.id,
   username: u.username,
   displayName: u.displayName,
+  email: u.email ?? null,
+  onboardingCompleted: u.onboardingCompleted ?? true,
   role: u.role,
   gender: u.gender,
   heightCm: u.heightCm,
@@ -211,13 +213,18 @@ function workoutsFor(state: FakeState, user: AdminUserDTO): WorkoutLogDTO[] {
         source: "planned" as const,
         skipped: false,
         metric: e.metric,
-        sets: Array.from({ length: e.targetSets }, () => ({ reps: e.targetReps, rir: e.targetRIR })),
+        // Bodyweight and timed movements carry no load — the same shape a real log has.
+        sets: Array.from({ length: e.targetSets }, () => ({
+          reps: e.targetReps,
+          rir: e.targetRIR,
+          weightKg: e.metric === "reps" ? 40 + (e.targetReps % 4) * 5 : null,
+        })),
       })),
       run: day.run ? { segments: [{ km: day.run.targetKm, min: day.run.targetMin }], totalKm: day.run.targetKm, totalMin: day.run.targetMin, targetKm: day.run.targetKm, targetMin: day.run.targetMin } : null,
       swim: day.swim ? { segments: [{ km: day.swim.targetKm, min: day.swim.targetMin }], totalKm: day.swim.targetKm, totalMin: day.swim.targetMin, targetKm: day.swim.targetKm, targetMin: day.swim.targetMin } : null,
       durationMin: 52 + i * 3,
       notes: i === 0 ? "Bench'te üst set zorladı, RIR 1." : null,
-      rpe: 7 + (i % 2),
+      rpe: (7 + (i % 2)) as number | null,
     };
   });
 }
@@ -503,6 +510,8 @@ export function createFakeApiClient(options: FakeOptions = {}): ApiClient {
           id: nextId("usr"),
           username: input.username,
           displayName: input.displayName,
+          email: null,
+          onboardingCompleted: false,
           role: input.role ?? "user",
           gender: input.gender ?? "male",
           heightCm: input.heightCm ?? null,

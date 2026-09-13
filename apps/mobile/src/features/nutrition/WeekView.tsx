@@ -41,8 +41,8 @@ export function WeekView({ week }: { week: WeekNutrition }) {
       </Entry>
       <Entry index={1}>
         <View style={styles.tiles}>
-          <StatTile testID="week-avg" label="Ortalama" value={fmtInt(week.avg.kcal)} hint="kcal / gün" icon="flame-outline" style={styles.grow} />
-          <StatTile testID="week-logged" label="Kayıtlı gün" value={`${fmtInt(week.daysLogged)}/7`} hint="bu hafta" icon="calendar-outline" style={styles.grow} />
+          <StatTile testID="week-avg" label="Ortalama" value={fmtInt(week.avg.kcal)} hint="kcal / gün" icon="calories" style={styles.grow} />
+          <StatTile testID="week-logged" label="Kayıtlı gün" value={`${fmtInt(week.daysLogged)}/7`} hint="bu hafta" icon="calendar" style={styles.grow} />
         </View>
       </Entry>
       <Entry index={2}>

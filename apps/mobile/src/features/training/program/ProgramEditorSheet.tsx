@@ -114,7 +114,7 @@ export function ProgramEditorSheet({ sheetRef, program, onClose }: ProgramEditor
       </BottomSheetScrollView>
       <View style={styles.footer}>
         <Button label="Vazgeç" variant="ghost" onPress={close} style={styles.grow} testID="editor-cancel" />
-        <Button label="Kaydet" variant="primary" icon="checkmark" loading={save.isPending} disabled={!dirty} onPress={commit} style={styles.grow} testID="editor-save" />
+        <Button label="Kaydet" variant="primary" icon="check" loading={save.isPending} disabled={!dirty} onPress={commit} style={styles.grow} testID="editor-save" />
       </View>
     </Sheet>
   );
@@ -226,7 +226,7 @@ function DayRow({
       >
         <GestureDetector gesture={pan}>
           <Animated.View style={styles.handle} testID={`editor-handle-${index}`} accessibilityLabel="Sıralama tutamacı">
-            <Icon name="reorder-three-outline" size={22} color="inkSubtle" />
+            <Icon icon="reorder" size={22} color="inkSubtle" />
           </Animated.View>
         </GestureDetector>
         <View style={styles.texts}>
@@ -237,7 +237,7 @@ function DayRow({
             {day.kind === "rest" ? "Dinlenme" : counts.km > 0 ? `${fmtNumber(counts.km, 1)} km` : `${counts.exercises} hareket · ${counts.sets} set`}
           </Text>
         </View>
-        <Icon name="chevron-forward" size={18} color="inkSubtle" />
+        <Icon icon="forward" size={18} color="inkSubtle" />
       </Pressable>
     </Animated.View>
   );
@@ -251,7 +251,7 @@ function DayEditor({ day, onChange, onAdd, onBack }: { day: DayDTO | undefined; 
 
   return (
     <View style={styles.list} testID="editor-day">
-      <Chip label="Günler" icon="chevron-back" onPress={onBack} testID="editor-back" />
+      <Chip label="Günler" icon="back" onPress={onBack} testID="editor-back" />
       <TextField label="Gün adı" value={day.title} onChangeText={(title) => onChange({ ...day, title })} testID="editor-title" />
       <TextField label="Odak" value={day.focus} onChangeText={(focus) => onChange({ ...day, focus })} placeholder="Göğüs · Sırt" testID="editor-focus" />
       <View style={styles.chips}>
@@ -286,7 +286,7 @@ function DayEditor({ day, onChange, onAdd, onBack }: { day: DayDTO | undefined; 
               minTarget={false}
               style={styles.remove}
             >
-              <Icon name="close" size={18} color="danger" />
+              <Icon icon="close" size={18} color="danger" />
             </Pressable>
           </View>
           <View style={styles.stepperRow}>
@@ -344,7 +344,7 @@ function ExercisePicker({ onPick, onBack }: { onPick: (exercise: ExerciseDTO) =>
 
   return (
     <View style={styles.list} testID="editor-picker">
-      <Chip label="Geri" icon="chevron-back" onPress={onBack} testID="picker-back" />
+      <Chip label="Geri" icon="back" onPress={onBack} testID="picker-back" />
       <TextField label="Hareket ara" value={q} onChangeText={setQ} icon="search" autoCorrect={false} testID="picker-search" />
       {results.length === 0 && !catalog.isPending ? (
         <Text variant="body" color="inkMuted">
@@ -369,7 +369,7 @@ function ExercisePicker({ onPick, onBack }: { onPick: (exercise: ExerciseDTO) =>
               {exercise.metric === "time" ? " sn" : ""}
             </Text>
           </View>
-          <Icon name="add-circle-outline" size={20} color="primary" />
+          <Icon icon="add" size={20} color="primary" />
         </Pressable>
       ))}
     </View>

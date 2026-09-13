@@ -40,7 +40,7 @@ export function CalorieHero({ day, onPressTarget }: { day: NutritionDayView; onP
             <Text variant="label" color="inkMuted">
               {target.mode === "auto" ? "Günlük hedef" : "Hedefin"}
             </Text>
-            <Icon name="options-outline" size={16} color="inkSubtle" />
+            <Icon icon="settings" size={16} color="inkSubtle" />
           </View>
           <Text variant="title" tabular>
             {fmtInt(totals.kcal)}

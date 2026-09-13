@@ -2,14 +2,15 @@ import React from "react";
 import { StyleSheet, View, type ViewProps } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing, type Tone } from "../theme/tokens";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { resolveGlyph, type IconGlyph } from "./icons";
 import { Text } from "./Text";
 
 export interface StatTileProps extends ViewProps {
   label: string;
   value: string;
   hint?: string;
-  icon?: IconName;
+  icon?: IconGlyph;
   tone?: Tone;
 }
 
@@ -19,7 +20,7 @@ export function StatTile({ label, value, hint, icon, tone, style, ...rest }: Sta
   return (
     <View {...rest} style={[styles.tile, { backgroundColor: colors.surfaceMuted }, style]} accessibilityLabel={`${label}: ${value}${hint ? ` ${hint}` : ""}`}>
       <View style={styles.head}>
-        {icon && <Icon name={icon} size={14} color={tone ?? "inkMuted"} />}
+        {icon && <Icon name={resolveGlyph(icon)} size={14} color={tone ?? "inkMuted"} />}
         <Text variant="caption" color="inkMuted" numberOfLines={1}>
           {label}
         </Text>

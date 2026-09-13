@@ -1,6 +1,7 @@
 export { Text, type TextProps } from "./Text";
 export { Box, type BoxProps } from "./Box";
 export { Icon, type IconName, type IconProps } from "./Icon";
+export { APP_ICONS, APP_ICON_NAMES, glyphFor, type AppIcon, type IconSpec } from "./icons";
 export { Pressable, type PressableProps, type PressHaptic } from "./Pressable";
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from "./Button";
 export { Surface, type SurfaceProps } from "./Surface";

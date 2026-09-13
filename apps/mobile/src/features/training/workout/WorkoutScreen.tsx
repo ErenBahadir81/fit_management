@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, ScrollView, StyleSheet, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import type { ExerciseDTO } from "@fitfloow/core";
-import { fmtDuration } from "../../../lib/format";
+import { fmtDuration, fmtInt } from "../../../lib/format";
 import { haptic } from "../../../lib/haptics";
 import { Floo } from "../../../mascot/Floo";
 import { SpeechBubble } from "../../../mascot/SpeechBubble";
@@ -15,42 +15,52 @@ import { Chip } from "../../../ui/Chip";
 import { EmptyState } from "../../../ui/EmptyState";
 import { Header } from "../../../ui/Header";
 import { Icon } from "../../../ui/Icon";
+import { Pressable } from "../../../ui/Pressable";
 import { ProgressBar } from "../../../ui/ProgressBar";
 import { Screen } from "../../../ui/Screen";
 import { Sheet, SheetActions, useSheet } from "../../../ui/Sheet";
 import { SuccessCheck } from "../../../ui/SuccessCheck";
 import { Text } from "../../../ui/Text";
 import { useToast } from "../../../ui/Toast";
+import { compareToLast, findLastSameDay } from "../lib/present";
 import {
+  DEFAULT_REST_SECONDS,
+  cardioSlots,
   doneSets,
   elapsedMinutes,
   hasAnything,
+  muscleSets,
   nextPending,
+  paneCount,
   progress,
-  restRemaining,
   toCompleteInput,
   totalSets,
-  type CardioSlot,
+  totalTonnage,
 } from "../lib/logger";
-import { useCompleteWorkout, useMuscles, useProgram } from "../queries";
+import { useCompleteWorkout, useLastPerformances, useMuscles, useProgram, useWorkouts } from "../queries";
 import { AddExerciseSheet } from "./AddExerciseSheet";
 import { CardioPane } from "./CardioPane";
-import { ExercisePane } from "./ExercisePane";
+import { ExercisePane, setLabel } from "./ExercisePane";
 import { FinishSheet } from "./FinishSheet";
-import { RestTimer, mmss } from "./RestTimer";
+import { SessionSheet } from "./SessionSheet";
 import { clearDraft, useWorkoutSession } from "./useWorkoutSession";
+// C2 — W1's rest controller and its timer, consumed exactly as the contract specifies.
+import { RestTimer, useRestController } from "./restBridge";
 
 /** How long the "Antrenman kaydedildi" moment stays before the modal closes itself. */
-const SAVED_MS = 1400;
+const SAVED_MS = 2600;
+const NO_NAMES: string[] = [];
 
 /** Full-screen set-by-set logger. Route: `/(modals)/workout`. */
 export function WorkoutScreen() {
   const router = useRouter();
   const toast = useToast();
   const { colors } = useTheme();
+  const reduce = useReducedMotion();
   const { width } = useWindowDimensions();
   const program = useProgram();
   const muscles = useMuscles();
+  const history = useWorkouts({ limit: 60 });
   const complete = useCompleteWorkout();
 
   const view = program.data ?? null;
@@ -59,6 +69,7 @@ export function WorkoutScreen() {
 
   const finishSheet = useSheet();
   const addSheet = useSheet();
+  const sessionSheet = useSheet();
   const { ref: leaveRef, present: presentLeave, dismiss: dismissLeave } = useSheet();
   const pager = useRef<ScrollView>(null);
   const [saved, setSaved] = useState(false);
@@ -73,28 +84,22 @@ export function WorkoutScreen() {
     }
   }, [restored, toast]);
 
-  const cardioSlots = useMemo<CardioSlot[]>(() => (state ? ([state.run ? "run" : null, state.swim ? "swim" : null].filter(Boolean) as CardioSlot[]) : []), [state]);
-  const paneCount = (state?.exercises.length ?? 0) + cardioSlots.length;
-
-  // Keep the pager in sync with the reducer's active pane (auto-advance after the last set).
+  /* ------------------------------- the pager ------------------------------- */
+  // `state.activeIndex` is the one source of truth: it addresses every pane (exercises, then the
+  // cardio slots), it drives the pager, the dots and the reducer's "which set am I logging".
   const activeIndex = state?.activeIndex ?? 0;
-  useEffect(() => {
-    pager.current?.scrollTo({ x: activeIndex * width, animated: true });
-  }, [activeIndex, width]);
+  const slots = useMemo(() => (state ? cardioSlots(state) : []), [state]);
+  const panes = state ? paneCount(state) : 0;
 
-  // Which pane is actually on screen. The reducer only tracks exercises, but the cardio panes sit
-  // after them in the same pager, so the dots need their own notion of "where am I". Reset during
-  // render (not in an effect) whenever the reducer moves the active exercise.
-  const [pane, setPane] = useState({ index: activeIndex, syncedTo: activeIndex });
-  if (pane.syncedTo !== activeIndex) setPane({ index: activeIndex, syncedTo: activeIndex });
-  const visiblePane = pane.index;
+  useEffect(() => {
+    pager.current?.scrollTo({ x: activeIndex * width, animated: !reduce });
+  }, [activeIndex, reduce, width]);
 
   const settleOn = useCallback(
     (index: number) => {
-      setPane((p) => (p.index === index ? p : { ...p, index }));
-      if (state && index !== state.activeIndex && index < (state.exercises.length || 1)) dispatch({ type: "focus", index });
+      if (index !== activeIndex) dispatch({ type: "focus", index });
     },
-    [dispatch, state]
+    [activeIndex, dispatch]
   );
 
   const onScrollEnd = useCallback(
@@ -104,13 +109,10 @@ export function WorkoutScreen() {
 
   /**
    * react-native-web's ScrollView never fires `onMomentumScrollEnd` — `ScrollViewBase` only wires
-   * `onScroll` — so on web the pager never told the screen which exercise the user had swiped to:
-   * "Seti tamamla" kept logging against the pane they had left, and then snapped back to it.
-   *
-   * So settle on `onScroll` instead, but only once the ticks stop (the same trick RNW uses for its
-   * own scroll-end) and only on a page boundary. Acting on every tick would be wrong twice over: a
-   * mid-swipe tick would steal focus, and the *first* tick of the auto-advance animation still
-   * reports the old pane, which would bounce the pager straight back.
+   * `onScroll` — so on web the pager never told the screen which exercise the user had swiped to.
+   * Settle on `onScroll` instead, but only once the ticks stop and only on a page boundary: a
+   * mid-swipe tick would steal focus, and the first tick of a programmatic scroll still reports the
+   * pane we are leaving, which would bounce the pager straight back.
    */
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => void (settleTimer.current && clearTimeout(settleTimer.current)), []);
@@ -126,15 +128,47 @@ export function WorkoutScreen() {
     [settleOn, width]
   );
 
+  const jumpToPane = useCallback(
+    (index: number) => {
+      sessionSheet.dismiss();
+      dispatch({ type: "focus", index });
+    },
+    [dispatch, sessionSheet]
+  );
+
+  /* --------------------------------- rest (C2) ------------------------------ */
+  const currentExercise = state && activeIndex < state.exercises.length ? state.exercises[activeIndex] : null;
+  const onRestFinish = useCallback(() => void haptic.medium(), []);
+  const rest = useRestController({ exerciseKey: currentExercise?.name ?? "", fallbackSeconds: state?.restSeconds ?? DEFAULT_REST_SECONDS, onFinish: onRestFinish });
+
+  /* ------------------------- "what did I do last time" ---------------------- */
+  const exerciseNames = useMemo(() => state?.exercises.map((e) => e.name) ?? NO_NAMES, [state]);
+  const lastOf = useLastPerformances(exerciseNames);
+  const prefilled = useRef(new Set<string>());
+  useEffect(() => {
+    if (!state) return;
+    state.exercises.forEach((ex, i) => {
+      if (prefilled.current.has(ex.id)) return;
+      const perf = lastOf(ex.name);
+      if (!perf) return; // still loading — try again when it lands
+      prefilled.current.add(ex.id);
+      const top = perf.sets[0];
+      if (top) dispatch({ type: "prefill", exercise: i, weightKg: top.weightKg ?? null, reps: top.reps });
+    });
+  }, [dispatch, lastOf, state]);
+
+  /* -------------------------------- actions --------------------------------- */
   const pending = state ? nextPending(state) : null;
-  const rest = state ? restRemaining(state, now) : 0;
   const allDone = Boolean(state) && pending === null;
+  const pendingSet = pending && state ? state.exercises[pending.exercise].sets[pending.set] : null;
+  const pendingExercise = pending && state ? state.exercises[pending.exercise] : null;
 
   const completeSet = useCallback(() => {
     if (!state) return;
     void haptic.medium(); // one firm tap per set; the success buzz is saved for the finish
     dispatch({ type: "complete-set", at: Date.now() });
-  }, [dispatch, state]);
+    rest.start();
+  }, [dispatch, rest, state]);
 
   const addExercise = useCallback(
     (exercise: ExerciseDTO) => {
@@ -168,7 +202,16 @@ export function WorkoutScreen() {
     router.back();
   }, [presentLeave, router, state]);
 
-  if (saved) return <SavedState />;
+  /* -------------------------- the session, summarised ----------------------- */
+  const previous = useMemo(() => (state ? findLastSameDay(history.data ?? [], state.dayOrder, state.dateKey) : null), [history.data, state]);
+  const summary = useMemo(
+    () => (state ? compareToLast({ tonnageKg: totalTonnage(state), sets: doneSets(state) }, previous) : null),
+    [previous, state]
+  );
+
+  if (saved && state && summary) {
+    return <SavedState tonnageKg={totalTonnage(state)} sets={doneSets(state)} minutes={elapsedMinutes(state, now)} muscleCount={Object.keys(muscleSets(state)).length} summaryTr={summary.summaryTr} />;
+  }
 
   if (program.isError && !view) {
     return (
@@ -184,7 +227,7 @@ export function WorkoutScreen() {
     );
   }
 
-  if (!state || paneCount === 0) {
+  if (!state || panes === 0) {
     const noProgram = Boolean(view && view.program.days.length === 0);
     return (
       <Screen tabBar={false} edges={["top", "bottom"]}>
@@ -201,7 +244,19 @@ export function WorkoutScreen() {
 
   const done = doneSets(state);
   const total = totalSets(state);
-  const primaryLabel = allDone ? "Antrenmanı bitir" : "Seti tamamla";
+  const tonnage = totalTonnage(state);
+  const whereLabel =
+    activeIndex < state.exercises.length
+      ? `${activeIndex + 1}/${state.exercises.length} · ${state.exercises[activeIndex].name}`
+      : slots[activeIndex - state.exercises.length] === "run"
+        ? "Koşu"
+        : "Yüzme";
+
+  // What the primary action will actually log — named, because from a cardio pane it is not obvious.
+  const nextLabel =
+    pending && pendingSet && pendingExercise
+      ? `${pendingExercise === currentExercise ? "" : `${pendingExercise.name} · `}${pending.set + 1}. set · ${setLabel(pendingSet, pendingExercise.metric === "time" ? "sn" : "tekrar")}`
+      : null;
 
   return (
     <Screen scroll={false} tabBar={false} edges={["top"]}>
@@ -212,45 +267,61 @@ export function WorkoutScreen() {
           left={{ icon: "close", label: "Kapat", onPress: leave, testID: "workout-close" }}
           right={{ icon: "flag-outline", label: "Bitir", onPress: finishSheet.present, testID: "workout-finish" }}
         />
-        <View style={styles.progressRow}>
-          <Text variant="label" color="inkMuted" tabular testID="workout-progress">
-            {done}/{total} set
-          </Text>
-          <View style={styles.spacer} />
-          <Icon name="time-outline" size={14} color="inkSubtle" />
-          <Text variant="label" color="inkMuted" tabular testID="workout-elapsed">
-            {fmtDuration(elapsedMinutes(state, now))}
-          </Text>
-        </View>
-        <ProgressBar value={progress(state)} tone="primary" height={6} accessibilityLabel={`${done} / ${total} set tamam`} />
-        {/* One dot per pane — the cardio panes get one too, otherwise nothing hints they exist. */}
-        {paneCount > 1 ? (
-          <View style={styles.dots}>
-            {state.exercises.map((e, i) => (
-              <View
-                key={e.id}
-                testID={`pane-dot-${i}`}
-                style={[
-                  styles.dot,
-                  {
-                    backgroundColor: i === visiblePane ? colors.primary : e.skipped ? colors.warning : e.sets.every((s) => s.done) ? colors.success : colors.border,
-                    width: i === visiblePane ? 18 : 6,
-                  },
-                ]}
-              />
-            ))}
-            {cardioSlots.map((slot, i) => {
-              const index = state.exercises.length + i;
-              return (
-                <View
-                  key={slot}
-                  testID={`pane-dot-${index}`}
-                  style={[styles.dot, { backgroundColor: index === visiblePane ? colors.primary : colors.border, width: index === visiblePane ? 18 : 6 }]}
-                />
-              );
-            })}
+
+        {/* The whole strip is the way into the session overview — a bigger target than any icon. */}
+        <Pressable
+          onPress={sessionSheet.present}
+          haptic="select"
+          minTarget={false}
+          scaleTo={0.995}
+          accessibilityLabel={`${whereLabel}. ${done} / ${total} set tamam. Antrenmanın tamamını görmek için dokun`}
+          testID="session-overview"
+          style={styles.overview}
+        >
+          <View style={styles.whereRow}>
+            <Text variant="label" numberOfLines={1} style={styles.grow}>
+              {whereLabel}
+            </Text>
+            <Icon icon="exercises" size={16} color="inkSubtle" />
           </View>
-        ) : null}
+          <ProgressBar value={progress(state)} tone="primary" height={6} accessibilityLabel={`${done} / ${total} set tamam`} />
+          <View style={styles.metaRow}>
+            <Text variant="label" color="inkMuted" tabular testID="workout-progress">
+              {done}/{total} set
+            </Text>
+            {tonnage > 0 ? (
+              <Text variant="label" color="inkMuted" tabular testID="workout-tonnage">
+                · {fmtInt(tonnage)} kg
+              </Text>
+            ) : null}
+            <View style={styles.grow} />
+            <Icon icon="duration" size={14} color="inkSubtle" />
+            <Text variant="label" color="inkMuted" tabular testID="workout-elapsed">
+              {fmtDuration(elapsedMinutes(state, now))}
+            </Text>
+          </View>
+          {panes > 1 ? (
+            <View style={styles.dots}>
+              {state.exercises.map((e, i) => (
+                <View
+                  key={e.id}
+                  testID={`pane-dot-${i}`}
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: i === activeIndex ? colors.primary : e.skipped ? colors.warning : e.sets.every((s) => s.done) ? colors.success : colors.border,
+                      width: i === activeIndex ? 18 : 6,
+                    },
+                  ]}
+                />
+              ))}
+              {slots.map((slot, i) => {
+                const index = state.exercises.length + i;
+                return <View key={slot} testID={`pane-dot-${index}`} style={[styles.dot, { backgroundColor: index === activeIndex ? colors.primary : colors.border, width: index === activeIndex ? 18 : 6 }]} />;
+              })}
+            </View>
+          ) : null}
+        </Pressable>
       </View>
 
       <ScrollView
@@ -272,15 +343,17 @@ export function WorkoutScreen() {
             index={index}
             width={width}
             muscles={muscles.data ?? []}
+            last={lastOf(exercise.name)}
             onSetReps={(setIndex, value) => dispatch({ type: "set-reps", exercise: index, set: setIndex, value })}
             onSetRir={(setIndex, value) => dispatch({ type: "set-rir", exercise: index, set: setIndex, value })}
+            onSetWeight={(setIndex, value) => dispatch({ type: "set-weight", exercise: index, set: setIndex, value })}
             onUndoSet={(setIndex) => dispatch({ type: "undo-set", exercise: index, set: setIndex })}
             onAddSet={() => dispatch({ type: "add-set", exercise: index })}
             onRemoveSet={() => dispatch({ type: "remove-set", exercise: index })}
             onToggleSkip={() => dispatch({ type: "toggle-skip", exercise: index })}
           />
         ))}
-        {cardioSlots.map((slot) => {
+        {slots.map((slot) => {
           const cardio = state[slot];
           if (!cardio) return null;
           return (
@@ -298,18 +371,19 @@ export function WorkoutScreen() {
       </ScrollView>
 
       <View style={[styles.bar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {rest > 0 ? <RestTimer remaining={rest} total={state.restSeconds} onSkip={() => dispatch({ type: "rest-skip" })} /> : null}
+        {/* Rest sits directly above the thumb: mid-set, that is where both the eye and the hand are. */}
+        <RestTimer controller={rest} />
         <View style={styles.barRow}>
           <Chip label="Hareket ekle" icon="add" onPress={addSheet.present} testID="workout-add-exercise" />
-          <View style={styles.spacer} />
-          {rest > 0 ? (
-            <Text variant="caption" color="inkMuted" tabular>
-              {mmss(rest)}
+          <View style={styles.grow} />
+          {nextLabel ? (
+            <Text variant="caption" color="inkMuted" tabular numberOfLines={1} testID="next-set-preview">
+              {nextLabel}
             </Text>
           ) : null}
         </View>
         <Button
-          label={primaryLabel}
+          label={allDone ? "Antrenmanı bitir" : "Seti kaydet"}
           variant="primary"
           icon={allDone ? "checkmark" : "checkmark-circle"}
           full
@@ -323,12 +397,14 @@ export function WorkoutScreen() {
         state={state}
         now={now}
         muscles={muscles.data ?? []}
+        compare={summary}
         saving={complete.isPending}
         onRpe={(value) => dispatch({ type: "set-rpe", value })}
         onNotes={(value) => dispatch({ type: "set-notes", value })}
         onFinish={finish}
         onCancel={finishSheet.dismiss}
       />
+      <SessionSheet sheetRef={sessionSheet.ref} state={state} onJump={jumpToPane} />
       <AddExerciseSheet sheetRef={addSheet.ref} onPick={addExercise} />
       <Sheet ref={leaveRef} title="Antrenmandan çık">
         <Text variant="body" color="inkMuted" testID="leave-sheet">
@@ -362,14 +438,24 @@ export function WorkoutScreen() {
   );
 }
 
-function SavedState() {
+/** The last thing you see: what you actually did, not just that it saved. */
+function SavedState({ tonnageKg, sets, minutes, muscleCount, summaryTr }: { tonnageKg: number; sets: number; minutes: number; muscleCount: number; summaryTr: string }) {
   const mascot = useMascot("workout");
   return (
     <Screen tabBar={false} edges={["top", "bottom"]} contentStyle={styles.saved}>
       <Animated.View entering={FadeIn.duration(200)} style={styles.savedInner} testID="workout-saved">
-        <SuccessCheck size={96} />
+        <SuccessCheck size={88} />
         <Text variant="heading" align="center">
           Antrenman kaydedildi
+        </Text>
+        <View style={styles.savedStats}>
+          {tonnageKg > 0 ? <SavedStat value={`${fmtInt(tonnageKg)} kg`} label="toplam yük" /> : null}
+          <SavedStat value={String(sets)} label="set" />
+          <SavedStat value={fmtDuration(minutes)} label="süre" />
+          {muscleCount > 0 ? <SavedStat value={String(muscleCount)} label="kas grubu" /> : null}
+        </View>
+        <Text variant="body" color="inkMuted" align="center" testID="workout-saved-compare">
+          {summaryTr}
         </Text>
         <Floo mood="cheer" size="m" />
         <SpeechBubble text={mascot.text} tail="none" />
@@ -378,16 +464,40 @@ function SavedState() {
   );
 }
 
+function SavedStat({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.savedStat}>
+      <Text variant="title" tabular align="center">
+        {value}
+      </Text>
+      <Text variant="caption" color="inkMuted" align="center">
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.gutter, gap: spacing.sm, paddingBottom: spacing.md },
-  progressRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  spacer: { flex: 1 },
+  whereRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  overview: { gap: spacing.sm },
   dots: { flexDirection: "row", gap: spacing.xs, justifyContent: "center", marginTop: spacing.xs },
   dot: { height: 6, borderRadius: 3 },
   pager: { flex: 1 },
-  bar: { paddingHorizontal: spacing.gutter, paddingTop: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card },
+  bar: {
+    paddingHorizontal: spacing.gutter,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: radii.card,
+    borderTopRightRadius: radii.card,
+  },
   barRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   grow: { flex: 1 },
   saved: { flex: 1, justifyContent: "center" },
   savedInner: { alignItems: "center", gap: spacing.lg },
+  savedStats: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.xl },
+  savedStat: { gap: 2, minWidth: 64 },
 });

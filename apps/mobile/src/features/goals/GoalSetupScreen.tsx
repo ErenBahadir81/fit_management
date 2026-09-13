@@ -2,33 +2,35 @@ import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { BODY_FAT_CATEGORY_TR, MIN_SAFE_BODY_FAT, type GoalDTO, type GoalProfile } from "@fitfloow/core";
+import { DEFAULT_GOAL_SETTINGS, bodyComposition, macrosFor } from "@fitfloow/core";
+import { getApi } from "../../lib/api";
 import { todayKey } from "../../lib/dates";
-import { fmtDate, fmtInt, fmtKg, fmtPct } from "../../lib/format";
+import { describeError } from "../../lib/errors";
+import { fmtDate, fmtKg, fmtPct } from "../../lib/format";
 import { Floo } from "../../mascot/Floo";
 import { SpeechBubble } from "../../mascot/SpeechBubble";
 import { useMascot } from "../../mascot/useMascot";
 import { useTheme } from "../../theme/ThemeProvider";
 import { radii, spacing } from "../../theme/tokens";
 import { Button } from "../../ui/Button";
-import { Card } from "../../ui/Card";
 import { Chip } from "../../ui/Chip";
 import { EmptyState } from "../../ui/EmptyState";
 import { Entry } from "../../ui/Entry";
 import { Header } from "../../ui/Header";
 import { Reveal } from "../../ui/Reveal";
 import { Screen } from "../../ui/Screen";
-import { Segmented } from "../../ui/Segmented";
 import { Skeleton, SkeletonGroup } from "../../ui/Skeleton";
 import { SuccessCheck } from "../../ui/SuccessCheck";
 import { Text } from "../../ui/Text";
+import { useToast } from "../../ui/Toast";
 import { useSession } from "../auth/session";
 import { useBodySummary } from "../body/useBody";
-import { PreviewCard, PREVIEW_HEIGHT } from "./components/PreviewCard";
-import { TargetSlider } from "./components/TargetSlider";
-import { PROFILE_OPTIONS, defaultTarget, instantPlan, snapTarget, targetBounds } from "./goalMath";
-import { useCreateGoal, useGoalPreview, useGoalView, useUpdateGoal } from "./useGoal";
-
-const PROFILE_SEG = PROFILE_OPTIONS.map((p) => ({ value: p.value, label: p.label }));
+import { GoalChooserSection } from "./components/GoalChooserSection";
+import { PLAN_OUTCOME_HEIGHT } from "./components/PlanOutcome";
+import { gainCalories, intentForGoal, maintenanceEnergy, summaryOf, type GoalIntent } from "./goalIntent";
+import { defaultTarget, snapTarget, targetBounds } from "./goalMath";
+import { usePlansByPace } from "./useLocalPlan";
+import { useAbandonGoal, useCreateGoal, useGoalPreview, useGoalView, useUpdateGoal } from "./useGoal";
 
 export interface GoalSetupScreenProps {
   /** `edit` preloads the active goal's target and PATCHes instead of creating. */
@@ -36,17 +38,24 @@ export interface GoalSetupScreenProps {
 }
 
 /**
- * Goal setup: current bf → target slider → pace → live preview → "Hedefi başlat".
- * The preview is instant (core engine on-device) and confirmed by the API when the slider settles.
+ * Choosing a goal.
+ *
+ * Intent first, then the number, then the pace — the same `GoalChooserSection` the onboarding flow
+ * renders, so the decision looks and behaves identically whether you make it on day one or change
+ * it six weeks in. Every choice redraws the arrival date instantly on device; the server preview
+ * confirms the selected pace a beat later.
  */
 export function GoalSetupScreen({ mode = "create" }: GoalSetupScreenProps) {
   const router = useRouter();
+  const toast = useToast();
   const user = useSession((s) => s.user);
   const summaryQ = useBodySummary();
   const goalQ = useGoalView();
   const create = useCreateGoal();
   const update = useUpdateGoal();
+  const abandon = useAbandonGoal();
   const [done, setDone] = useState<GoalDTO | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   const latest = summaryQ.data?.latest ?? null;
   const sex = summaryQ.data?.profile.gender ?? user?.gender ?? "male";
@@ -56,34 +65,80 @@ export function GoalSetupScreen({ mode = "create" }: GoalSetupScreenProps) {
   const existing = mode === "edit" && goalQ.data?.goal?.status === "active" ? goalQ.data.goal : null;
   const editLoading = mode === "edit" && !goalQ.data;
 
-  // The user's choices override the data-derived defaults; nothing is copied into state in an effect.
+  // The user's choices always win over the data-derived defaults; nothing is copied in an effect.
+  const [chosenIntent, setIntent] = useState<GoalIntent | null>(null);
   const [chosenTarget, setTarget] = useState<number | null>(null);
-  const [chosenProfile, setProfile] = useState<GoalProfile | null>(null);
+  const [chosenPace, setPace] = useState<GoalProfile | null>(null);
+
   const initialTarget = useMemo(() => {
     if (currentBf === null || editLoading) return null;
     return existing ? snapTarget(existing.targetBodyFatPct, bounds) : defaultTarget(sex, currentBf);
   }, [bounds, currentBf, editLoading, existing, sex]);
   const target = chosenTarget ?? initialTarget;
-  const profile: GoalProfile = chosenProfile ?? existing?.profile ?? "optimal";
+  const pace: GoalProfile = chosenPace ?? existing?.profile ?? "optimal";
+  const intent = chosenIntent ?? (existing ? intentForGoal(existing, currentBf) : bounds.max <= bounds.min ? "maintain" : "lose");
 
   const today = todayKey();
-  const instant = useMemo(
-    () => (latest && target !== null ? instantPlan({ sex, weightKg: latest.weightKg, bodyFatPct: latest.bodyFatPct, heightCm, birthDate: user?.birthDate, activityLevel: user?.activityLevel ?? "moderate", targetBodyFatPct: target, profile, todayKey: today, tdeeOverride: existing?.tdeeOverride }) : null),
-    [latest, target, sex, heightCm, user?.birthDate, user?.activityLevel, profile, today, existing?.tdeeOverride]
+  const planInput = useMemo(
+    () =>
+      latest && target !== null
+        ? { sex, weightKg: latest.weightKg, bodyFatPct: latest.bodyFatPct, heightCm, birthDate: user?.birthDate, activityLevel: user?.activityLevel ?? "moderate", targetBodyFatPct: target, todayKey: today, tdeeOverride: existing?.tdeeOverride }
+        : null,
+    [latest, target, sex, heightCm, user?.birthDate, user?.activityLevel, today, existing?.tdeeOverride]
   );
-  const preview = useGoalPreview({ targetBodyFatPct: target ?? bounds.min, profile, enabled: Boolean(latest) && target !== null });
-  const plan = preview.isCurrent && preview.server ? preview.server.plan : instant;
-  const warnings = plan?.warnings ?? [];
-  const blocked = !plan || plan.roadmap.length === 0 || warnings.includes("TARGET_TOO_LOW") || bounds.max <= bounds.min;
+  const plans = usePlansByPace(planInput);
+
+  const preview = useGoalPreview({ targetBodyFatPct: target ?? bounds.min, profile: pace, enabled: intent === "lose" && Boolean(latest) && target !== null });
+  // Local numbers keep the screen instant; the server's answer replaces them once it agrees.
+  const authoritative = preview.isCurrent && preview.server ? preview.server.plan : null;
+  const shown = useMemo(() => ({ ...plans, [pace]: authoritative ?? plans[pace] }), [plans, pace, authoritative]);
+
+  const energy = useMemo(
+    () => (latest ? maintenanceEnergy({ sex, weightKg: latest.weightKg, bodyFatPct: latest.bodyFatPct, heightCm, birthDate: user?.birthDate, activityLevel: user?.activityLevel ?? "moderate", todayKey: today }) : null),
+    [latest, sex, heightCm, user?.birthDate, user?.activityLevel, today]
+  );
+  const maintenance = energy ? Math.round(energy.maintenance / 10) * 10 : null;
+
+  const plan = shown[pace];
+  const warnings = intent === "lose" ? (plan?.warnings ?? []) : [];
+  const blockedLose = intent === "lose" && (!plan || plan.roadmap.length === 0 || warnings.includes("TARGET_TOO_LOW") || bounds.max <= bounds.min);
+  const blocked = intent === "lose" ? blockedLose : maintenance === null;
+
+  /** Maintain / gain are not goals: they move the daily calorie target and retire any active goal. */
+  const applyCalorieIntent = useCallback(async () => {
+    if (!latest || maintenance === null) return;
+    if (existing) await abandon.mutateAsync();
+    if (intent === "maintain") {
+      await getApi().nutrition.setTarget({ mode: "auto" });
+      return;
+    }
+    const calories = gainCalories(maintenance);
+    const { leanMassKg } = bodyComposition(latest.weightKg, latest.bodyFatPct);
+    const macros = macrosFor({ sex, weightKg: latest.weightKg, leanMassKg, bodyFatPct: latest.bodyFatPct, dailyCalories: calories, settings: DEFAULT_GOAL_SETTINGS });
+    await getApi().nutrition.setTarget({ mode: "manual", calories: macros.calories, protein: macros.protein, carbs: macros.carbs, fat: macros.fat });
+  }, [abandon, existing, intent, latest, maintenance, sex]);
 
   const submit = useCallback(() => {
-    if (target === null || blocked) return;
-    const input = { targetBodyFatPct: target, profile };
+    if (blocked || switching) return;
+    if (intent !== "lose") {
+      setSwitching(true);
+      applyCalorieIntent()
+        .then(() => {
+          toast.show({ message: intent === "maintain" ? "Günlük kalorin koruma seviyesine ayarlandı" : "Günlük kalorin kas için yükseltildi", kind: "success" });
+          router.back();
+        })
+        .catch((e: unknown) => toast.show({ message: describeError(e, "Kalori hedefi ayarlanamadı. Tekrar dene."), kind: "error" }))
+        .finally(() => setSwitching(false));
+      return;
+    }
+    if (target === null) return;
+    const input = { targetBodyFatPct: target, profile: pace };
     if (existing) update.mutate(input, { onSuccess: () => router.back() });
     else create.mutate(input, { onSuccess: (goal) => setDone(goal) });
-  }, [target, blocked, profile, existing, update, create, router]);
+  }, [applyCalorieIntent, blocked, create, existing, intent, pace, router, switching, target, toast, update]);
 
   const ready = Boolean(summaryQ.data) && !editLoading;
+  const cta = intent !== "lose" ? (existing ? "Hedefi bırak ve devam et" : "Bu kaloriyle devam et") : existing ? "Hedefi güncelle" : "Hedefi başlat";
 
   if (done) return <SuccessView goal={done} onRoadmap={() => router.replace("/(modals)/goal/roadmap")} />;
 
@@ -92,46 +147,36 @@ export function GoalSetupScreen({ mode = "create" }: GoalSetupScreenProps) {
       <Header title={existing ? "Hedefi düzenle" : "Hedef belirle"} compact left={{ icon: "close", label: "Kapat", onPress: () => router.back() }} />
       <Reveal ready={ready} skeleton={<SetupSkeleton />}>
         {ready && !latest ? (
-          <EmptyState illustration={<Floo mood="think" size="m" />} title="Önce bir ölçüm gerekli" body="Yağ oranını bilmeden yol haritası çizemem. Boyun ve bel ölçüsü iki dakika sürer." action={{ label: "Ölçüm ekle", onPress: () => router.back(), icon: "add" }} />
-        ) : ready && latest && target !== null ? (
+          <EmptyState
+            illustration={<Floo mood="think" size="m" />}
+            title="Önce bir ölçüm gerekli"
+            body="Yağ oranını bilmeden yol haritası çizemem. Boyun ve bel ölçüsü iki dakika sürer."
+            action={{ label: "Ölçüm ekle", onPress: () => router.back(), icon: "measure" }}
+          />
+        ) : ready && latest ? (
           <View style={styles.stack}>
             <Entry index={0}>
               <CurrentRow bf={latest.bodyFatPct} weight={latest.weightKg} category={summaryQ.data?.category ? BODY_FAT_CATEGORY_TR[summaryQ.data.category] : null} date={latest.dateKey} />
             </Entry>
             <Entry index={1}>
-              <Card>
-                <View style={styles.cardHead}>
-                  <Text variant="label" color="inkMuted">
-                    Hedef yağ oranı
-                  </Text>
-                  <Text variant="display" tone="primary" tabular testID="goal-target">
-                    {fmtPct(target, 1)}
-                  </Text>
-                </View>
-                <TargetSlider value={target} bounds={bounds} onChange={setTarget} testID="goal-slider" />
-                {bounds.max <= bounds.min ? (
-                  <Text variant="caption" tone="warning" style={styles.hint}>
-                    Zaten sağlıklı alt sınırdasın; yeni bir yağ hedefi önermiyorum.
-                  </Text>
-                ) : null}
-              </Card>
+              <GoalChooserSection
+                intent={intent}
+                onIntent={setIntent}
+                target={target}
+                bounds={bounds}
+                onTarget={(v) => setTarget(snapTarget(v, bounds))}
+                pace={pace}
+                onPace={setPace}
+                plans={shown}
+                todayKey={today}
+                maintenanceCalories={maintenance}
+                gainCaloriesValue={maintenance === null ? null : gainCalories(maintenance)}
+                pending={preview.pending}
+                warnings={warnings}
+              />
             </Entry>
             <Entry index={2}>
-              <Card>
-                <Text variant="label" color="inkMuted" style={styles.hint}>
-                  Tempo
-                </Text>
-                <Segmented options={PROFILE_SEG} value={profile} onChange={setProfile} testID="goal-profile" />
-                <Text variant="body" color="inkMuted" style={styles.profileHint} accessibilityLiveRegion="polite">
-                  {PROFILE_OPTIONS.find((p) => p.value === profile)?.hint}
-                </Text>
-              </Card>
-            </Entry>
-            <Entry index={3}>
-              <PreviewCard plan={plan} pending={preview.pending} warnings={warnings} />
-            </Entry>
-            <Entry index={4}>
-              <Button label={existing ? "Hedefi güncelle" : "Hedefi başlat"} onPress={submit} disabled={blocked} loading={create.isPending || update.isPending} full size="lg" icon="flag" testID="goal-submit" />
+              <Button label={cta} onPress={submit} disabled={blocked} loading={create.isPending || update.isPending || switching} full size="lg" icon="goal" testID="goal-submit" />
             </Entry>
           </View>
         ) : null}
@@ -171,14 +216,14 @@ function SuccessView({ goal, onRoadmap }: { goal: GoalDTO; onRoadmap: () => void
         <Text variant="display" align="center">
           Yola çıktık
         </Text>
-        <Text variant="body" color="inkMuted" align="center" tabular>
-          Hedef {fmtPct(goal.targetBodyFatPct, 1)} · {goal.plan.estimatedWeeks} hafta · günde {fmtInt(goal.plan.initialDailyCalorieTarget)} kcal
+        <Text variant="body" color="inkMuted" align="center" tabular testID="goal-success-summary">
+          {summaryOf(goal.plan)}
         </Text>
         <View style={styles.flooRow}>
           <Floo mood={mascot.mood === "happy" ? "cheer" : mascot.mood} size="m" testID="goal-success-floo" />
           <SpeechBubble text={mascot.text} tail="left" style={styles.bubble} testID="goal-success-bubble" />
         </View>
-        <Button label="Yol haritasını gör" onPress={onRoadmap} full size="lg" iconRight="arrow-forward" testID="goal-see-roadmap" />
+        <Button label="Yol haritasını gör" onPress={onRoadmap} full size="lg" iconRight="next" testID="goal-see-roadmap" />
       </View>
     </Screen>
   );
@@ -188,9 +233,9 @@ function SetupSkeleton() {
   return (
     <SkeletonGroup testID="goal-setup-skeleton" style={styles.stack}>
       <Skeleton height={72} radius={radii.md} />
+      <Skeleton height={252} radius={radii.md} />
       <Skeleton height={168} radius={radii.card} />
-      <Skeleton height={132} radius={radii.card} />
-      <Skeleton height={PREVIEW_HEIGHT} radius={radii.card} />
+      <Skeleton height={PLAN_OUTCOME_HEIGHT} radius={radii.card} />
       <Skeleton height={56} radius={radii.control + 2} />
     </SkeletonGroup>
   );
@@ -201,9 +246,6 @@ const styles = StyleSheet.create({
   current: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderRadius: radii.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, minHeight: 72 },
   currentTexts: { flex: 1, gap: 2 },
   currentValues: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm },
-  cardHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: spacing.sm },
-  hint: { marginBottom: spacing.sm },
-  profileHint: { marginTop: spacing.md, minHeight: 44 },
   successContent: { flexGrow: 1, justifyContent: "center" },
   success: { alignItems: "center", gap: spacing.lg, paddingVertical: spacing.xxl },
   flooRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, alignSelf: "stretch", marginTop: spacing.sm },

@@ -7,6 +7,7 @@ import { haptic } from "../../lib/haptics";
 import { useToast } from "../../ui/Toast";
 import { GOAL_KEY } from "../goals/useGoal";
 import { HOME_QUERY_KEY } from "../home/useHome";
+import { ENERGY_KEY } from "../nutrition/components/EnergyCard";
 import { REPORT_KEYS } from "../reports/useReport";
 import { optimisticSummary, optimisticTrends, type RangeDays } from "./bodyMath";
 
@@ -42,6 +43,8 @@ export function useInvalidateBody() {
       qc.invalidateQueries({ queryKey: GOAL_KEY }),
       qc.invalidateQueries({ queryKey: REPORT_KEYS.all }),
       qc.invalidateQueries({ queryKey: HOME_QUERY_KEY }),
+      // Lean mass moves the BMR, which moves every number on the energy card.
+      qc.invalidateQueries({ queryKey: ENERGY_KEY }),
     ]);
 }
 

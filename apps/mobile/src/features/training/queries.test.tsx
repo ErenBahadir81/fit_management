@@ -9,6 +9,7 @@ import {
   useDeleteWorkout,
   useExerciseCatalog,
   useJumpTo,
+  useLastPerformances,
   useProgram,
   useRecovery,
   useSkipDay,
@@ -31,6 +32,7 @@ describe("training query keys", () => {
     expect(trainingKeys.recovery).toEqual(["recovery"]);
     expect(trainingKeys.workouts({ limit: 30 })).toEqual(["workouts", { limit: 30 }]);
     expect(trainingKeys.stats(8)).toEqual(["training-stats", 8]);
+    expect(trainingKeys.lastPerformance("Bench Press")).toEqual(["last-performance", "Bench Press"]);
   });
 });
 
@@ -63,6 +65,20 @@ describe("training queries", () => {
 
     const cat = await renderHookUI(() => useExerciseCatalog("bench"), { queryClient: qc });
     await waitFor(() => expect(cat.result.current.data?.[0]?.name).toBe("Bench Press"));
+  });
+
+  test("useLastPerformances reads what was logged last time, per exercise name", async () => {
+    const { result } = await renderHookUI(() => useLastPerformances(["Bench Press", "Bir Daha Yapılmamış Hareket"]), { queryClient: makeQueryClient() });
+    await waitFor(() => expect(result.current("Bench Press")).toBeTruthy());
+
+    const bench = result.current("Bench Press")!;
+    expect(bench.dateKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(bench.sets.length).toBeGreaterThan(0);
+    expect(typeof bench.sets[0].reps).toBe("number");
+
+    // Never done before, and never asked for: both answer "nothing", never throw.
+    await waitFor(() => expect(result.current("Bir Daha Yapılmamış Hareket")).toEqual({ dateKey: null, sets: [] }));
+    expect(result.current("Sorulmayan Hareket")).toBeNull();
   });
 });
 
@@ -130,7 +146,7 @@ describe("training mutations", () => {
     const complete = await renderHookUI(() => useCompleteWorkout(), { queryClient: qc });
     await act(async () => {
       complete.result.current.mutate({
-        strength: [{ name: "Bench Press", muscles: [{ key: "chest", load: 1 }], sets: [{ reps: 8, rir: 2 }] }],
+        strength: [{ name: "Bench Press", muscles: [{ key: "chest", load: 1 }], sets: [{ reps: 8, rir: 2, weightKg: 60 }] }],
         run: null,
         swim: null,
         durationMin: 48,

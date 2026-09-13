@@ -58,7 +58,7 @@ export function ScanResults({ items, meal, mock, notFood, saving, onGrams, onRem
             Miktarları düzelt, gerisini bana bırak.
           </Text>
         </View>
-        {mock ? <Chip testID="scan-mock-chip" label="Demo modu" size="sm" tone="warning" icon="flask-outline" /> : null}
+        {mock ? <Chip testID="scan-mock-chip" label="Demo modu" size="sm" tone="warning" icon="estimate" /> : null}
       </View>
 
       <View style={styles.cards}>
@@ -68,7 +68,7 @@ export function ScanResults({ items, meal, mock, notFood, saving, onGrams, onRem
       </View>
 
       <Pressable testID="scan-add-more" onPress={onAddMore} haptic="select" style={styles.addMore}>
-        <Icon name="add-circle-outline" size={18} color="primary" />
+        <Icon icon="add" size={18} color="primary" />
         <Text variant="label" color="primary">
           Başka bir yemek ekle
         </Text>
@@ -119,7 +119,7 @@ function DetectionCard({ item, onGrams, onRemove }: { item: ScanItem; onGrams: (
         </View>
         {item.confidence != null ? <Chip label={fmtPct(item.confidence * 100, 0)} size="sm" tone={confidenceTone(item.confidence)} /> : null}
         <Pressable testID={`detection-remove-${item.key}`} onPress={() => onRemove(item.key)} haptic="select" minTarget={false} accessibilityLabel={`${item.name} kaldır`} style={styles.remove}>
-          <Icon name="close" size={18} color="inkSubtle" />
+          <Icon icon="close" size={18} color="inkSubtle" />
         </Pressable>
       </View>
       <View style={styles.cardBody}>

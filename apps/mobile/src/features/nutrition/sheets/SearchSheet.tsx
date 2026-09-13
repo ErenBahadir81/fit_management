@@ -73,7 +73,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
 
   const listEmpty = useMemo(() => {
     if (showRecents) {
-      return recents.isPending ? <ResultsSkeleton /> : <EmptyState compact icon="time-outline" title="Henüz kayıt yok" body="Aramaya başla, sık yediklerin burada birikecek." />;
+      return recents.isPending ? <ResultsSkeleton /> : <EmptyState compact icon="recent" title="Henüz kayıt yok" body="Aramaya başla, sık yediklerin burada birikecek." />;
     }
     if (search.isPending) return <ResultsSkeleton />;
     return (
@@ -120,7 +120,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
       ) : (
         <View style={styles.stack}>
           <View style={[styles.field, { backgroundColor: colors.surfaceMuted }]}>
-            <Icon name="search" size={18} color="inkSubtle" />
+            <Icon icon="search" size={18} color="inkSubtle" />
             <SheetInput
               testID="food-search-input"
               value={text}
@@ -135,7 +135,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
             />
             {text.length > 0 ? (
               <Pressable testID="food-search-clear" onPress={() => setText("")} haptic="select" minTarget={false} accessibilityLabel="Temizle" style={styles.clear}>
-                <Icon name="close-circle" size={18} color="inkSubtle" />
+                <Icon icon="close" size={18} color="inkSubtle" />
               </Pressable>
             ) : null}
           </View>
@@ -144,7 +144,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
             <Text variant="label" color="inkMuted" style={styles.grow}>
               {showRecents ? "Son kullanılanlar" : `“${search.query}” için sonuçlar`}
             </Text>
-            <Chip testID="remote-toggle" label="İnternette ara" size="sm" icon="globe-outline" selected={remote} onPress={() => setRemote((v) => !v)} />
+            <Chip testID="remote-toggle" label="İnternette ara" size="sm" icon="online" selected={remote} onPress={() => setRemote((v) => !v)} />
           </View>
 
           <View style={styles.list}>
@@ -161,7 +161,7 @@ export function SearchSheet({ meal: initialMeal, start = "search", onAdd, onClos
           </View>
 
           <Pressable testID="open-custom-food" onPress={() => setMode({ kind: "custom" })} haptic="select" style={styles.manual}>
-            <Icon name="create-outline" size={18} color="primary" />
+            <Icon icon="edit" size={18} color="primary" />
             <Text variant="label" color="primary">
               Listede yok, elle gir
             </Text>
@@ -205,7 +205,7 @@ function FoodRow({ food, onPress, onQuickAdd }: { food: FoodDTO; onPress: (f: Fo
           </View>
         ) : null}
       </View>
-      <Icon name="chevron-forward" size={18} color="inkSubtle" />
+      <Icon icon="forward" size={18} color="inkSubtle" />
     </Pressable>
   );
 }

@@ -5,6 +5,7 @@ export * from "./catalog";
 export * from "./program";
 export * from "./body";
 export * from "./goal";
+export * from "./onboarding";
 export * from "./nutrition";
 export * from "./report";
 export * from "./mascot";

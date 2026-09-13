@@ -74,7 +74,7 @@ export function Stepper({ value, onChange, step = 1, min = -Infinity, max = Infi
         minTarget={false}
         style={[styles.btn, { width: btn, height: btn, backgroundColor: colors.surfaceMuted }]}
       >
-        <Icon name="remove" size={20} color="ink" />
+        <Icon icon="minus" size={20} color="ink" />
       </Pressable>
       <Text variant={size === "sm" ? "title" : "heading"} tabular align="center" style={styles.value} accessibilityLiveRegion="polite">
         {display}
@@ -89,7 +89,7 @@ export function Stepper({ value, onChange, step = 1, min = -Infinity, max = Infi
         minTarget={false}
         style={[styles.btn, { width: btn, height: btn, backgroundColor: colors.primarySoft }]}
       >
-        <Icon name="add" size={20} color="primary" />
+        <Icon icon="add" size={20} color="primary" />
       </Pressable>
     </View>
   );

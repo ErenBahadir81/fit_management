@@ -28,6 +28,7 @@
     "e2e:admin": "node e2e/admin.e2e.mjs"
   },
   "devDependencies": {
+    "playwright": "1.63.0",
     "typescript": "5.9.3"
   }
 }

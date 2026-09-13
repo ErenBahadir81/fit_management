@@ -11,6 +11,9 @@ export type { RateLimit, RateInput, RateResult, DailyTargetInput, DailyTargetRes
 export { computeGoalPlan, tdeeForWeek } from "./plan";
 export type { GoalEngineInput } from "./plan";
 
+/* C4 — the plan in plain Turkish. */
+export { etaLabelTr, formatTrNumber, goalMilestones, goalSummaryTr } from "./milestones";
+
 export { ewmaTrend, ewmaAt, ewmaChange, ewmaSlopePerWeek, latestTrendWeight, weighInsPerWeek } from "./ewma";
 export type { WeightPoint, WeightTrendPoint, EwmaSettings } from "./ewma";
 

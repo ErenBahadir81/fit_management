@@ -50,7 +50,7 @@ export function AddExerciseSheet({ sheetRef, onPick }: AddExerciseSheetProps) {
                   {exercise.metric === "time" ? " sn" : ""}
                 </Text>
               </View>
-              <Icon name="add-circle-outline" size={20} color="primary" />
+              <Icon icon="add" size={20} color="primary" />
             </Pressable>
           ))}
         </View>

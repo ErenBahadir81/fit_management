@@ -6,7 +6,13 @@ import { useSession } from "../../auth/session";
 import { setApi } from "../../../lib/api";
 import { createFakeApi } from "../../../lib/fake";
 import { trainingState, withCompletedToday, withEmptyHistory, withRestDay, withoutProgram } from "../../../lib/fake/training";
+import { storage } from "../../../lib/storage";
+import type { Weekday } from "@fitfloow/core";
+import { todayKey } from "../../../lib/dates";
+import { createLoggerState, loggerReducer } from "../lib/logger";
+import { groupLogsByWeek } from "../lib/present";
 import { trainingKeys } from "../queries";
+import { WORKOUT_DRAFT_KEY } from "../workout/useWorkoutSession";
 import { ProgramScreen } from "./ProgramScreen";
 
 jest.mock("expo-router", () => jest.requireActual("../../../../__tests__/mocks/expo-router"));
@@ -27,6 +33,31 @@ async function mount(state?: ReturnType<typeof trainingState>, latencyMs = 0) {
 describe("ProgramScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    storage.clearAll();
+  });
+
+  test("an unfinished session turns the primary action into 'carry on', with how far you got", async () => {
+    const api = createFakeApi({ latencyMs: 0, signedIn: true });
+    setApi(api);
+    await signIn(api);
+    const view = await api.training.program();
+    let inProgress = createLoggerState({
+      day: view.current.day,
+      dayIndex: view.current.index,
+      programId: view.program.id,
+      weekNumber: view.program.weekNumber,
+      dateKey: view.schedule.find((s) => s.isToday)!.dateKey,
+      startedAt: Date.now() - 12 * 60_000,
+    });
+    inProgress = loggerReducer(inProgress, { type: "set-weight", exercise: 0, set: 0, value: 60 });
+    inProgress = loggerReducer(inProgress, { type: "complete-set", at: Date.now() });
+    inProgress = loggerReducer(inProgress, { type: "complete-set", at: Date.now() });
+    storage.set(WORKOUT_DRAFT_KEY, JSON.stringify(inProgress));
+
+    await renderUI(<ProgramScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("start-workout")).toBeTruthy());
+    expect(screen.getByTestId("resume-progress")).toHaveTextContent(/2\/14 set/);
+    expect(within(screen.getByTestId("start-workout")).getByText("Antrenmana devam et")).toBeTruthy();
   });
 
   test("shows the skeleton first, then the week strip, today's card and the weekly volume", async () => {
@@ -37,6 +68,7 @@ describe("ProgramScreen", () => {
     expect(screen.getByTestId("week-strip")).toBeTruthy();
     expect(within(screen.getByTestId("current-day-card")).getByText("Üst Vücut A")).toBeTruthy();
     expect(screen.getByText("Antrenmana başla")).toBeTruthy();
+    expect(screen.queryByTestId("resume-progress")).toBeNull();
     expect(screen.getByTestId("volume-card")).toBeTruthy();
     expect(screen.getByText("Haftalık hacim")).toBeTruthy();
     expect(screen.getByTestId("volume-toggle")).toBeTruthy(); // 9 muscles, 5 shown collapsed
@@ -112,11 +144,27 @@ describe("ProgramScreen", () => {
     const logs = (await api.training.workouts({ limit: 60 })).logs;
     const first = logs[0];
     await waitFor(() => expect(screen.getByTestId(`history-row-${first.id}`)).toBeTruthy());
-    expect(screen.getByText("Bu hafta")).toBeTruthy();
+    // Which label the newest section carries depends on the weekday the suite runs on: the fixture
+    // user measures on Sunday and the fake history stops at yesterday, so on a Sunday there is
+    // legitimately nothing in "Bu hafta". `weekLabel` itself is covered in present.test.ts — what
+    // this screen owes us is that the rows are grouped under the heading the grouping produced.
+    const { user } = await api.auth.me();
+    const sections = groupLogsByWeek(logs, user.measurementDay as Weekday, todayKey());
+    expect(sections.length).toBeGreaterThan(0);
+    expect(screen.getByText(sections[0].title)).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId(`history-row-${first.id}`));
     await waitFor(() => expect(screen.getByTestId("log-muscle-chips")).toBeTruthy());
     expect(screen.getByTestId("log-delete")).toBeTruthy();
+  });
+
+  test("a history row says what happened: the load moved, the sets, the time", async () => {
+    const { api } = await mount();
+    const logs = (await api.training.workouts({ limit: 60 })).logs;
+    const lifted = logs.find((l) => !l.isOffDay && l.strength.some((e) => e.sets.some((s) => (s.weightKg ?? 0) > 0)))!;
+    await waitFor(() => expect(screen.getByTestId(`history-row-${lifted.id}`)).toBeTruthy());
+    expect(screen.getByTestId(`history-meta-${lifted.id}`)).toHaveTextContent(/kg/);
+    expect(screen.getByTestId(`history-meta-${lifted.id}`)).toHaveTextContent(/set/);
   });
 
   test("deleting a session hides the row and offers undo before the request fires", async () => {
@@ -170,7 +218,9 @@ describe("ProgramScreen", () => {
 
     await fireEvent.press(screen.getByTestId("editor-sets-0-inc"));
     await fireEvent.press(screen.getByTestId("editor-add-exercise"));
-    await waitFor(() => expect(screen.getByTestId("picker-search")).toBeTruthy());
+    // The search field renders as soon as the sheet opens; the rows arrive with the catalog query a
+    // tick later. Waiting on the field and pressing a row was a race that lost under full-suite load.
+    await waitFor(() => expect(screen.getByTestId("picker-item-ex_squat")).toBeTruthy());
     await fireEvent.press(screen.getByTestId("picker-item-ex_squat"));
     await waitFor(() => expect(screen.getByText("Squat")).toBeTruthy());
   });

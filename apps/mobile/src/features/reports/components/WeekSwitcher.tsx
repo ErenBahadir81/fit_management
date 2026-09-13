@@ -24,7 +24,7 @@ export function WeekSwitcher({ weekKey, isCurrent, measurementDay, onPrev, onNex
   return (
     <View style={styles.row} accessibilityRole="toolbar">
       <Pressable onPress={onPrev} accessibilityLabel="Önceki hafta" haptic="select" style={[styles.btn, { backgroundColor: colors.surfaceMuted }]} testID="week-prev">
-        <Icon name="chevron-back" size={20} color="ink" />
+        <Icon icon="back" size={20} color="ink" />
       </Pressable>
       <Animated.View key={weekKey} entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)} style={styles.center}>
         <View style={styles.labelRow}>
@@ -38,7 +38,7 @@ export function WeekSwitcher({ weekKey, isCurrent, measurementDay, onPrev, onNex
         </Text>
       </Animated.View>
       <Pressable onPress={onNext ?? undefined} disabled={!onNext} accessibilityLabel="Sonraki hafta" haptic="select" style={[styles.btn, { backgroundColor: colors.surfaceMuted }]} testID="week-next">
-        <Icon name="chevron-forward" size={20} color="ink" />
+        <Icon icon="forward" size={20} color="ink" />
       </Pressable>
     </View>
   );

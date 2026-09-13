@@ -11,6 +11,7 @@ export interface UserDoc {
   _id: Types.ObjectId;
   username: string;
   displayName: string;
+  email: string | null;
   passwordHash: string;
   role: "admin" | "user";
   gender: "male" | "female";
@@ -19,6 +20,7 @@ export interface UserDoc {
   activityLevel: "sedentary" | "light" | "moderate" | "active" | "veryActive";
   measurementDay: number;
   mascotEnabled: boolean;
+  onboardingCompleted: boolean;
   unitSystem: "metric";
   refreshTokens: RefreshTokenDoc[];
   lastSeenAt: Date | null;
@@ -40,6 +42,7 @@ const UserSchema = new Schema<UserDoc>(
   {
     username: { type: String, required: true, unique: true, lowercase: true, trim: true },
     displayName: { type: String, required: true },
+    email: { type: String, default: null, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ["admin", "user"], default: "user" },
     gender: { type: String, enum: ["male", "female"], default: "male" },
@@ -52,6 +55,9 @@ const UserSchema = new Schema<UserDoc>(
     },
     measurementDay: { type: Number, min: 0, max: 6, default: 0 },
     mascotEnabled: { type: Boolean, default: true },
+    // C3: accounts minted before onboarding existed are treated as already onboarded — they were
+    // set up by an admin, so sending them through the questionnaire would be nonsense.
+    onboardingCompleted: { type: Boolean, default: true },
     unitSystem: { type: String, enum: ["metric"], default: "metric" },
     refreshTokens: { type: [RefreshTokenSchema], default: [] },
     lastSeenAt: { type: Date, default: null },
@@ -69,6 +75,7 @@ export function toUserDTO(u: UserDoc) {
     id: String(u._id),
     username: u.username,
     displayName: u.displayName,
+    email: u.email ?? null,
     role: u.role,
     gender: u.gender,
     heightCm: u.heightCm ?? null,
@@ -76,6 +83,7 @@ export function toUserDTO(u: UserDoc) {
     activityLevel: u.activityLevel ?? "moderate",
     measurementDay: u.measurementDay ?? 0,
     mascotEnabled: u.mascotEnabled ?? true,
+    onboardingCompleted: u.onboardingCompleted ?? true,
     createdAt: (u.createdAt ?? new Date()).toISOString(),
     lastSeenAt: u.lastSeenAt ? u.lastSeenAt.toISOString() : null,
   };

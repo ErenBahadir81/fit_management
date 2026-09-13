@@ -4,18 +4,27 @@
  * Everything the screen shows is derived from this state, and every interaction is one action.
  * No I/O, no `Date.now()`: actions that need the clock carry `at`, selectors take `now`. That keeps
  * the reducer trivially testable and makes the MMKV draft (crash/relaunch restore) a plain snapshot.
+ *
+ * Rest *timing* is deliberately absent: `useRestController` (C2, owned by the rest engine) runs the
+ * countdown. All the reducer keeps is `restSeconds`, the per-day default the controller falls back to.
  */
 import { clamp, round } from "@fitfloow/core";
 import type { CompleteWorkoutInput, DayDTO, DayKind, ExerciseMetric, MuscleLoad } from "@fitfloow/core";
 
-export const DRAFT_VERSION = 1;
+/** v1 → v2: sets gained `weightKg`, the reducer lost `restEndsAt`. `restoreDraft` migrates v1. */
+export const DRAFT_VERSION = 2;
 /** Default rest between sets (s). */
 export const DEFAULT_REST_SECONDS = 90;
+/** One plate per side on a 20 kg bar — the increment the ± affordances use. */
+export const WEIGHT_STEP_KG = 2.5;
+export const MAX_WEIGHT_KG = 1000;
 
 export interface LoggerSet {
   /** Reps, or seconds when the exercise metric is `time`. */
   reps: number;
   rir: number | null;
+  /** Load in kg. `null` = bodyweight / not recorded — never `0` (C1). */
+  weightKg: number | null;
   done: boolean;
 }
 
@@ -59,12 +68,15 @@ export interface LoggerState {
   dateKey: string;
   startedAt: number;
   exercises: LoggerExercise[];
+  /**
+   * The pane the user is on — exercises first, then one per cardio slot. One index for the pager,
+   * the dots and the reducer's own "which exercise am I logging against".
+   */
   activeIndex: number;
   run: LoggerCardio | null;
   swim: LoggerCardio | null;
+  /** Per-day default rest (s). Handed to the rest controller as `fallbackSeconds` (C2). */
   restSeconds: number;
-  /** Epoch ms the current rest ends at; `null` when no rest is running. */
-  restEndsAt: number | null;
   rpe: number | null;
   notes: string;
   /** Monotonic id source so ad-hoc exercises/segments get stable keys without side effects. */
@@ -85,6 +97,9 @@ export type LoggerAction =
   | { type: "undo-set"; exercise: number; set: number }
   | { type: "set-reps"; exercise: number; set: number; value: number }
   | { type: "set-rir"; exercise: number; set: number; value: number | null }
+  | { type: "set-weight"; exercise: number; set: number; value: number | null }
+  /** Seed the untouched sets of an exercise from last session's numbers. */
+  | { type: "prefill"; exercise: number; weightKg: number | null; reps: number | null }
   | { type: "add-set"; exercise: number }
   | { type: "remove-set"; exercise: number }
   | { type: "toggle-skip"; exercise: number }
@@ -92,8 +107,6 @@ export type LoggerAction =
   | { type: "segment-add"; slot: CardioSlot }
   | { type: "segment-set"; slot: CardioSlot; id: string; km?: number; min?: number }
   | { type: "segment-remove"; slot: CardioSlot; id: string }
-  | { type: "rest-skip" }
-  | { type: "rest-restart"; at: number }
   | { type: "set-rpe"; value: number | null }
   | { type: "set-notes"; value: string };
 
@@ -110,7 +123,7 @@ export interface CreateLoggerOptions {
 }
 
 function seedSets(count: number, reps: number, rir: number | null): LoggerSet[] {
-  return Array.from({ length: Math.max(1, count) }, () => ({ reps, rir, done: false }));
+  return Array.from({ length: Math.max(1, count) }, () => ({ reps, rir, weightKg: null, done: false }));
 }
 
 function cardioFrom(target: DayDTO["run"], idPrefix: string): LoggerCardio | null {
@@ -153,7 +166,6 @@ export function createLoggerState(opts: CreateLoggerOptions): LoggerState {
     run: cardioFrom(day.run, "run"),
     swim: cardioFrom(day.swim, "swim"),
     restSeconds: opts.restSeconds ?? DEFAULT_REST_SECONDS,
-    restEndsAt: null,
     rpe: null,
     notes: "",
     seq: 1,
@@ -161,6 +173,19 @@ export function createLoggerState(opts: CreateLoggerOptions): LoggerState {
 }
 
 /* -------------------------------- selectors ------------------------------- */
+
+/** Exercise panes plus one per cardio slot — the pager's length, and `activeIndex`'s range. */
+export function paneCount(state: LoggerState): number {
+  return state.exercises.length + (state.run ? 1 : 0) + (state.swim ? 1 : 0);
+}
+
+/** The cardio slots in pager order, so the screen and the reducer agree on what pane N is. */
+export function cardioSlots(state: LoggerState): CardioSlot[] {
+  const slots: CardioSlot[] = [];
+  if (state.run) slots.push("run");
+  if (state.swim) slots.push("swim");
+  return slots;
+}
 
 /** First not-yet-completed set of an exercise, or `-1` when it is finished. */
 export function activeSetIndex(ex: LoggerExercise): number {
@@ -187,20 +212,17 @@ export function progress(state: LoggerState): number {
 /** The set the logger should focus next: active exercise first, then forward through the list. */
 export function nextPending(state: LoggerState): { exercise: number; set: number } | null {
   const n = state.exercises.length;
+  if (n === 0) return null;
+  // `activeIndex` can sit on a cardio pane; from there "next" means the first pending set anywhere.
+  const from = state.activeIndex < n ? state.activeIndex : 0;
   for (let step = 0; step < n; step++) {
-    const i = (state.activeIndex + step) % n;
+    const i = (from + step) % n;
     const ex = state.exercises[i];
     if (ex.skipped) continue;
     const set = activeSetIndex(ex);
     if (set !== -1) return { exercise: i, set };
   }
   return null;
-}
-
-/** Seconds left on the rest timer (0 when none / finished). */
-export function restRemaining(state: LoggerState, now: number): number {
-  if (state.restEndsAt === null) return 0;
-  return Math.max(0, Math.ceil((state.restEndsAt - now) / 1000));
 }
 
 /** Load-weighted sets per muscle key — the chips on the finish sheet. */
@@ -213,6 +235,25 @@ export function muscleSets(state: LoggerState): Record<string, number> {
     for (const m of ex.muscles) out[m.key] = round((out[m.key] ?? 0) + done * m.load, 1);
   }
   return out;
+}
+
+/** Σ reps × kg over this exercise's completed sets. Bodyweight sets move no tonnage. */
+export function exerciseTonnage(ex: LoggerExercise): number {
+  if (ex.skipped) return 0;
+  return round(
+    ex.sets.reduce((a, s) => (s.done && s.weightKg !== null ? a + s.reps * s.weightKg : a), 0),
+    1
+  );
+}
+
+/** The session's total tonnage — the one number that says "how much did I move today". */
+export function totalTonnage(state: LoggerState): number {
+  return round(state.exercises.reduce((a, e) => a + exerciseTonnage(e), 0), 1);
+}
+
+/** Does this session have any load at all? (a bodyweight/cardio day should not show a kg headline) */
+export function hasLoad(state: LoggerState): boolean {
+  return state.exercises.some((e) => !e.skipped && e.sets.some((s) => s.weightKg !== null));
 }
 
 /** Total completed reps (or seconds for `time` exercises) — the "hacim" number. */
@@ -250,6 +291,22 @@ function cardioInput(cardio: LoggerCardio | null): CompleteWorkoutInput["run"] {
   return { segments, targetKm: cardio.targetKm, targetMin: cardio.targetMin };
 }
 
+/**
+ * C1: the wire shape of one logged set. Declared here (rather than inlined in the payload literal)
+ * so `weightKg` travels whether or not core's `zSetEntry` has caught up — an object typed this way
+ * is structurally assignable to `SetEntryDTO[]` either way, and no excess-property check fires.
+ */
+export interface LoggedSetDTO {
+  reps: number;
+  rir: number | null;
+  weightKg: number | null;
+}
+
+function loggedSets(ex: LoggerExercise): LoggedSetDTO[] {
+  if (ex.skipped) return [];
+  return ex.sets.filter((s) => s.done).map((s) => ({ reps: s.reps, rir: s.rir, weightKg: s.weightKg }));
+}
+
 /** The `POST /program/complete` body. Only completed sets travel. */
 export function toCompleteInput(state: LoggerState, now: number): CompleteWorkoutInput {
   return {
@@ -262,7 +319,7 @@ export function toCompleteInput(state: LoggerState, now: number): CompleteWorkou
       source: e.source,
       skipped: e.skipped,
       metric: e.metric,
-      sets: e.skipped ? [] : e.sets.filter((s) => s.done).map((s) => ({ reps: s.reps, rir: s.rir })),
+      sets: loggedSets(e),
     })),
     run: cardioInput(state.run),
     swim: cardioInput(state.swim),
@@ -289,7 +346,7 @@ function mapCardio(state: LoggerState, slot: CardioSlot, fn: (c: LoggerCardio) =
 export function loggerReducer(state: LoggerState, action: LoggerAction): LoggerState {
   switch (action.type) {
     case "focus":
-      return { ...state, activeIndex: clamp(Math.trunc(action.index), 0, Math.max(0, state.exercises.length - 1)) };
+      return { ...state, activeIndex: clamp(Math.trunc(action.index), 0, Math.max(0, paneCount(state) - 1)) };
 
     case "complete-set": {
       const target = action.exercise !== undefined && action.set !== undefined ? { exercise: action.exercise, set: action.set } : nextPending(state);
@@ -305,17 +362,14 @@ export function loggerReducer(state: LoggerState, action: LoggerAction): LoggerS
         ...next,
         // Auto-advance the pane when this exercise is finished and something else is pending.
         activeIndex: after && exerciseDone(next.exercises[target.exercise]) ? after.exercise : next.activeIndex,
-        restEndsAt: after ? action.at + next.restSeconds * 1000 : null,
       };
     }
 
-    case "undo-set": {
-      const next = mapExercise(state, action.exercise, (e) => ({
+    case "undo-set":
+      return mapExercise(state, action.exercise, (e) => ({
         ...e,
         sets: e.sets.map((s, i) => (i === action.set ? { ...s, done: false } : s)),
       }));
-      return { ...next, restEndsAt: null };
-    }
 
     case "set-reps":
       return mapExercise(state, action.exercise, (e) => ({
@@ -329,11 +383,33 @@ export function loggerReducer(state: LoggerState, action: LoggerAction): LoggerS
         sets: e.sets.map((s, i) => (i === action.set ? { ...s, rir: action.value === null ? null : clamp(Math.round(action.value), 0, 10) } : s)),
       }));
 
+    case "set-weight": {
+      const value = action.value === null ? null : round(clamp(action.value, 0, MAX_WEIGHT_KG), 2);
+      return mapExercise(state, action.exercise, (e) => ({
+        ...e,
+        // You rarely change plates between sets, so the load carries onto every set still to come —
+        // including ones a prefill only *suggested*. Logged sets keep whatever they were logged
+        // with, and a genuinely different load per set is set when that set comes round.
+        // Reps deliberately do not carry: those are the number that varies as you fatigue.
+        sets: e.sets.map((s, i) => (i === action.set || (i > action.set && !s.done) ? { ...s, weightKg: value } : s)),
+      }));
+    }
+
+    case "prefill": {
+      if (action.weightKg === null && action.reps === null) return state;
+      const weightKg = action.weightKg === null ? null : round(clamp(action.weightKg, 0, MAX_WEIGHT_KG), 2);
+      const reps = action.reps === null ? null : clamp(Math.round(action.reps), 0, 10_000);
+      return mapExercise(state, action.exercise, (e) => ({
+        ...e,
+        sets: e.sets.map((s) => (s.done || s.weightKg !== null ? s : { ...s, weightKg, reps: reps ?? s.reps })),
+      }));
+    }
+
     case "add-set":
       return mapExercise(state, action.exercise, (e) => {
         if (e.sets.length >= 20) return e;
         const last = e.sets[e.sets.length - 1];
-        return { ...e, sets: [...e.sets, { reps: last?.reps ?? e.plannedReps, rir: last?.rir ?? e.plannedRIR, done: false }] };
+        return { ...e, sets: [...e.sets, { reps: last?.reps ?? e.plannedReps, rir: last?.rir ?? e.plannedRIR, weightKg: last?.weightKg ?? null, done: false }] };
       });
 
     case "remove-set":
@@ -347,7 +423,7 @@ export function loggerReducer(state: LoggerState, action: LoggerAction): LoggerS
       const next = mapExercise(state, action.exercise, (e) => ({ ...e, skipped: !e.skipped }));
       if (!next.exercises[action.exercise]?.skipped) return next;
       const after = nextPending(next);
-      return { ...next, activeIndex: after ? after.exercise : next.activeIndex, restEndsAt: null };
+      return { ...next, activeIndex: after ? after.exercise : next.activeIndex };
     }
 
     case "add-exercise": {
@@ -388,12 +464,6 @@ export function loggerReducer(state: LoggerState, action: LoggerAction): LoggerS
     case "segment-remove":
       return mapCardio(state, action.slot, (c) => (c.segments.length <= 1 ? c : { ...c, segments: c.segments.filter((s) => s.id !== action.id) }));
 
-    case "rest-skip":
-      return state.restEndsAt === null ? state : { ...state, restEndsAt: null };
-
-    case "rest-restart":
-      return { ...state, restEndsAt: action.at + state.restSeconds * 1000 };
-
     case "set-rpe":
       return { ...state, rpe: action.value === null ? null : clamp(Math.round(action.value), 1, 10) };
 
@@ -407,15 +477,41 @@ export function loggerReducer(state: LoggerState, action: LoggerAction): LoggerS
 
 /* --------------------------------- drafts --------------------------------- */
 
+/** A persisted draft, whichever schema version wrote it. Only the fields migration reads are typed. */
+type PersistedDraft = Partial<LoggerState> & {
+  version?: unknown;
+  restEndsAt?: number | null;
+  exercises?: (Partial<LoggerExercise> & { sets?: Partial<LoggerSet>[] })[];
+};
+
+/** v1 → v2: every set gains `weightKg: null` (missing load is not zero load) and rest timing goes. */
+function migrateV1(draft: PersistedDraft): LoggerState {
+  const { restEndsAt: _dropped, ...rest } = draft;
+  return {
+    ...(rest as LoggerState),
+    version: DRAFT_VERSION,
+    exercises: (draft.exercises ?? []).map((e) => ({
+      ...(e as LoggerExercise),
+      sets: (e.sets ?? []).map((s) => ({
+        reps: typeof s.reps === "number" ? s.reps : 0,
+        rir: typeof s.rir === "number" ? s.rir : null,
+        weightKg: typeof s.weightKg === "number" ? s.weightKg : null,
+        done: s.done === true,
+      })),
+    })),
+  };
+}
+
 /**
  * Validate a persisted draft against the day the program is actually on. A draft from another day,
- * another date or an older schema is dropped rather than confusing the user.
+ * another date or a schema this build does not know is dropped rather than confusing the user;
+ * an older but readable schema is migrated so a mid-session app update never loses logged work.
  */
 export function restoreDraft(raw: unknown, expect: { dayOrder: number; dateKey: string }): LoggerState | null {
   if (!raw || typeof raw !== "object") return null;
-  const d = raw as Partial<LoggerState>;
-  if (d.version !== DRAFT_VERSION) return null;
+  const d = raw as PersistedDraft;
+  if (typeof d.version !== "number" || d.version < 1 || d.version > DRAFT_VERSION) return null;
   if (d.dayOrder !== expect.dayOrder || d.dateKey !== expect.dateKey) return null;
   if (!Array.isArray(d.exercises) || typeof d.startedAt !== "number") return null;
-  return d as LoggerState;
+  return d.version === DRAFT_VERSION ? (d as LoggerState) : migrateV1(d);
 }

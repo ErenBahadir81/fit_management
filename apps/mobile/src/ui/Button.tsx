@@ -2,7 +2,8 @@ import React from "react";
 import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { absoluteFill, radii, spacing } from "../theme/tokens";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { resolveGlyph, type IconGlyph } from "./icons";
 import { Pressable, type PressableProps } from "./Pressable";
 import { Text } from "./Text";
 
@@ -13,8 +14,8 @@ export interface ButtonProps extends Omit<PressableProps, "children" | "style"> 
   label: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
-  icon?: IconName;
-  iconRight?: IconName;
+  icon?: IconGlyph;
+  iconRight?: IconGlyph;
   loading?: boolean;
   /** Stretch to the container width. */
   full?: boolean;
@@ -51,11 +52,11 @@ export function Button({ label, variant = "primary", size = "md", icon, iconRigh
       ]}
     >
       <View style={[styles.content, loading && styles.hidden]} accessibilityElementsHidden={Boolean(loading)}>
-        {icon && <Icon name={icon} size={size === "sm" ? 16 : 20} color={fg} />}
+        {icon && <Icon name={resolveGlyph(icon)} size={size === "sm" ? 16 : 20} color={fg} />}
         <Text variant={textVariant} style={{ color: fg }} numberOfLines={1}>
           {label}
         </Text>
-        {iconRight && <Icon name={iconRight} size={size === "sm" ? 16 : 20} color={fg} />}
+        {iconRight && <Icon name={resolveGlyph(iconRight)} size={size === "sm" ? 16 : 20} color={fg} />}
       </View>
       {loading && (
         <View style={styles.spinner} pointerEvents="none">

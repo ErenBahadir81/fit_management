@@ -2,8 +2,8 @@
  * TRAINING data layer — every training screen reads through these hooks, never `getApi()` directly.
  * Mutations are optimistic against the `["program"]` composite and roll back with a toast on failure.
  */
-import { useCallback } from "react";
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
+import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   advancePointer,
   jumpTo as jumpPointer,
@@ -11,6 +11,7 @@ import {
   trDateKey,
   type CompleteWorkoutInput,
   type ExerciseDTO,
+  type LastPerformance,
   type MuscleDTO,
   type ProgramInput,
   type ProgramView,
@@ -39,6 +40,7 @@ export const trainingKeys = {
   stats: (weeks: number) => ["training-stats", weeks] as const,
   exercises: (q: string) => ["exercises", q] as const,
   muscles: ["muscles"] as const,
+  lastPerformance: (name: string) => ["last-performance", name] as const,
 };
 
 /* --------------------------------- reads ---------------------------------- */
@@ -79,6 +81,35 @@ export function useMuscles() {
     queryFn: async () => (await getApi().catalog.muscles()).muscles,
     staleTime: 60 * 60_000,
   });
+}
+
+/**
+ * C1 — "what did I do last time?" for every exercise in the session, fetched in one pass so the
+ * pager does not fire a request per pane as the user swipes. Returns a lookup: `null` while a name
+ * is still loading or was never asked for, `{ dateKey: null, sets: [] }` when there is no history.
+ */
+export function useLastPerformances(names: readonly string[]): (name: string) => LastPerformance | null {
+  const unique = useMemo(() => [...new Set(names.filter((n) => n.trim().length > 0))], [names]);
+  const results = useQueries({
+    queries: unique.map((name) => ({
+      queryKey: trainingKeys.lastPerformance(name),
+      queryFn: () => getApi().training.lastPerformance(name),
+      // A past session cannot change while this one is open; one fetch per exercise is plenty.
+      staleTime: 30 * 60_000,
+      retry: false,
+    })),
+  });
+
+  const byName = useMemo(() => {
+    const map = new Map<string, LastPerformance>();
+    unique.forEach((name, i) => {
+      const data = results[i]?.data;
+      if (data) map.set(name, data);
+    });
+    return map;
+  }, [results, unique]);
+
+  return useCallback((name: string) => byName.get(name) ?? null, [byName]);
 }
 
 /** Refresh everything a completed/skipped session touches: program, recovery, history, stats, home and the weekly report. */

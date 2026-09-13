@@ -96,7 +96,7 @@ export function SwipeToDelete({ children, onDelete, enabled = true, deleteTestID
           minTarget={false}
           style={[styles.actionButton, { backgroundColor: colors.danger, borderRadius: radius }]}
         >
-          <Icon name="trash-outline" size={20} color="onPrimary" />
+          <Icon icon="delete" size={20} color="onPrimary" />
           <Text variant="caption" color="onPrimary">
             Sil
           </Text>

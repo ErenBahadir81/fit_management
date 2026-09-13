@@ -8,6 +8,7 @@ import { Button } from "../../../ui/Button";
 import { Card } from "../../../ui/Card";
 import { Chip } from "../../../ui/Chip";
 import { Icon } from "../../../ui/Icon";
+import type { AppIcon } from "../../../ui/icons";
 import { Text } from "../../../ui/Text";
 import { HOME_HEIGHTS } from "../HomeSkeleton";
 
@@ -24,7 +25,7 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
   if (!day) {
     return (
       <Card variant="muted" onPress={onOpenProgram} style={styles.min} testID="home-today">
-        <Row icon="barbell-outline" eyebrow="Program" title="Henüz program yok" body="Bir program seç, günleri ben takip edeyim." />
+        <Row icon="workout" eyebrow="Program" title="Henüz program yok" body="Bir program seç, günleri ben takip edeyim." />
       </Card>
     );
   }
@@ -33,7 +34,7 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
       <Card onPress={onOpenProgram} style={styles.min} testID="home-today">
         <View style={styles.head}>
           <View style={[styles.badge, { backgroundColor: colors.successSoft }]}>
-            <Icon name="checkmark" size={18} color="success" />
+            <Icon icon="check" size={18} color="success" />
           </View>
           <Text variant="label" tone="success">
             Tamamlandı
@@ -43,8 +44,8 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
           {log.title}
         </Text>
         <View style={styles.chips}>
-          {log.durationMin ? <Chip label={fmtDuration(log.durationMin)} size="sm" icon="time-outline" /> : null}
-          {log.strength.length ? <Chip label={`${log.strength.reduce((a, s) => a + s.sets.length, 0)} set`} size="sm" icon="layers-outline" /> : null}
+          {log.durationMin ? <Chip label={fmtDuration(log.durationMin)} size="sm" icon="duration" /> : null}
+          {log.strength.length ? <Chip label={`${log.strength.reduce((a, s) => a + s.sets.length, 0)} set`} size="sm" icon="volume" /> : null}
           {log.rpe ? <Chip label={`RPE ${log.rpe}`} size="sm" /> : null}
         </View>
         <Text variant="body" color="inkMuted">
@@ -56,14 +57,14 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
   if (log?.isOffDay) {
     return (
       <Card variant="muted" onPress={onOpenProgram} style={styles.min} testID="home-today">
-        <Row icon="play-skip-forward-outline" eyebrow="Bugün" title="Bugün atlandı" body="Sorun değil — program kaldığı yerden devam eder." />
+        <Row icon="skip" eyebrow="Bugün" title="Bugün atlandı" body="Sorun değil — program kaldığı yerden devam eder." />
       </Card>
     );
   }
   if (day.kind === "rest") {
     return (
       <Card variant="muted" onPress={onOpenProgram} style={styles.min} testID="home-today">
-        <Row icon="bed-outline" eyebrow="Bugün" title="Dinlenme günü" body="Kaslar dinlenirken büyür. Hafif yürüyüş, bol su, iyi uyku." />
+        <Row icon="rest" eyebrow="Bugün" title="Dinlenme günü" body="Kaslar dinlenirken büyür. Hafif yürüyüş, bol su, iyi uyku." />
       </Card>
     );
   }
@@ -85,18 +86,18 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
         </Text>
       ) : null}
       <View style={styles.cta}>
-        <Button label="Antrenmana başla" onPress={onOpenProgram} variant="inverse" icon="play" testID="home-start-workout" />
+        <Button label="Antrenmana başla" onPress={onOpenProgram} variant="inverse" icon="start" testID="home-start-workout" />
       </View>
     </Card>
   );
 }
 
-function Row({ icon, eyebrow, title, body }: { icon: React.ComponentProps<typeof Icon>["name"]; eyebrow: string; title: string; body: string }) {
+function Row({ icon, eyebrow, title, body }: { icon: AppIcon; eyebrow: string; title: string; body: string }) {
   const { colors } = useTheme();
   return (
     <View style={styles.rowWrap}>
       <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
-        <Icon name={icon} size={18} color="primary" />
+        <Icon icon={icon} size={18} color="primary" />
       </View>
       <View style={styles.rowTexts}>
         <Text variant="label" color="inkMuted">

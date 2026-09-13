@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zDateKey, zId, zIso, zMeal } from "./common";
+import { patchOf, zDateKey, zId, zIso, zMeal } from "./common";
 
 export const zPer100g = z.object({
   kcal: z.number().min(0).max(900),
@@ -46,7 +46,7 @@ export const zFoodInput = z.object({
   brand: z.string().trim().max(60).nullable().optional(),
 });
 export type FoodInput = z.infer<typeof zFoodInput>;
-export const zFoodUpdate = zFoodInput.partial();
+export const zFoodUpdate = patchOf(zFoodInput);
 
 export const zMealEntry = z.object({
   id: zId,

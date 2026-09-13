@@ -2,7 +2,8 @@ import React from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { spacing } from "../theme/tokens";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { resolveGlyph, type IconGlyph } from "./icons";
 import { Pressable } from "./Pressable";
 import { Text } from "./Text";
 
@@ -10,7 +11,7 @@ export interface ListRowProps {
   label: string;
   value?: string;
   hint?: string;
-  icon?: IconName;
+  icon?: IconGlyph;
   /** Custom trailing node (Toggle, Chip…). Replaces value + chevron. */
   right?: React.ReactNode;
   onPress?: () => void;
@@ -27,7 +28,7 @@ export function ListRow({ label, value, hint, icon, right, onPress, chevron = Bo
     <>
       {icon && (
         <View style={[styles.iconWrap, { backgroundColor: destructive ? colors.dangerSoft : colors.primarySoft }]}>
-          <Icon name={icon} size={18} color={destructive ? "danger" : "primary"} />
+          <Icon name={resolveGlyph(icon)} size={18} color={destructive ? "danger" : "primary"} />
         </View>
       )}
       <View style={styles.texts}>
@@ -47,7 +48,7 @@ export function ListRow({ label, value, hint, icon, right, onPress, chevron = Bo
               {value}
             </Text>
           ) : null}
-          {chevron && <Icon name="chevron-forward" size={18} color="inkSubtle" />}
+          {chevron && <Icon icon="forward" size={18} color="inkSubtle" />}
         </>
       )}
     </>

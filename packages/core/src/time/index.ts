@@ -140,6 +140,54 @@ export function previousWeekKeys(weekKey: string, n: number, includeSelf = false
   return out;
 }
 
+export const MONTHS_TR = [
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık",
+] as const;
+
+/**
+ * The locative suffix ("-de/-da/-te/-ta") each month name takes. A twelve-entry table beats a
+ * vowel-harmony implementation here: it is exhaustive, obviously correct, and never surprises.
+ */
+const MONTH_LOCATIVE_TR: Record<(typeof MONTHS_TR)[number], string> = {
+  Ocak: "'ta",
+  Şubat: "'ta",
+  Mart: "'ta",
+  Nisan: "'da",
+  Mayıs: "'ta",
+  Haziran: "'da",
+  Temmuz: "'da",
+  Ağustos: "'ta",
+  Eylül: "'de",
+  Ekim: "'de",
+  Kasım: "'da",
+  Aralık: "'ta",
+};
+
+/** "2026-01-17" → "17 Ocak". Deterministic — no Intl, so it reads the same on every runtime. */
+export function formatDayMonthTr(key: string): string {
+  const [, m, d] = key.split("-").map(Number);
+  const month = MONTHS_TR[(m ?? 1) - 1] ?? MONTHS_TR[0];
+  return `${d ?? 1} ${month}`;
+}
+
+/** "2026-01-17" → "17 Ocak'ta" — the form a sentence needs. */
+export function formatDayMonthLocativeTr(key: string): string {
+  const [, m, d] = key.split("-").map(Number);
+  const month = MONTHS_TR[(m ?? 1) - 1] ?? MONTHS_TR[0];
+  return `${d ?? 1} ${month}${MONTH_LOCATIVE_TR[month]}`;
+}
+
 /** Date formatting always in Türkiye time (tr-TR). */
 export function formatTRDate(d: Date | string, opts: Intl.DateTimeFormatOptions): string {
   const date = typeof d === "string" ? new Date(d) : d;

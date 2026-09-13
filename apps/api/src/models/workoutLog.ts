@@ -1,7 +1,15 @@
 import mongoose, { Schema, model, type Model, type Types } from "mongoose";
-import type { CardioEntryDTO, StrengthEntryDTO, WorkoutLogDTO } from "@fitfloow/core";
+import type { CardioEntryDTO, SetEntryDTO, StrengthEntryDTO, WorkoutLogDTO } from "@fitfloow/core";
 
-const SetEntrySchema = new Schema({ reps: { type: Number, required: true }, rir: { type: Number, default: null } }, { _id: false });
+/**
+ * `weightKg` (C1) landed in 2.1: every set stored before it has no such field. `default: null`
+ * covers hydrated reads, and `toSetEntryDTO` covers `.lean()` ones — a missing load is always
+ * `null` ("bodyweight / not recorded"), never `0`.
+ */
+const SetEntrySchema = new Schema(
+  { reps: { type: Number, required: true }, rir: { type: Number, default: null }, weightKg: { type: Number, default: null } },
+  { _id: false }
+);
 const MuscleLoadSchema = new Schema({ key: { type: String, required: true }, load: { type: Number, default: 1 } }, { _id: false });
 
 const StrengthEntrySchema = new Schema(
@@ -79,6 +87,34 @@ WorkoutLogSchema.index({ userId: 1, dateKey: 1 });
 
 export const WorkoutLog: Model<WorkoutLogDoc> = (mongoose.models.WorkoutLog as Model<WorkoutLogDoc>) || model<WorkoutLogDoc>("WorkoutLog", WorkoutLogSchema);
 
+/** Normalizes one set, filling in the load a pre-2.1 document simply does not have. */
+export function toSetEntryDTO(s: Partial<SetEntryDTO> | null | undefined): SetEntryDTO {
+  const weightKg = s?.weightKg;
+  return {
+    reps: typeof s?.reps === "number" ? s.reps : 0,
+    rir: typeof s?.rir === "number" ? s.rir : null,
+    weightKg: typeof weightKg === "number" && Number.isFinite(weightKg) ? weightKg : null,
+  };
+}
+
+/**
+ * Field-by-field on purpose: `l.strength` is a Mongoose DocumentArray on a hydrated log, and
+ * spreading a subdocument copies its internals instead of its data.
+ */
+export function toStrengthEntryDTO(e: StrengthEntryDTO): StrengthEntryDTO {
+  return {
+    name: e.name,
+    muscles: (e.muscles ?? []).map((m) => ({ key: m.key, load: m.load ?? 1 })),
+    plannedSets: e.plannedSets ?? 0,
+    plannedReps: e.plannedReps ?? 0,
+    plannedRIR: e.plannedRIR ?? null,
+    source: e.source ?? "planned",
+    skipped: e.skipped ?? false,
+    metric: e.metric ?? "reps",
+    sets: (e.sets ?? []).map(toSetEntryDTO),
+  };
+}
+
 export function toWorkoutLogDTO(l: WorkoutLogDoc): WorkoutLogDTO {
   return {
     id: String(l._id),
@@ -89,7 +125,7 @@ export function toWorkoutLogDTO(l: WorkoutLogDoc): WorkoutLogDTO {
     title: l.title,
     kind: l.kind,
     isOffDay: l.isOffDay,
-    strength: l.strength ?? [],
+    strength: (l.strength ?? []).map(toStrengthEntryDTO),
     run: l.run ?? null,
     swim: l.swim ?? null,
     durationMin: l.durationMin ?? null,

@@ -64,4 +64,15 @@ describe("ProfileScreen", () => {
     await fireEvent.press(screen.getByText("Çıkış yap"));
     await waitFor(() => expect(useSession.getState().status).toBe("signedOut"));
   });
+
+  test("the birth date is a real picker, not a date-format text field", async () => {
+    await renderUI(<ProfileScreen />);
+    await waitFor(() => expect(screen.getByTestId("birth-row")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("birth-row"));
+    await waitFor(() => expect(screen.getByTestId("birth-picker-year")).toBeTruthy());
+    expect(screen.queryByPlaceholderText(/\d{4}-\d{2}-\d{2}/)).toBeNull();
+    await fireEvent.press(screen.getByTestId("birth-picker-year-option-1990"));
+    await fireEvent.press(screen.getByTestId("birth-save"));
+    await waitFor(() => expect(useSession.getState().user?.birthDate?.startsWith("1990-")).toBe(true));
+  });
 });

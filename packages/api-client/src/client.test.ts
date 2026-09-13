@@ -94,6 +94,46 @@ describe("api-client", () => {
     expect((await api.admin.users()).users).toEqual([]);
   });
 
+  it("register stores tokens exactly like login", async () => {
+    const tokens = memoryTokenStore();
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://api/auth/register");
+      expect((init?.headers as Record<string, string>).authorization).toBeUndefined();
+      return jsonResponse(200, { accessToken: "a", refreshToken: "r", user: { id: "u", onboardingCompleted: false } });
+    });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never, tokens });
+    const res = await api.auth.register({ username: "eren", password: "coksaglam", displayName: "Eren" });
+    expect(res.user.onboardingCompleted).toBe(false);
+    expect(await tokens.getAccessToken()).toBe("a");
+    expect(await tokens.getRefreshToken()).toBe("r");
+  });
+
+  it("onboarding.complete and me.energy hit their routes", async () => {
+    const calls: string[] = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? "GET"} ${url}`);
+      return jsonResponse(200, url.endsWith("/onboarding") ? { user: {}, bodyEntry: {}, goal: null } : { bmr: 1800 });
+    });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never });
+    await api.onboarding.complete({
+      profile: { gender: "male", birthDate: "1996-04-12", heightCm: 180, activityLevel: "moderate", measurementDay: 0 },
+      measurement: { weightKg: 88, neckCm: 39, waistCm: 96 },
+      goal: { targetBodyFatPct: 15, profile: "optimal" },
+    });
+    expect((await api.me.energy()).bmr).toBe(1800);
+    expect(calls).toEqual(["POST http://api/onboarding", "GET http://api/me/energy"]);
+  });
+
+  it("lastPerformance URL-encodes the exercise name", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("http://api/training/exercises/Bench%20Press%2FDB/last");
+      return jsonResponse(200, { dateKey: "2026-09-08", sets: [{ reps: 8, rir: 2, weightKg: 60 }] });
+    });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never });
+    const res = await api.training.lastPerformance("Bench Press/DB");
+    expect(res.sets[0].weightKg).toBe(60);
+  });
+
   it("204 resolves to undefined", async () => {
     const api = createApiClient({ baseUrl: "http://api", fetch: (async () => new Response(null, { status: 204 })) as never });
     await expect(api.training.deleteWorkout("x")).resolves.toBeUndefined();

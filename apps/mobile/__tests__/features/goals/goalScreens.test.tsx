@@ -29,10 +29,13 @@ describe("GoalSetupScreen", () => {
     useSession.setState({ status: "signedIn", user: (await api.auth.me()).user });
   });
 
-  test("current bf, a default target 5 points lower, the instant preview, and slider snapping through a11y actions", async () => {
+  test("current bf, a default target 5 points lower, the instant outcome, and slider snapping through a11y actions", async () => {
     await api.goals.abandon();
     await renderUI(<GoalSetupScreen />, { queryClient: makeQueryClient() });
-    await waitFor(() => expect(screen.getByTestId("goal-slider")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("goal-intent")).toBeTruthy());
+    // Intent leads; fat loss is preselected when the body has room for it.
+    expect(screen.getByTestId("goal-intent-lose").props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByTestId("goal-slider")).toBeTruthy();
     const summary = await api.body.summary();
     const bf = summary.latest!.bodyFatPct;
     const def = defaultTarget("male", bf);
@@ -41,7 +44,7 @@ describe("GoalSetupScreen", () => {
 
     const user = (await api.auth.me()).user;
     const plan = instantPlan({ sex: "male", weightKg: summary.latest!.weightKg, bodyFatPct: bf, heightCm: summary.latest!.heightCm, birthDate: user.birthDate, activityLevel: user.activityLevel, targetBodyFatPct: def, profile: "optimal", todayKey: TODAY });
-    expect(screen.getByTestId("preview-weeks").props.children).toBe(`${plan.estimatedWeeks} hafta`);
+    expect(screen.getByTestId("outcome-weeks").props.children).toBe(`${plan.estimatedWeeks} hafta`);
     expect(screen.getByTestId("goal-slider").props.accessibilityValue).toMatchObject({ min: 5, now: def });
 
     await a11y(screen.getByTestId("goal-slider"), "decrement");
@@ -50,9 +53,30 @@ describe("GoalSetupScreen", () => {
     await a11y(screen.getByTestId("goal-slider"), "increment");
     await a11y(screen.getByTestId("goal-slider"), "increment");
     expect(screen.getByTestId("goal-target").props.children).toBe(fmtPct(def + 0.5, 1));
-    // pace switch changes the preview
-    await fireEvent.press(screen.getByTestId("goal-profile-aggressive"));
-    await waitFor(() => expect(screen.getByTestId("preview-weeks").props.children).not.toBe(`${plan.estimatedWeeks} hafta`));
+    // every pace shows the date it lands on, so the trade-off is visible before committing
+    for (const pace of ["conservative", "optimal", "aggressive"]) expect(screen.getByTestId(`goal-pace-${pace}-date`)).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("goal-pace-aggressive"));
+    await waitFor(() => expect(screen.getByTestId("outcome-weeks").props.children).not.toBe(`${plan.estimatedWeeks} hafta`));
+  });
+
+  test("the outcome card leads with the arrival date and carries the milestone spine", async () => {
+    await api.goals.abandon();
+    await renderUI(<GoalSetupScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("outcome-date")).toBeTruthy());
+    expect(screen.getByTestId("outcome-spine")).toBeTruthy();
+    expect(screen.getByTestId("outcome-kcal").props.children).toMatch(/kcal$/);
+  });
+
+  test("choosing to hold steady drops the plan and offers a maintenance calorie level instead", async () => {
+    await api.goals.abandon();
+    await renderUI(<GoalSetupScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("goal-intent-maintain")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("goal-intent-maintain"));
+    expect(screen.queryByTestId("goal-slider")).toBeNull();
+    expect(screen.getByText("Kilonu koruyan günlük kalori")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("goal-submit"));
+    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
+    expect(api.fake.goal?.status).not.toBe("active");
   });
 
   test("'Hedefi başlat' creates the goal, Floo cheers, and the roadmap is one tap away", async () => {
@@ -72,7 +96,7 @@ describe("GoalSetupScreen", () => {
   test("edit mode preloads the active target/pace and PATCHes the goal", async () => {
     await renderUI(<GoalSetupScreen mode="edit" />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("goal-target").props.children).toBe(fmtPct(15, 1)));
-    expect(screen.getByTestId("goal-profile-conservative").props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByTestId("goal-pace-conservative").props.accessibilityState).toMatchObject({ selected: true });
     await a11y(screen.getByTestId("goal-slider"), "decrement");
     await fireEvent.press(screen.getByText("Hedefi güncelle"));
     await waitFor(() => expect(api.fake.goal?.targetBodyFatPct).toBe(14.5));
@@ -108,6 +132,16 @@ describe("RoadmapScreen", () => {
     await waitFor(() => expect(screen.getAllByTestId(/^week-row-/).length).toBe(goal!.plan.roadmap.length));
     expect(screen.getByText("Bu hafta")).toBeTruthy();
     expect(screen.getByTestId(`week-row-${progress!.weekIndexInPlan}`)).toBeTruthy();
+  });
+
+  test("the plan reads as one sentence, and the milestone spine answers 'when do I get where'", async () => {
+    await renderUI(<RoadmapScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("roadmap-summary")).toBeTruthy());
+    const { goal } = await api.goals.current();
+    expect(screen.getByTestId("roadmap-summary").props.children).toBe(goal!.plan.summaryTr);
+    const stops = goal!.plan.milestones.length;
+    expect(stops).toBeGreaterThan(0);
+    for (let i = 0; i < stops; i++) expect(screen.getByTestId(`roadmap-spine-${i}`)).toBeTruthy();
   });
 
   test("recalibration applies the measured TDEE and explains the result in a sheet", async () => {

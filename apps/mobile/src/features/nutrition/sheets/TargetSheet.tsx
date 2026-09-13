@@ -18,6 +18,8 @@ const DERIVED_TR: Record<NonNullable<DietTargetDTO["derivedFrom"]>, string> = {
 
 export interface TargetSheetProps {
   target: DietTargetDTO;
+  /** Closes the sheet and leaves the full breakdown (BMR, maintenance, deficit) on the tab behind it. */
+  onExplain?: () => void;
   onSave: (input: { mode: "auto" | "manual"; calories?: number; protein?: number; carbs?: number; fat?: number }) => void;
   onClose: () => void;
   saving?: boolean;
@@ -29,7 +31,7 @@ const num = (v: string) => {
 };
 
 /** Auto (from the goal) or manual macros. Auto is the default and needs no input. */
-export function TargetSheet({ target, onSave, onClose, saving }: TargetSheetProps) {
+export function TargetSheet({ target, onSave, onClose, saving, onExplain }: TargetSheetProps) {
   const [mode, setMode] = useState<"auto" | "manual">(target.mode);
   const [calories, setCalories] = useState(String(Math.round(target.calories)));
   const [protein, setProtein] = useState(String(Math.round(target.protein)));
@@ -68,6 +70,9 @@ export function TargetSheet({ target, onSave, onClose, saving }: TargetSheetProp
             <Text variant="caption" color="inkMuted" tabular>
               P {fmtInt(target.protein)} g · K {fmtInt(target.carbs)} g · Y {fmtInt(target.fat)} g
             </Text>
+            {onExplain ? (
+              <Button label="Bu sayı nereden geliyor?" variant="ghost" size="sm" iconRight="forward" onPress={onExplain} style={styles.explain} testID="target-explain" />
+            ) : null}
           </Surface>
         ) : (
           <View style={styles.form}>
@@ -102,6 +107,7 @@ export function TargetSheet({ target, onSave, onClose, saving }: TargetSheetProp
 const styles = StyleSheet.create({
   stack: { gap: spacing.lg },
   auto: { padding: spacing.lg, gap: spacing.xxs },
+  explain: { alignSelf: "flex-start", marginTop: spacing.sm, paddingHorizontal: 0 },
   form: { gap: spacing.md },
   row: { flexDirection: "row", gap: spacing.md },
   grow: { flex: 1 },

@@ -42,7 +42,8 @@ export async function toAdminUserDTOs(users: UserDoc[]): Promise<AdminUserDTO[]>
     Program.distinct("userId", { userId: { $in: ids } }),
     Goal.find({ userId: { $in: ids } })
       .select({ userId: 1, status: 1 })
-      .sort({ createdAt: -1 })
+      // `_id` breaks a same-millisecond `createdAt` tie so "the most recent goal" is stable.
+      .sort({ createdAt: -1, _id: -1 })
       .lean(),
   ]);
   const withProgram = new Set(programUserIds.map((v) => String(v)));

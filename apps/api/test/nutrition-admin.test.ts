@@ -153,6 +153,36 @@ describe("admin foods", () => {
     expect(await Food.findById(food.id).lean()).toBeNull();
   });
 
+  it("renaming a food keeps everything the edit did not mention", async () => {
+    const { headers } = await asAdmin(t);
+    const created = await t.app.inject({
+      method: "POST",
+      url: url("/admin/foods"),
+      headers,
+      payload: {
+        name: "Mercimek çorbası",
+        aliases: ["mercimek", "corba"],
+        category: "çorba",
+        per100g: { kcal: 90, protein: 5, carbs: 12, fat: 2 },
+        defaultServingG: 250,
+        servings: [{ label: "1 kâse", grams: 250 }],
+      },
+    });
+    const food = created.json().food;
+    await t.app.inject({ method: "PATCH", url: url(`/admin/foods/${food.id}`), headers, payload: { verified: true } });
+
+    const patched = await t.app.inject({ method: "PATCH", url: url(`/admin/foods/${food.id}`), headers, payload: { name: "Ezogelin çorbası" } });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().food).toMatchObject({
+      name: "Ezogelin çorbası",
+      aliases: ["mercimek", "corba"],
+      category: "çorba",
+      defaultServingG: 250,
+      servings: [{ label: "1 kâse", grams: 250 }],
+      verified: true,
+    });
+  });
+
   it("404s on an unknown id", async () => {
     const { headers } = await asAdmin(t);
     expect((await t.app.inject({ method: "PATCH", url: url("/admin/foods/nope"), headers, payload: { verified: true } })).statusCode).toBe(404);

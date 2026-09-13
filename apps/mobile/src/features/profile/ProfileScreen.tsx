@@ -14,15 +14,16 @@ import { Header } from "../../ui/Header";
 import { ListRow } from "../../ui/ListRow";
 import { Screen } from "../../ui/Screen";
 import { Segmented } from "../../ui/Segmented";
+import { DatePicker } from "../../ui/DatePicker";
 import { Sheet, SheetActions, useSheet } from "../../ui/Sheet";
 import { Stepper } from "../../ui/Stepper";
 import { Text } from "../../ui/Text";
-import { TextField } from "../../ui/TextField";
 import { Toggle } from "../../ui/Toggle";
 import { useSession } from "../auth/session";
 import { useUpdateMe } from "./useUpdateMe";
 
 const ACTIVITY_KEYS = Object.keys(ACTIVITY_TR) as ActivityLevel[];
+const THIS_YEAR = new Date().getUTCFullYear();
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "system", label: "Sistem" },
   { value: "light", label: "Açık" },
@@ -36,8 +37,7 @@ export function ProfileScreen() {
   const { colors, mode, setMode } = useTheme();
   const update = useUpdateMe();
   const { ref: birthRef, present: openBirth, dismiss: closeBirth } = useSheet();
-  const [birthDraft, setBirthDraft] = useState("");
-  const [birthError, setBirthError] = useState<string | null>(null);
+  const [birthDraft, setBirthDraft] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
   if (!user) return null;
@@ -49,10 +49,8 @@ export function ProfileScreen() {
     .toUpperCase();
 
   const saveBirth = () => {
-    const v = birthDraft.trim();
-    if (!isDateKey(v)) return setBirthError("YYYY-AA-GG biçiminde gir (örn. 1996-04-12).");
-    setBirthError(null);
-    update.mutate({ birthDate: v });
+    if (!birthDraft || !isDateKey(birthDraft)) return;
+    update.mutate({ birthDate: birthDraft });
     closeBirth();
   };
 
@@ -96,13 +94,13 @@ export function ProfileScreen() {
         <Card padded={false} style={styles.listCard}>
           <ListRow
             label="Boy"
-            icon="resize-outline"
+            icon="height"
             right={<Stepper value={user.heightCm ?? 170} min={120} max={230} step={1} size="sm" format={(v) => `${v} cm`} onChange={(v) => update.mutate({ heightCm: v })} testID="height" />}
           />
           <Divider inset={spacing.lg} />
           <ListRow
             label="Cinsiyet"
-            icon="male-female-outline"
+            icon="gender"
             right={
               <Segmented<Gender>
                 options={[
@@ -120,11 +118,10 @@ export function ProfileScreen() {
           <Divider inset={spacing.lg} />
           <ListRow
             label="Doğum tarihi"
-            icon="calendar-outline"
+            icon="calendar"
             value={user.birthDate ? fmtDate(user.birthDate, "long") : "Ekle"}
             onPress={() => {
-              setBirthDraft(user.birthDate ?? "");
-              setBirthError(null);
+              setBirthDraft(user.birthDate);
               openBirth();
             }}
             testID="birth-row"
@@ -134,10 +131,10 @@ export function ProfileScreen() {
 
       <Section title="Uygulama">
         <Card padded={false} style={styles.listCard}>
-          <ListRow label="Floo" hint="Maskot mesajlarını göster" icon="happy-outline" right={<Toggle value={user.mascotEnabled} onChange={(v) => update.mutate({ mascotEnabled: v })} accessibilityLabel="Floo maskotu" testID="mascot-toggle" />} />
+          <ListRow label="Floo" hint="Maskot mesajlarını göster" icon="mascot" right={<Toggle value={user.mascotEnabled} onChange={(v) => update.mutate({ mascotEnabled: v })} accessibilityLabel="Floo maskotu" testID="mascot-toggle" />} />
           <Divider inset={spacing.lg} />
           <View style={styles.themeRow}>
-            <ListRow label="Tema" icon="contrast-outline" />
+            <ListRow label="Tema" icon="theme" />
             <Segmented<ThemeMode> options={THEME_OPTIONS} value={mode} onChange={setMode} size="sm" testID="theme" />
           </View>
         </Card>
@@ -146,7 +143,7 @@ export function ProfileScreen() {
       <Button
         label="Çıkış yap"
         variant="danger"
-        icon="log-out-outline"
+        icon="logout"
         full
         loading={signingOut}
         onPress={async () => {
@@ -161,10 +158,13 @@ export function ProfileScreen() {
       </Text>
 
       <Sheet ref={birthRef} title="Doğum tarihi">
-        <TextField label="Tarih" value={birthDraft} onChangeText={setBirthDraft} placeholder="1996-04-12" keyboardType="numbers-and-punctuation" error={birthError} hint="Yaş, bazal metabolizma hesabında kullanılır." testID="birth-input" />
+        <Text variant="caption" color="inkMuted" style={styles.sheetHint}>
+          Yaş, bazal metabolizma hesabına giriyor.
+        </Text>
+        <DatePicker value={birthDraft} onChange={setBirthDraft} label="Doğum tarihi" minYear={THIS_YEAR - 100} maxYear={THIS_YEAR - 13} testID="birth-picker" />
         <SheetActions>
           <Button label="Vazgeç" variant="ghost" onPress={closeBirth} style={styles.flex} />
-          <Button label="Kaydet" onPress={saveBirth} style={styles.flex} />
+          <Button label="Kaydet" onPress={saveBirth} disabled={!birthDraft} style={styles.flex} testID="birth-save" />
         </SheetActions>
       </Sheet>
     </Screen>
@@ -196,4 +196,5 @@ const styles = StyleSheet.create({
   segSmall: { width: 150 },
   themeRow: { gap: spacing.sm, paddingBottom: spacing.md },
   flex: { flex: 1 },
+  sheetHint: { marginBottom: spacing.sm },
 });

@@ -6,6 +6,7 @@ import { round } from "../utils/index";
 import { previousWeekKeys, shiftKey, trDateKey, weekKeyFor, type Weekday } from "../time/index";
 import type { MuscleDTO, TrainingStats } from "../schemas/index";
 import { buildHits, effectiveSets } from "./recovery";
+import { logTonnageKg } from "./tonnage";
 import { toMs, type WorkoutLogLike } from "./types";
 
 export interface TrainingStatsInput {
@@ -62,7 +63,7 @@ export function buildTrainingStats(input: TrainingStatsInput): TrainingStats {
   const known = new Set(muscles.map((m) => m.key));
 
   const buckets = new Map<string, TrainingStats["weeks"][number]>();
-  for (const weekKey of weekKeys) buckets.set(weekKey, { weekKey, sessions: 0, sets: 0, cardioKm: 0, volumeByMuscle: {} });
+  for (const weekKey of weekKeys) buckets.set(weekKey, { weekKey, sessions: 0, sets: 0, cardioKm: 0, tonnageKg: 0, volumeByMuscle: {} });
 
   for (const log of logs ?? []) {
     if (!log || log.isOffDay) continue;
@@ -71,6 +72,7 @@ export function buildTrainingStats(input: TrainingStatsInput): TrainingStats {
     bucket.sessions += 1;
     bucket.sets += loggedSets(log);
     bucket.cardioKm = round(bucket.cardioKm + cardioKm(log), 2);
+    bucket.tonnageKg = round(bucket.tonnageKg + logTonnageKg(log), 2);
     for (const hit of buildHits([log])) {
       if (!known.has(hit.key)) continue;
       bucket.volumeByMuscle[hit.key] = round((bucket.volumeByMuscle[hit.key] ?? 0) + effectiveSets(hit), 1);

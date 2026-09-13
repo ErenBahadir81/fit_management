@@ -9,7 +9,7 @@ import { Chip } from "../../../ui/Chip";
 import { Icon } from "../../../ui/Icon";
 import { Ring } from "../../../ui/Ring";
 import { Text } from "../../../ui/Text";
-import { ON_TRACK_TR } from "../../home/components/GoalCard";
+import { ON_TRACK_TR } from "../../goals/goalIntent";
 import { scoreTone } from "../../reports/reportMath";
 import { BODY_HEIGHTS } from "../BodySkeleton";
 
@@ -22,7 +22,7 @@ export function GoalLinkCard({ view, onPress }: { view: GoalView | undefined; on
     return (
       <Card variant="muted" onPress={onPress} style={styles.min} testID="body-goal-link" accessibilityLabel="Hedef belirle">
         <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
-          <Icon name="flag-outline" size={18} color="primary" />
+          <Icon icon="goal" size={18} color="primary" />
         </View>
         <Text variant="bodyStrong" style={styles.title}>
           Hedef belirle
@@ -71,7 +71,7 @@ export function ReportLinkCard({ report, onPress }: { report: WeeklyReportDTO | 
           </Ring>
         ) : (
           <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
-            <Icon name="newspaper-outline" size={18} color="primary" />
+            <Icon icon="report" size={18} color="primary" />
           </View>
         )}
         <View style={styles.texts}>
@@ -87,7 +87,7 @@ export function ReportLinkCard({ report, onPress }: { report: WeeklyReportDTO | 
         <Text variant="caption" color="inkSubtle" tabular numberOfLines={1}>
           {report ? `${report.nutrition.daysLogged} gün kayıt · ${report.training.sessions} antrenman` : "Puan ve özet"}
         </Text>
-        <Icon name="chevron-forward" size={14} color="inkSubtle" />
+        <Icon icon="forward" size={14} color="inkSubtle" />
       </View>
     </Card>
   );

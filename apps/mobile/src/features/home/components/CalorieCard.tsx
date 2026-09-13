@@ -23,7 +23,7 @@ export function CalorieCard({ today, onPress }: { today: HomeDTO["today"]; onPre
             <Text variant="label" color="inkMuted">
               Bugün
             </Text>
-            <Icon name="chevron-forward" size={16} color="inkSubtle" />
+            <Icon icon="forward" size={16} color="inkSubtle" />
           </View>
           <Text variant="title" tabular>
             {fmtInt(calories.eaten)}

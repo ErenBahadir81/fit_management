@@ -7,20 +7,58 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "web": { "bundler": "metro", "output": "single", "favicon": "./assets/icon.png" },
-    "ios": { "supportsTablet": false, "bundleIdentifier": "net.floow.fitfloow" },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/icon.png"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "net.floow.fitfloow"
+    },
     "android": {
       "package": "net.floow.fitfloow",
       "edgeToEdgeEnabled": true,
-      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#6D5DF6" }
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6D5DF6"
+      }
     },
     "plugins": [
       "expo-router",
-      ["expo-camera", { "cameraPermission": "FitFloow yemeklerini tanımak için kameranı kullanır." }],
-      ["expo-image-picker", { "photosPermission": "FitFloow yemek fotoğraflarını seçmek için galerine erişir." }],
-      ["expo-splash-screen", { "backgroundColor": "#0B0D12", "image": "./assets/splash-icon.png", "imageWidth": 160, "resizeMode": "contain" }],
-      "expo-secure-store"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "FitFloow yemeklerini tan\u0131mak i\u00e7in kameran\u0131 kullan\u0131r."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FitFloow yemek foto\u011fraflar\u0131n\u0131 se\u00e7mek i\u00e7in galerine eri\u015fir."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B0D12",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-secure-store",
+      "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "color": "#6D5DF6",
+          "defaultChannel": "rest-timer"
+        }
+      ]
     ],
-    "experiments": { "typedRoutes": true }
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

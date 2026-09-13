@@ -1,11 +1,12 @@
 import React, { memo, useCallback, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import type { WorkoutLogDTO } from "@fitfloow/core";
-import { fmtDate, fmtDuration, fmtNumber } from "../../../lib/format";
+import { fmtDate, fmtDuration, fmtInt, fmtNumber } from "../../../lib/format";
 import { relativeDayLabel } from "../../../lib/dates";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
-import { Icon, type IconName } from "../../../ui/Icon";
+import { Icon } from "../../../ui/Icon";
+import type { AppIcon } from "../../../ui/icons";
 import { Pressable } from "../../../ui/Pressable";
 import { SwipeToDelete } from "../../../ui/SwipeToDelete";
 import { Text } from "../../../ui/Text";
@@ -13,12 +14,12 @@ import { logSummary } from "../lib/present";
 
 export const HISTORY_ROW_HEIGHT = 76;
 
-const KIND_ICON: Record<WorkoutLogDTO["kind"], IconName> = {
-  strength: "barbell-outline",
-  run: "walk-outline",
-  swim: "water-outline",
-  stretch: "body-outline",
-  rest: "bed-outline",
+const KIND_ICON: Record<WorkoutLogDTO["kind"], AppIcon> = {
+  strength: "strength",
+  run: "run",
+  swim: "swim",
+  stretch: "stretch",
+  rest: "rest",
 };
 
 export interface HistoryRowProps {
@@ -34,7 +35,13 @@ export const HistoryRow = memo(function HistoryRow({ log, onPress, onDelete }: H
   const remove = useCallback(() => onDelete(log), [log, onDelete]);
   const open = useCallback(() => onPress(log), [log, onPress]);
 
-  const meta = [s.sets > 0 ? `${s.sets} set` : null, s.km > 0 ? `${fmtNumber(s.km, 1)} km` : null, log.durationMin ? fmtDuration(log.durationMin) : null, log.rpe ? `RPE ${log.rpe}` : null]
+  // What happened, heaviest fact first: the load you moved, then the work, then the time it took.
+  const meta = [
+    s.tonnageKg > 0 ? `${fmtInt(s.tonnageKg)} kg` : null,
+    s.sets > 0 ? `${s.sets} set` : null,
+    s.km > 0 ? `${fmtNumber(s.km, 1)} km` : null,
+    log.durationMin ? fmtDuration(log.durationMin) : null,
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -51,18 +58,18 @@ export const HistoryRow = memo(function HistoryRow({ log, onPress, onDelete }: H
         style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
         <View style={[styles.icon, { backgroundColor: log.isOffDay ? colors.warningSoft : colors.primarySoft }]}>
-          <Icon name={log.isOffDay ? "play-skip-forward-outline" : KIND_ICON[log.kind]} size={18} color={log.isOffDay ? "warning" : "primary"} />
+          <Icon icon={log.isOffDay ? "skip" : KIND_ICON[log.kind]} size={18} color={log.isOffDay ? "warning" : "primary"} />
         </View>
         <View style={styles.texts}>
           <Text variant="bodyStrong" numberOfLines={1}>
             {log.isOffDay ? "Atlandı" : log.title}
           </Text>
-          <Text variant="caption" color="inkMuted" tabular numberOfLines={1}>
+          <Text variant="caption" color="inkMuted" tabular numberOfLines={1} testID={`history-meta-${log.id}`}>
             {relativeDayLabel(log.dateKey)}
             {meta ? ` · ${meta}` : ""}
           </Text>
         </View>
-        <Icon name="chevron-forward" size={18} color="inkSubtle" />
+        <Icon icon="forward" size={18} color="inkSubtle" />
       </Pressable>
     </SwipeToDelete>
   );

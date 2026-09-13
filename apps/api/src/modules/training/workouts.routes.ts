@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { zDateKey, zUpdateWorkoutInput, type WorkoutLogDTO } from "@fitfloow/core";
+import { zDateKey, zUpdateWorkoutInput, type LastPerformance, type WorkoutLogDTO } from "@fitfloow/core";
 import { AppError } from "../../lib/errors";
-import { WorkoutLog, toWorkoutLogDTO, type WorkoutLogDoc } from "../../models/workoutLog";
+import { WorkoutLog, toSetEntryDTO, toWorkoutLogDTO, type WorkoutLogDoc } from "../../models/workoutLog";
+import { escapeRegex } from "../platform/users.service";
 import { buildCardio, buildStrengthEntries, catalogFor, invalidateWeeks, measurementDayOf, objectIdOrNotFound, workoutFilter } from "./service";
 
 const zListQuery = z.object({
@@ -12,9 +13,32 @@ const zListQuery = z.object({
   before: z.string().optional(),
 });
 const zIdParams = z.object({ id: z.string().min(1) });
+const zExerciseNameParams = z.object({ name: z.string().trim().min(1).max(80) });
 
 export async function workoutRoutes(app: FastifyInstance) {
   const auth = { preHandler: [app.authenticate] };
+
+  /**
+   * C1 — "last time you did this". The most recent session in which the caller actually logged
+   * this exercise (skipped or empty entries do not count). An exercise never logged is an empty
+   * answer, not a 404: "no history" is information, not an error.
+   */
+  app.get("/training/exercises/:name/last", { ...auth, schema: { params: zExerciseNameParams } }, async (req): Promise<LastPerformance> => {
+    const { name } = req.params as z.infer<typeof zExerciseNameParams>;
+    const nameRx = new RegExp(`^${escapeRegex(name)}$`, "i");
+    const doc = await WorkoutLog.findOne({
+      userId: req.auth.id,
+      isOffDay: false,
+      strength: { $elemMatch: { name: nameRx, skipped: { $ne: true }, "sets.0": { $exists: true } } },
+    })
+      .sort({ date: -1, _id: -1 })
+      .select({ dateKey: 1, strength: 1 })
+      .lean<Pick<WorkoutLogDoc, "dateKey" | "strength"> | null>();
+
+    const entry = doc?.strength?.find((e) => nameRx.test(e.name ?? "") && !e.skipped && (e.sets?.length ?? 0) > 0);
+    if (!doc || !entry) return { dateKey: null, sets: [] };
+    return { dateKey: doc.dateKey, sets: entry.sets.map(toSetEntryDTO) };
+  });
 
   /** History, newest first. `before` is the id of the last row of the previous page. */
   app.get("/workouts", { ...auth, schema: { querystring: zListQuery } }, async (req) => {

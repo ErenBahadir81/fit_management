@@ -7,6 +7,7 @@ import { useTheme } from "../theme/ThemeProvider";
 import { springs, timing } from "../theme/motion";
 import { radii, spacing } from "../theme/tokens";
 import { Icon, type IconName } from "./Icon";
+import { APP_ICONS, type AppIcon } from "./icons";
 import { Pressable } from "./Pressable";
 import { Text } from "./Text";
 
@@ -18,12 +19,17 @@ export interface TabItem {
   iconActive: IconName;
 }
 
+function tab(name: string, label: string, icon: AppIcon): TabItem {
+  return { name, label, icon: APP_ICONS[icon].name, iconActive: APP_ICONS[icon].active };
+}
+
+/** Glyphs come from the semantic map, so the bar can never drift from the rest of the app. */
 export const TAB_ITEMS: readonly TabItem[] = [
-  { name: "index", label: "Ana Sayfa", icon: "home-outline", iconActive: "home" },
-  { name: "program", label: "Program", icon: "barbell-outline", iconActive: "barbell" },
-  { name: "nutrition", label: "Beslenme", icon: "restaurant-outline", iconActive: "restaurant" },
-  { name: "body", label: "Vücut", icon: "body-outline", iconActive: "body" },
-  { name: "profile", label: "Profil", icon: "person-outline", iconActive: "person" },
+  tab("index", "Ana Sayfa", "home"),
+  tab("program", "Program", "program"),
+  tab("nutrition", "Beslenme", "nutrition"),
+  tab("body", "Vücut", "body"),
+  tab("profile", "Profil", "profile"),
 ];
 
 export const TAB_BAR_HEIGHT = 64;

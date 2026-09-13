@@ -3,16 +3,17 @@ import { StyleSheet, View, type ViewProps } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { spacing } from "../theme/tokens";
 import { Button } from "./Button";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { resolveGlyph, type IconGlyph } from "./icons";
 import { Text } from "./Text";
 
 export interface EmptyStateProps extends ViewProps {
   title: string;
   body?: string;
-  icon?: IconName;
+  icon?: IconGlyph;
   /** Custom illustration — pass `<Floo mood="sleepy" size="m" />` from features. */
   illustration?: React.ReactNode;
-  action?: { label: string; onPress: () => void; icon?: IconName };
+  action?: { label: string; onPress: () => void; icon?: IconGlyph };
   compact?: boolean;
 }
 
@@ -23,7 +24,7 @@ export function EmptyState({ title, body, icon = "sparkles", illustration, actio
     <View {...rest} style={[styles.wrap, compact && styles.compact, style]}>
       {illustration ?? (
         <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
-          <Icon name={icon} size={28} color="primary" />
+          <Icon name={resolveGlyph(icon)} size={28} color="primary" />
         </View>
       )}
       <Text variant="title" align="center">

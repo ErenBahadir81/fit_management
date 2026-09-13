@@ -5,7 +5,7 @@ import { radii, spacing } from "../../theme/tokens";
 import { Skeleton, SkeletonGroup, SkeletonText } from "../../ui/Skeleton";
 
 /** Mirrors HomeScreen's layout 1:1 (same card heights) so the crossfade has zero layout jump. */
-export const HOME_HEIGHTS = { today: 156, calorie: 168, goal: 150, recovery: 132, tile: 84 } as const;
+export const HOME_HEIGHTS = { today: 156, calorie: 168, goal: 232, recovery: 132, tile: 84 } as const;
 
 function CardSkeleton({ height, children }: { height: number; children?: React.ReactNode }) {
   const { colors } = useTheme();
@@ -22,7 +22,21 @@ export function HomeSkeleton() {
         </View>
         <Skeleton height={64} circle />
       </View>
-      <Skeleton height={56} radius={radii.md} />
+      <CardSkeleton height={HOME_HEIGHTS.goal}>
+        <View style={[styles.row, { justifyContent: "space-between" }]}>
+          <Skeleton width={70} height={12} />
+          <Skeleton width={70} height={22} radius={radii.pill} />
+        </View>
+        <View style={[styles.row, { marginTop: spacing.lg }]}>
+          <Skeleton height={92} circle />
+          <View style={{ flex: 1, gap: spacing.sm }}>
+            <Skeleton width={150} height={30} radius={10} />
+            <Skeleton width={130} height={16} />
+            <Skeleton width={90} height={12} />
+          </View>
+        </View>
+        <Skeleton height={20} style={{ marginTop: spacing.lg }} />
+      </CardSkeleton>
       <CardSkeleton height={HOME_HEIGHTS.today}>
         <Skeleton width={110} height={12} />
         <Skeleton width={180} height={26} radius={10} style={{ marginTop: spacing.md }} />
@@ -37,18 +51,6 @@ export function HomeSkeleton() {
             <Skeleton width={150} height={22} />
             <SkeletonText lines={2} lineHeight={10} />
           </View>
-        </View>
-      </CardSkeleton>
-      <CardSkeleton height={HOME_HEIGHTS.goal}>
-        <View style={[styles.row, { justifyContent: "space-between" }]}>
-          <Skeleton width={140} height={18} />
-          <Skeleton width={70} height={28} radius={radii.pill} />
-        </View>
-        <Skeleton height={8} radius={4} style={{ marginTop: spacing.lg }} />
-        <View style={[styles.row, { marginTop: spacing.lg }]}>
-          <Skeleton height={36} />
-          <Skeleton height={36} />
-          <Skeleton height={36} />
         </View>
       </CardSkeleton>
       <CardSkeleton height={HOME_HEIGHTS.recovery}>

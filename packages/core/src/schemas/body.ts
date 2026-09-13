@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zDateKey, zGender, zId, zIso } from "./common";
+import { patchOf, zDateKey, zGender, zId, zIso } from "./common";
 
 export const zBodyEntry = z.object({
   id: zId,
@@ -29,7 +29,7 @@ export const zBodyEntryInput = z.object({
   notes: z.string().max(300).nullable().optional(),
 });
 export type BodyEntryInput = z.infer<typeof zBodyEntryInput>;
-export const zBodyEntryUpdate = zBodyEntryInput.partial();
+export const zBodyEntryUpdate = patchOf(zBodyEntryInput);
 
 export const zWeighIn = z.object({
   id: zId,

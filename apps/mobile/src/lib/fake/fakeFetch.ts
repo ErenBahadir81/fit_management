@@ -194,6 +194,42 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
     },
     false
   );
+  /**
+   * C3 — sign-up. A brand-new account starts genuinely empty (no history, no goal, onboarding
+   * not done) so the demo can walk the whole first-run flow, not just the furnished one.
+   */
+  on(
+    "POST",
+    "/auth/register",
+    ({ body }) => {
+      const username = String(body.username ?? "").trim().toLowerCase();
+      const password = String(body.password ?? "");
+      const displayName = String(body.displayName ?? "").trim();
+      if (username.length < 3 || !displayName) return err(400, "VALIDATION", "Kullanıcı adı ve görünen ad gerekli");
+      if (password.length < 8) return err(400, "VALIDATION", "Şifre en az 8 karakter olmalı");
+      if (username === state.user.username) return err(409, "CONFLICT", "Bu kullanıcı adı alınmış");
+
+      state.user = {
+        ...fx.makeUser(),
+        id: fx.nextId("u"),
+        username,
+        displayName,
+        email: body.email ? String(body.email).trim().toLowerCase() : null,
+        heightCm: null,
+        birthDate: null,
+        onboardingCompleted: false,
+        createdAt: new Date().toISOString(),
+      };
+      state.password = password;
+      state.logs = [];
+      state.bodyEntries = [];
+      state.weighIns = [];
+      state.mealEntries = [];
+      state.goal = null;
+      return ok({ ...issueTokens(), user: state.user });
+    },
+    false
+  );
   on(
     "POST",
     "/auth/refresh",
@@ -218,6 +254,28 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
     if (body.currentPassword !== state.password) return err(400, "VALIDATION", "Mevcut şifre hatalı");
     state.password = String(body.newPassword);
     return noContent();
+  });
+  // C3 — "yaklaşık kalori ihtiyacın", the same maths the API runs.
+  on("GET", "/me/energy", () => ok(domain.energyFor(today(), state.user, state.bodyEntries.at(-1) ?? null, state.goal)));
+
+  /** C3 — the one-time questionnaire. Idempotent, exactly like the real route. */
+  on("POST", "/onboarding", ({ body }) => {
+    const profile = body.profile as Partial<UserDTO> & { heightCm?: number; gender?: "male" | "female" };
+    const measurement = body.measurement as { weightKg?: number; neckCm?: number; waistCm?: number; hipCm?: number | null };
+    if (!profile || !measurement) return err(400, "VALIDATION", "Profil ve ölçüm bilgisi gerekli");
+    const gender = profile.gender ?? state.user.gender;
+    if (gender === "female" && measurement.hipCm == null) return err(400, "VALIDATION", "Kadınlar için kalça ölçüsü gerekli");
+
+    state.user = { ...state.user, ...profile, onboardingCompleted: true };
+    const entry = bodyEntryFrom({ ...measurement, gender, heightCm: profile.heightCm ?? state.user.heightCm ?? 175 });
+    state.bodyEntries = [...state.bodyEntries.filter((e) => e.dateKey !== entry.dateKey), entry].sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1));
+    upsertWeighIn(entry.weightKg, entry.dateKey, "bodyEntry");
+
+    const wanted = body.goal as { targetBodyFatPct?: number; profile?: GoalDTO["profile"] } | null | undefined;
+    if (wanted && state.goal?.status !== "active") {
+      state.goal = domain.goalCreate(today(), state.user, entry, Number(wanted.targetBodyFatPct), wanted.profile ?? "optimal");
+    }
+    return ok({ user: state.user, bodyEntry: entry, goal: wanted ? state.goal : null });
   });
 
   // catalog
@@ -290,6 +348,16 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   on("DELETE", "/workouts/:id", ({ params }) => {
     state.logs = state.logs.filter((l) => l.id !== params.id);
     return noContent();
+  });
+  // C1 — "last time you did this". Empty is a valid answer; the fake never 404s here either.
+  on("GET", "/training/exercises/:name/last", ({ params }) => {
+    const wanted = params.name.trim().toLocaleLowerCase("tr");
+    for (const log of [...state.logs].sort((a, b) => (a.date < b.date ? 1 : -1))) {
+      if (log.isOffDay) continue;
+      const entry = log.strength.find((e) => e.name.trim().toLocaleLowerCase("tr") === wanted && !e.skipped && e.sets.length > 0);
+      if (entry) return ok({ dateKey: log.dateKey, sets: entry.sets });
+    }
+    return ok({ dateKey: null, sets: [] });
   });
   on("GET", "/recovery", () => ok(recovery()));
   on("GET", "/training/stats", ({ query }) => ok(fx.makeTrainingStats(today(), state.logs, md(), Number(query.weeks ?? 8))));

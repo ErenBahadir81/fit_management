@@ -77,8 +77,20 @@ export const zProgramTemplateInput = z.object({
 export type ProgramTemplateInput = z.infer<typeof zProgramTemplateInput>;
 
 /* ------------------------------- logs ---------------------------------- */
-export const zSetEntry = z.object({ reps: z.number().min(0).max(10000), rir: z.number().int().min(0).max(10).nullable() });
+export const zSetEntry = z.object({
+  reps: z.number().min(0).max(10000),
+  rir: z.number().int().min(0).max(10).nullable(),
+  /** Load in kg. `null` = bodyweight / not recorded. Absent in pre-2.1 logs. */
+  weightKg: z.number().min(0).max(1000).nullable().default(null),
+});
 export type SetEntryDTO = z.infer<typeof zSetEntry>;
+
+/**
+ * "Last time you did this" (C1): the most recent logged instance of an exercise for the caller.
+ * `{ dateKey: null, sets: [] }` is a valid answer — never a 404.
+ */
+export const zLastPerformance = z.object({ dateKey: z.string().nullable(), sets: z.array(zSetEntry) });
+export type LastPerformance = z.infer<typeof zLastPerformance>;
 
 export const zStrengthEntry = z.object({
   name: z.string().min(1),
@@ -144,7 +156,22 @@ export const zCompleteWorkoutInput = z.object({
   rpe: z.number().min(1).max(10).nullable().default(null),
 });
 export type CompleteWorkoutInput = z.infer<typeof zCompleteWorkoutInput>;
-export const zUpdateWorkoutInput = zCompleteWorkoutInput.partial();
+
+/**
+ * Editing a logged session. Written out longhand rather than as `zCompleteWorkoutInput.partial()`
+ * because `.partial()` keeps the `.default(...)`s: `{ rpe: 7 }` would come out as
+ * `{ rpe: 7, strength: [], run: null, … }` and quietly erase the whole session. Here, a field the
+ * client did not send stays `undefined` and the route leaves it alone.
+ */
+export const zUpdateWorkoutInput = z.object({
+  strength: z.array(zStrengthEntryInput).optional(),
+  run: zCardioEntryInput.nullable().optional(),
+  swim: zCardioEntryInput.nullable().optional(),
+  durationMin: z.number().min(0).max(600).nullable().optional(),
+  notes: z.string().max(500).nullable().optional(),
+  rpe: z.number().min(1).max(10).nullable().optional(),
+});
+export type UpdateWorkoutInput = z.infer<typeof zUpdateWorkoutInput>;
 
 export const zScheduleEntry = z.object({
   dateKey: z.string(),
@@ -213,6 +240,8 @@ export const zTrainingStats = z.object({
       sessions: z.number().int(),
       sets: z.number(),
       cardioKm: z.number(),
+      /** Load moved that week: Σ reps × weightKg. 0 for weeks logged before 2.1. */
+      tonnageKg: z.number().default(0),
       volumeByMuscle: z.record(z.string(), z.number()),
     })
   ),
