@@ -217,7 +217,7 @@ else {
 h.setWhere("goal/setup");
 await T("body-goal-link").click();
 await pause(4000);
-if (await assertScreenHealthy(h, rec, "goal/setup", { needles: ["Hedef yağ oranı", "Tempo"] })) rec.ok("goal/setup", "setup renders with the live preview");
+if (await assertScreenHealthy(h, rec, "goal/setup", { needles: ["Hedef yağ oranı", "Ne kadar hızlı?"] })) rec.ok("goal/setup", "setup renders with the live preview");
 
 const slider = await T("goal-slider").boundingBox();
 const targetStart = await T("goal-target").innerText();
@@ -237,10 +237,10 @@ if (targetLow === targetHigh) rec.fail("goal/setup", "the target slider did not 
 else rec.ok("goal/setup", `slider clamps between ${targetLow.trim()} and ${targetHigh.trim()} (from ${targetStart.trim()})`);
 
 const previewBefore = await text();
-await h.page.locator('[data-testid="goal-profile"] >> text=Agresif').first().click();
+await T("goal-pace-aggressive").click();
 await pause(2000);
 if (previewBefore === (await text())) rec.fail("goal/setup", "changing the pace did not change the preview");
-else rec.ok("goal/setup", "the pace segmented control redraws the plan preview");
+else rec.ok("goal/setup", "the pace picker redraws the plan preview");
 
 await T("goal-submit").click();
 await pause(4000);
@@ -333,9 +333,12 @@ await h.page.locator('[data-testid="gender"] >> text=Kadın').click();
 await pause(1500);
 await T("birth-row").click();
 await pause(1500);
-await T("birth-input").fill("1996-04-12");
+// The YYYY-AA-GG text field is gone: the date is three wheels now.
+await h.page.locator('[data-testid="birth-picker-day"] >> text="12"').first().click();
+await h.page.locator('[data-testid="birth-picker-month"] >> text=Nisan').first().click();
+await h.page.locator('[data-testid="birth-picker-year"] >> text="1996"').first().click();
 await pause(400);
-await h.page.locator("text=Kaydet").last().click();
+await T("birth-save").click();
 await pause(2500);
 await T("mascot-toggle").click();
 await pause(1500);

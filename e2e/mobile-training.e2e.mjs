@@ -251,14 +251,16 @@ if (await loginMobile(h, rec)) {
   }
 
   h.setWhere("training/logger-steppers");
-  const repsBefore = await text("reps-0");
+  const repsField = h.page.locator('[data-testid="reps-0-input"]');
+  const repsBefore = await repsField.inputValue();
   await T("reps-0-inc").click();
   await wait(400);
-  expect("training/logger-steppers", "the reps stepper increments", (await text("reps-0")) !== repsBefore);
-  const rirBefore = await text("rir-0");
-  await T("rir-0-dec").click();
+  expect("training/logger-steppers", "the +1 nudge raises the reps", (await repsField.inputValue()) !== repsBefore);
+  // RIR is a row of choices now, not a stepper: 0-4 covers everything people actually log.
+  // Asserted through the logged row rather than aria-checked — react-native-web drops
+  // `accessibilityState` on Pressable, so the DOM carries no selection state to read.
+  await T("rir-0-3").click();
   await wait(400);
-  expect("training/logger-steppers", "the RIR stepper decrements", (await text("rir-0")) !== rirBefore);
 
   h.setWhere("training/logger-set");
   const progressBefore = await text("workout-progress");
@@ -266,11 +268,12 @@ if (await loginMobile(h, rec)) {
   await wait(1200);
   expect("training/logger-set", "completing a set advances the counter", (await text("workout-progress")) !== progressBefore);
   expect("training/logger-set", "the completed set becomes a done row", (await count("set-done-0-0")) === 1);
+  expect("training/logger-set", "the chosen RIR is carried onto the logged set", (await text("set-done-0-0")).includes("RIR 3"));
   expect("training/logger-set", "the rest timer starts", (await count("rest-timer")) === 1);
   // The rest chip pulses forever, so Playwright's stability check never settles on it.
-  await T("rest-timer").click({ force: true });
+  await T("rest-skip").click({ force: true });
   await wait(900);
-  expect("training/logger-set", "tapping the rest timer skips the rest", (await count("rest-timer")) === 0);
+  expect("training/logger-set", "the skip control ends the rest", (await count("rest-timer")) === 0);
 
   h.setWhere("training/logger-draft");
   // Leaving with "Sakla ve çık" must keep the in-progress session on the device.
@@ -319,7 +322,7 @@ if (await loginMobile(h, rec)) {
     if ((await count("set-active-0")) === 0) break;
     await T("complete-set").click();
     await wait(500);
-    if (await count("rest-timer")) await T("rest-timer").click({ force: true });
+    if (await count("rest-timer")) await T("rest-skip").click({ force: true });
     await wait(250);
   }
   await wait(1200);

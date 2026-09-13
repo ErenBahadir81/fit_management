@@ -239,7 +239,9 @@ function RirChoice({ value, selected, onPress, testID }: { value: number; select
       haptic="select"
       testID={testID}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      // A radio is announced by `checked`, not `selected` — with the wrong one a screen reader
+      // reads five unlabelled options and never says which is chosen.
+      accessibilityState={{ checked: selected }}
       accessibilityLabel={`RIR ${value}`}
       style={[styles.rirChoice, { backgroundColor: selected ? colors.primary : colors.surfaceMuted }]}
     >
