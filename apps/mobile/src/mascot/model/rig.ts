@@ -132,6 +132,28 @@ export function rad(d: number): number {
   return (d * Math.PI) / 180;
 }
 
+/** An angle difference folded into (−180°, 180°]. */
+export function wrapDeg(d: number): number {
+  "worklet";
+  if (!Number.isFinite(d)) return 0;
+  let r = d % 360;
+  if (r > 180) r -= 360;
+  else if (r <= -180) r += 360;
+  return r;
+}
+
+/**
+ * A shoulder angle folded into (−120°, 240°]: the arm's own range, from folded in across the chest
+ * round through hanging, out and straight up to just past it. Every angle an arm can reach has one
+ * value here, and neighbouring poses have neighbouring values.
+ */
+export function unwrapShoulder(a: number): number {
+  "worklet";
+  let r = wrapDeg(a);
+  if (r <= -120) r += 360;
+  return r;
+}
+
 /**
  * A soft limit: identity inside [lo, hi], then an exponential approach to `lo − knee` / `hi +
  * knee`. A spring that overshoots a limit leans into it and comes back, instead of hitting a wall.
@@ -177,11 +199,11 @@ export interface BodyXform {
   k: number;
 }
 
-/** A body-space point, carried by the body: hydration, squash, lean, then the hop / shift. */
-export function bodyToWorld(p: Pt, b: BodyXform): Pt {
+/** A body-space point, carried by the body: hydration (`k`, default `b.k`), squash, lean, then the hop / shift. */
+export function bodyToWorld(p: Pt, b: BodyXform, k: number = b.k): Pt {
   "worklet";
-  const hx = 100 + (p.x - 100) * b.k;
-  const hy = 158 + (p.y - 158) * b.k;
+  const hx = 100 + (p.x - 100) * k;
+  const hy = 158 + (p.y - 158) * k;
   const dx = (hx - b.ox) * b.sx;
   const dy = (hy - b.oy) * b.sy;
   const a = rad(b.lean);
@@ -466,8 +488,12 @@ export function armGeometry(v: readonly number[], base: number, s: number, shoul
   if (w > 0.001 && targetWorld) {
     const sol = ik(s, shoulder, targetWorld, UPPER_ARM, FOREARM);
     // Blend in angle space, so a hand easing onto a target follows an arc, not a straight line.
-    a1 = a1 + (sol.a1 - a1) * w;
-    a2 = a2 + (sol.a2 - a2) * w;
+    // Blend in joint space: the shoulder angle in one fixed range (so a raised arm comes down
+    // the outside, never over the head), and the elbow as a bend relative to the upper arm.
+    const ikA1 = unwrapShoulder(sol.a1 - leanS) + leanS;
+    const bend = a2 - a1;
+    a1 = a1 + (ikA1 - a1) * w;
+    a2 = a1 + bend + (wrapDeg(sol.a2 - sol.a1) - bend) * w;
   }
   a1 = softClamp(a1, -60 + leanS, 185 + leanS, 12);
   const chain = fk(s, shoulder, a1, a2, UPPER_ARM, FOREARM);
@@ -517,6 +543,8 @@ export function legGeometry(v: readonly number[], base: number, s: number, hip: 
 export const SPRING = (() => {
   const k = new Array<number>(CHANNEL_COUNT).fill(260);
   const z = new Array<number>(CHANNEL_COUNT).fill(0.7);
+  /** Speed limits, units per second. Only the IK goals have one: see below. */
+  const vmax = new Array<number>(CHANNEL_COUNT).fill(Infinity);
   const set = (name: string, kk: number, zz: number) => {
     k[CH[name as Channel]] = kk;
     z[CH[name as Channel]] = zz;
@@ -533,6 +561,10 @@ export const SPRING = (() => {
     set(`${side}_ik`, 260, 0.9);
     set(`${side}_ikX`, 240, 0.8);
     set(`${side}_ikY`, 240, 0.8);
+    // A hand that is already reaching and gets a new goal far away (from the chin to the top of
+    // the head) must travel there, not arrive in two frames: cap it at ≈ 7 units a frame.
+    vmax[CH[`${side}_ikX` as Channel]] = 420;
+    vmax[CH[`${side}_ikY` as Channel]] = 420;
     set(`${side}_fx`, 420, 0.72);
     set(`${side}_fy`, 520, 0.68);
     set(`${side}_fa`, 360, 0.6);
@@ -545,14 +577,32 @@ export const SPRING = (() => {
   set("eye", 400, 0.9);
   set("lookX", 300, 0.8);
   set("lookY", 300, 0.8);
-  return { k, z };
+  return { k, z, vmax };
 })();
 
 /**
- * One semi-implicit Euler step of every channel toward its target. `dt` in seconds; sub-stepped
- * so a dropped frame cannot blow the stiffer springs up.
+ * Reduced motion: every channel on the same critically damped spring. It starts from rest, so a
+ * pose change eases in and out over ≈ 250 ms, and it never overshoots — a cross-fade between poses
+ * with no travel past the target, no bounce and no whip.
  */
-export function stepSprings(x: number[], vel: number[], target: readonly number[], dt: number, k: readonly number[], z: readonly number[]): number {
+export const SPRING_REDUCED = {
+  k: new Array<number>(CHANNEL_COUNT).fill(520),
+  z: new Array<number>(CHANNEL_COUNT).fill(1),
+};
+
+/**
+ * One semi-implicit Euler step of every channel toward its target. `dt` in seconds; sub-stepped
+ * so a dropped frame cannot blow the stiffer springs up. `vmax` (units/s per channel) caps speed.
+ */
+export function stepSprings(
+  x: number[],
+  vel: number[],
+  target: readonly number[],
+  dt: number,
+  k: readonly number[],
+  z: readonly number[],
+  vmax?: readonly number[]
+): number {
   "worklet";
   const steps = Math.max(1, Math.ceil(dt / 0.008));
   const h = dt / steps;
@@ -565,6 +615,8 @@ export function stepSprings(x: number[], vel: number[], target: readonly number[
       if (!Number.isFinite(t)) continue;
       const a = kk * (t - x[i]) - c * vel[i];
       vel[i] += a * h;
+      if (vmax && vel[i] > vmax[i]) vel[i] = vmax[i];
+      else if (vmax && vel[i] < -vmax[i]) vel[i] = -vmax[i];
       x[i] += vel[i] * h;
       if (!Number.isFinite(x[i]) || !Number.isFinite(vel[i])) {
         x[i] = t;
@@ -626,6 +678,20 @@ export function compileGesture(g: GestureSpec): CompiledGesture {
       values.push(last[j]);
     }
   }
+  // IK goals never travel from or back to the base pose: a reach blends in on its weight
+  // (`trackIkTargets`), so the goal holds its first authored value before it and its last after.
+  for (let j = 0; j < channels.length; j++) {
+    const name = CHANNELS[channels[j]];
+    if (!name.endsWith("_ikX") && !name.endsWith("_ikY")) continue;
+    let first = NaN;
+    for (let ki = 0; ki < keys.length && !Number.isFinite(first); ki++) first = values[ki * channels.length + j];
+    let prev = first;
+    for (let ki = 0; ki < keys.length; ki++) {
+      const at = ki * channels.length + j;
+      if (Number.isFinite(values[at])) prev = values[at];
+      else values[at] = prev;
+    }
+  }
   const duration = keys[keys.length - 1].t;
   return {
     times: keys.map((k) => k.t),
@@ -678,38 +744,133 @@ export function applyGesture(g: CompiledGesture, tMs: number, out: number[], wei
   return true;
 }
 
+// ── IK targets ─────────────────────────────────────────────────────────────
+
+/** One coordinate (`wantX` → x, else y) of an arm's FK wrist in body space, from its sh/el angles. */
+export function wristInBody(v: readonly number[], base: number, s: number, wantX: boolean): number {
+  "worklet";
+  const a1 = rad(v[base + A.sh]);
+  const a2 = rad(v[base + A.sh] + v[base + A.el]);
+  const sh = s < 0 ? SHOULDER.L : SHOULDER.R;
+  return wantX ? sh.x + s * (Math.sin(a1) * UPPER_ARM + Math.sin(a2) * FOREARM) : sh.y + Math.cos(a1) * UPPER_ARM + Math.cos(a2) * FOREARM;
+}
+
+/** A new IK goal further than this from the current one is reached by letting go first. */
+const RETARGET_FAR = 30;
+/** …and the goal is swapped once the weight has fallen below this. */
+const RETARGET_SNAP = 0.03;
+
+/**
+ * Keeps each arm's IK target channels honest, after every layer has written the target pose.
+ *
+ * A reach blends in JOINT space: the target is put at the goal the moment a reach starts (while
+ * its weight is still zero, so nothing visible moves) and the rising weight swings the shoulder and
+ * the elbow from their FK angles to the IK solution. Moving the target instead — from the hand to
+ * the goal in a straight line — dragged the hand through the shoulder whenever the arm started
+ * raised, and the IK solution flipped over the head. Letting go is the mirror image: the target
+ * stays where it was while the weight falls. With no reach at all the target is parked on the hand.
+ */
+export function trackIkTargets(x: number[], vel: number[], tgt: number[]): void {
+  "worklet";
+  for (let side = 0; side < 2; side++) {
+    const base = side === 0 ? ARM_BASE.L : ARM_BASE.R;
+    const s = side === 0 ? -1 : 1;
+    const idle = x[base + A.ik] < 0.02;
+    if (tgt[base + A.ik] > 0.001) {
+      const dx = tgt[base + A.ikX] - x[base + A.ikX];
+      const dy = tgt[base + A.ikY] - x[base + A.ikY];
+      if (!idle && dx * dx + dy * dy > RETARGET_FAR * RETARGET_FAR) {
+        // Already reaching and the new goal is across the body (chin → pointing, belly → brow):
+        // a straight run between the two can pass over the shoulder, where the solution flips.
+        // Let go first; the reach starts over from the arm's FK pose once the weight is low.
+        if (x[base + A.ik] < RETARGET_SNAP) {
+          x[base + A.ikX] = tgt[base + A.ikX];
+          x[base + A.ikY] = tgt[base + A.ikY];
+          vel[base + A.ikX] = 0;
+          vel[base + A.ikY] = 0;
+        } else {
+          tgt[base + A.ik] = 0;
+          tgt[base + A.ikX] = x[base + A.ikX];
+          tgt[base + A.ikY] = x[base + A.ikY];
+        }
+      } else if (idle) {
+        x[base + A.ikX] = tgt[base + A.ikX];
+        x[base + A.ikY] = tgt[base + A.ikY];
+        vel[base + A.ikX] = 0;
+        vel[base + A.ikY] = 0;
+      }
+    } else if (idle) {
+      const wx = wristInBody(x, base, s, true);
+      const wy = wristInBody(x, base, s, false);
+      tgt[base + A.ikX] = wx;
+      tgt[base + A.ikY] = wy;
+      x[base + A.ikX] = wx;
+      x[base + A.ikY] = wy;
+      vel[base + A.ikX] = 0;
+      vel[base + A.ikY] = 0;
+    } else {
+      tgt[base + A.ikX] = x[base + A.ikX];
+      tgt[base + A.ikY] = x[base + A.ikY];
+    }
+  }
+}
+
 // ── walking ────────────────────────────────────────────────────────────────
+
+/** 0 → 1 → 0 over a swing, with zero slope at both ends: a foot leaves and lands softly. */
+function swingBump(u: number): number {
+  "worklet";
+  const t = Math.max(0, Math.min(1, u));
+  const b = Math.sin(Math.PI * t);
+  return b * b;
+}
 
 /**
  * A front-on walk cycle, added on top of whatever the pose is. `phase` in radians; `amt` 0…1
- * fades the whole cycle in and out so starting and stopping never pops. One stride = 2π.
+ * fades the whole cycle in and out so starting and stopping never pops. One stride = 2π: the left
+ * foot swings over (0, π), the right over (π, 2π), and both are down at the contacts 0 and π.
  *
- * Contact → passing → contact: each foot lifts on its own half of the cycle (never both), the
- * body dips on contact and rises on the passing position, sways over the planted foot, and the
- * arms counter-swing the legs with the elbows lagging.
+ *  - The planted foot is planted: no lift, no slide, no toe roll while the other one swings.
+ *  - The swinging foot peels off toe-first, lifts, reaches in a touch and sets down.
+ *  - The body drops into the "down" position just after each contact (weight landing, a little
+ *    squash) and rises highest on the passing position, so two bobs per stride.
+ *  - It sways over the planted foot and tips a degree or two toward it.
+ *  - The arms counter-swing the legs: the arm opposite the swinging leg comes forward (in a
+ *    front view: the elbow folds in and the hand rises), with the elbow trailing the shoulder.
+ *    The two sides are not mirror copies — the right swings a touch wider.
  */
 export function applyWalk(out: number[], phase: number, amt: number): void {
   "worklet";
   if (amt <= 0.001) return;
-  const sL = Math.sin(phase);
-  const sR = Math.sin(phase + Math.PI);
-  const liftL = Math.max(0, sL);
-  const liftR = Math.max(0, sR);
-  out[CH.L_fy] += liftL * 7 * amt;
-  out[CH.R_fy] += liftR * 7 * amt;
-  out[CH.L_fx] += Math.cos(phase) * 1.5 * amt;
-  out[CH.R_fx] += Math.cos(phase + Math.PI) * 1.5 * amt;
-  out[CH.L_fa] += liftL * 10 * amt;
-  out[CH.R_fa] += liftR * 10 * amt;
-  // Two bobs per stride: high while passing, low on contact.
-  out[CH.hop] += (Math.abs(Math.sin(phase)) * 3.2 - 0.6) * amt;
-  out[CH.squash] += (Math.abs(Math.cos(phase)) * 0.035 - 0.012) * amt;
-  // Sway over the planted foot (the one NOT lifting).
-  out[CH.lean] += Math.sin(phase) * 2.6 * amt;
-  out[CH.x] += Math.sin(phase) * 1.4 * amt;
-  const swing = Math.sin(phase + 0.35);
-  out[CH.L_sh] += swing * 10 * amt;
-  out[CH.R_sh] -= swing * 10 * amt;
-  out[CH.L_el] += Math.sin(phase + 0.9) * 8 * amt;
-  out[CH.R_el] -= Math.sin(phase + 0.9) * 8 * amt;
+  const TAU = Math.PI * 2;
+  const p = ((phase % TAU) + TAU) % TAU;
+  const uL = p < Math.PI ? p / Math.PI : -1;
+  const uR = p >= Math.PI ? (p - Math.PI) / Math.PI : -1;
+  const liftL = uL >= 0 ? swingBump(uL) : 0;
+  const liftR = uR >= 0 ? swingBump(uR) : 0;
+  out[CH.L_fy] += liftL * 7.5 * amt;
+  out[CH.R_fy] += liftR * 7.5 * amt;
+  // Toe-off then toe-up to land: the toe angle leads the lift by a quarter of the swing.
+  out[CH.L_fa] += (uL >= 0 ? Math.sin(Math.PI * uL) * swingBump(Math.min(1, uL * 1.3)) * 9 : 0) * amt;
+  out[CH.R_fa] += (uR >= 0 ? Math.sin(Math.PI * uR) * swingBump(Math.min(1, uR * 1.3)) * 9 : 0) * amt;
+  // The swinging foot tucks in under the body at the passing position.
+  out[CH.L_fx] += -liftL * 1.6 * amt;
+  out[CH.R_fx] += -liftR * 1.6 * amt;
+  // Two bobs per stride: lowest ≈ 0.25 rad after each contact, highest on passing.
+  const bob = -Math.cos(2 * (p - 0.25));
+  out[CH.hop] += (bob * 2.3 + 0.4) * amt;
+  out[CH.squash] += Math.max(0, -bob) * 0.03 * amt;
+  // Sway over the planted foot: right while the left swings, left while the right swings.
+  const sway = Math.sin(p - 0.15);
+  out[CH.x] += sway * 1.8 * amt;
+  out[CH.lean] += sway * 1.6 * amt;
+  // Arms: the side opposite the swinging leg comes forward. Elbow lags the shoulder.
+  const fwdR = Math.sin(p - 0.3); // > 0 while the left leg swings → right arm forward
+  const fwdRel = Math.sin(p - 0.75);
+  out[CH.R_sh] += fwdR * 5.5 * amt;
+  out[CH.R_el] += -fwdRel * 13 * amt;
+  out[CH.L_sh] += -fwdR * 4.5 * amt;
+  out[CH.L_el] += fwdRel * 11 * amt;
+  out[CH.R_curl] += Math.max(0, fwdR) * 0.2 * amt;
+  out[CH.L_curl] += Math.max(0, -fwdR) * 0.2 * amt;
 }

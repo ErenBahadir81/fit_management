@@ -318,3 +318,40 @@ export const COMPILED_MIRROR: readonly CompiledGesture[] = GESTURES.map((g) =>
 export function gestureDuration(g: Gesture): number {
   return COMPILED[GESTURE_INDEX[g]].duration;
 }
+
+/**
+ * Reduced motion: a gesture collapses to one pose change. The rig eases to the pose the gesture
+ * holds longest (its most readable moment — the raised hand of a wave, the pointing arm), stays
+ * there for `hold` ms and eases back; the reduced springs make both changes ≈ 250 ms cross-fades
+ * with no travel past the target. `total` is when the gesture counts as finished.
+ */
+export interface ReducedGesture {
+  /** Timeline time of the pose to show, ms (a key time, so the pose is exactly that key). */
+  at: number;
+  hold: number;
+  total: number;
+}
+
+export const REDUCED_RETURN_MS = 320;
+
+function reducedPlan(g: CompiledGesture): ReducedGesture {
+  // The first key is the base pose and a one-shot's last key returns to it: neither is a pose.
+  let best = Math.min(1, g.times.length - 1);
+  let bestSpan = -1;
+  for (let k = 1; k < g.times.length - 1; k++) {
+    const span = g.times[k + 1] - g.times[k];
+    if (span >= bestSpan) {
+      best = k;
+      bestSpan = span;
+    }
+  }
+  const hold = Math.round(Math.max(450, Math.min(1000, g.duration * 0.5)));
+  return { at: g.times[best], hold, total: hold + REDUCED_RETURN_MS };
+}
+
+export const REDUCED: readonly ReducedGesture[] = COMPILED.map(reducedPlan);
+
+/** How long a gesture takes to finish under reduced motion, ms. */
+export function reducedGestureDuration(g: Gesture): number {
+  return REDUCED[GESTURE_INDEX[g]].total;
+}
