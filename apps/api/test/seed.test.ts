@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Types } from "mongoose";
 import { DEFAULT_MASCOT_MESSAGES } from "@fitfloow/core";
 import { createTestApp, type TestApp } from "./harness";
-import { runSeed } from "../src/seed/index";
+import { runSeed, seedOptionsFromConfig } from "../src/seed/index";
 import { SEED_EXERCISES, SEED_MUSCLES, SEED_TEMPLATES } from "../src/seed/data/index";
 import { User } from "../src/models/user";
 import { Muscle } from "../src/models/muscle";
@@ -14,6 +14,8 @@ import { DietTarget } from "../src/models/nutrition";
 import { MascotMessage } from "../src/models/mascot";
 import { Settings, getSettings } from "../src/models/settings";
 import { hashPassword } from "../src/modules/platform/auth.service";
+
+const DEV_SEED = { adminPassword: "Asd*123", userPassword: "Asd*123" };
 
 let t: TestApp;
 beforeAll(async () => {
@@ -40,7 +42,7 @@ async function counts() {
 
 describe("runSeed", () => {
   it("creates the full baseline on an empty database", async () => {
-    await runSeed();
+    await runSeed(DEV_SEED);
     expect(await counts()).toEqual({
       users: 2,
       muscles: SEED_MUSCLES.length,
@@ -70,12 +72,12 @@ describe("runSeed", () => {
   });
 
   it("is idempotent: running twice changes nothing", async () => {
-    await runSeed();
+    await runSeed(DEV_SEED);
     const first = await counts();
     const erenBefore = await User.findOne({ username: "eren" }).lean();
     const programBefore = await Program.findOne({ userId: erenBefore!._id }).lean();
 
-    await runSeed();
+    await runSeed(DEV_SEED);
     expect(await counts()).toEqual(first);
     const erenAfter = await User.findOne({ username: "eren" }).lean();
     expect(erenAfter!.passwordHash).toBe(erenBefore!.passwordHash);
@@ -95,7 +97,7 @@ describe("runSeed", () => {
       updatedAt: new Date("2024-01-01T00:00:00Z"),
     });
 
-    await runSeed();
+    await runSeed(DEV_SEED);
 
     const eren = await User.collection.findOne({ _id: existing.insertedId });
     expect(eren!.displayName).toBe("Eski Eren");
@@ -110,20 +112,20 @@ describe("runSeed", () => {
   });
 
   it("keeps an existing program instead of overwriting it", async () => {
-    await runSeed();
+    await runSeed(DEV_SEED);
     const eren = await User.findOne({ username: "eren" }).lean();
     await Program.updateOne({ userId: eren!._id }, { $set: { currentIndex: 3, name: "Kendi Programım" } });
-    await runSeed();
+    await runSeed(DEV_SEED);
     const program = await Program.findOne({ userId: eren!._id }).lean();
     expect(program).toMatchObject({ currentIndex: 3, name: "Kendi Programım" });
     expect(await Program.countDocuments()).toBe(2);
   });
 
   it("does not resurrect catalog rows an admin deleted (layered, insert-only-when-empty)", async () => {
-    await runSeed();
+    await runSeed(DEV_SEED);
     await Muscle.deleteOne({ key: "forearms" });
     await Exercise.deleteOne({ nameKey: "plank" });
-    await runSeed();
+    await runSeed(DEV_SEED);
     expect(await Muscle.countDocuments()).toBe(SEED_MUSCLES.length - 1);
     expect(await Exercise.countDocuments()).toBe(SEED_EXERCISES.length - 1);
   });
@@ -177,7 +179,7 @@ describe("legacy migration", () => {
     });
     await DietTarget.collection.insertOne({ userId, calories: 2500, protein: 175, carbs: 260, fat: 75, createdAt: new Date(), updatedAt: new Date() });
 
-    await runSeed();
+    await runSeed(DEV_SEED);
 
     const program = await Program.collection.findOne({ userId });
     expect(program!.days[0].exercises[0].muscles).toEqual([
@@ -207,8 +209,8 @@ describe("legacy migration", () => {
     });
     await DietTarget.collection.insertOne({ userId, mode: "auto", calories: 2000, protein: 1, carbs: 1, fat: 1, createdAt: new Date(), updatedAt: new Date() });
 
-    await runSeed();
-    await runSeed();
+    await runSeed(DEV_SEED);
+    await runSeed(DEV_SEED);
 
     const log = await WorkoutLog.collection.findOne({ userId });
     expect(log!.dateKey).toBe("2020-01-01");
@@ -226,12 +228,57 @@ describe("legacy migration", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
-    const report = await runSeed();
+    const report = await runSeed(DEV_SEED);
     expect(report.migrated.workoutLogMuscles).toBe(1);
     expect(report.migrated.workoutLogDateKeys).toBe(1);
     expect(report.created.users).toBe(2);
-    const second = await runSeed();
+    const second = await runSeed(DEV_SEED);
     expect(second.migrated.workoutLogMuscles).toBe(0);
     expect(second.created.users).toBe(0);
+  });
+});
+
+describe("runSeed accounts (production safety)", () => {
+  const prod = { isProd: true, SEED_ADMIN_PASSWORD: undefined, SEED_USER_PASSWORD: undefined };
+
+  it("creates no seed accounts in production without SEED_*_PASSWORD, but still seeds catalogs", async () => {
+    const report = await runSeed(seedOptionsFromConfig(prod));
+    expect(await User.countDocuments()).toBe(0);
+    expect(await Program.countDocuments()).toBe(0);
+    expect(report.skippedUsers).toEqual(["eren", "inci"]);
+    expect(await Muscle.countDocuments()).toBe(SEED_MUSCLES.length);
+    const login = await t.app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "eren", password: "Asd*123" } });
+    expect(login.statusCode).toBe(401);
+  });
+
+  it("creates only the accounts whose password is provided, with that password", async () => {
+    const report = await runSeed(seedOptionsFromConfig({ ...prod, SEED_ADMIN_PASSWORD: "a-long-admin-secret" }));
+    expect(report.created.users).toBe(1);
+    expect(report.skippedUsers).toEqual(["inci"]);
+    const bad = await t.app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "eren", password: "Asd*123" } });
+    expect(bad.statusCode).toBe(401);
+    const ok = await t.app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { username: "eren", password: "a-long-admin-secret" } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().user.role).toBe("admin");
+  });
+
+  it("creates no accounts when called without options", async () => {
+    const report = await runSeed();
+    expect(await User.countDocuments()).toBe(0);
+    expect(report.skippedUsers).toEqual(["eren", "inci"]);
+  });
+
+  it("falls back to the dev default outside production only", () => {
+    expect(seedOptionsFromConfig({ isProd: false, SEED_ADMIN_PASSWORD: undefined, SEED_USER_PASSWORD: undefined }).adminPassword).toBe("Asd*123");
+    expect(seedOptionsFromConfig(prod).adminPassword).toBeUndefined();
+  });
+
+  it("warns in production when an existing account still accepts the dev default password", async () => {
+    await User.create({ username: "eren", displayName: "Eren", passwordHash: await hashPassword("Asd*123"), role: "admin" });
+    await User.create({ username: "inci", displayName: "İnci", passwordHash: await hashPassword("changed-already"), role: "user" });
+    const report = await runSeed(seedOptionsFromConfig(prod));
+    expect(report.warnings).toHaveLength(1);
+    expect(report.warnings[0]).toContain("eren");
+    expect((await runSeed(DEV_SEED)).warnings).toEqual([]);
   });
 });
