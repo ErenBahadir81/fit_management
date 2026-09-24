@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics";
 import { renderUI } from "../helpers";
 import { Pressable } from "../../src/ui/Pressable";
 import { Button } from "../../src/ui/Button";
+import { light } from "../../src/theme/tokens";
 
 describe("Pressable", () => {
   beforeEach(() => {
@@ -111,5 +112,34 @@ describe("Button", () => {
       </>
     );
     for (const l of ["a", "b", "c", "d", "e"]) expect(screen.getByText(l)).toBeTruthy();
+  });
+
+  test("flat sizes: sm 40 / md 48 / lg 52, control radius, no glow shadow", async () => {
+    await renderUI(
+      <>
+        <Button label="s" onPress={() => {}} size="sm" testID="s" />
+        <Button label="m" onPress={() => {}} testID="m" />
+        <Button label="l" onPress={() => {}} size="lg" testID="l" />
+      </>
+    );
+    expect(screen.getByTestId("s")).toHaveStyle({ height: 40, borderRadius: 12 });
+    expect(screen.getByTestId("m")).toHaveStyle({ height: 48, borderRadius: 12, backgroundColor: light.primary });
+    expect(screen.getByTestId("l")).toHaveStyle({ height: 52 });
+    expect(screen.getByTestId("m")).not.toHaveStyle({ shadowOpacity: 0.16 });
+  });
+
+  test("primary darkens to primaryStrong while pressed and restores on release", async () => {
+    await renderUI(<Button label="Kaydet" onPress={() => {}} testID="btn" />);
+    const el = screen.getByTestId("btn");
+    await fireEvent(el, "pressIn");
+    expect(screen.getByTestId("btn")).toHaveStyle({ backgroundColor: light.primaryStrong });
+    await fireEvent(el, "pressOut");
+    expect(screen.getByTestId("btn")).toHaveStyle({ backgroundColor: light.primary });
+  });
+
+  test("inverse is a surface pill with primary text (never onPrimary, which is navy in dark)", async () => {
+    await renderUI(<Button label="Başla" onPress={() => {}} variant="inverse" testID="inv" />);
+    expect(screen.getByTestId("inv")).toHaveStyle({ backgroundColor: light.surface });
+    expect(screen.getByText("Başla")).toHaveStyle({ color: light.primary });
   });
 });

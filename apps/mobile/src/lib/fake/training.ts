@@ -11,7 +11,7 @@
  * setApi(createFakeApi({ latencyMs: 0, signedIn: true, state: withCardioDay(trainingState()) }));
  * ```
  */
-import { shiftKey, trDateKey, type DayDTO, type WorkoutLogDTO } from "@fitfloow/core";
+import { jumpTransition, logDayTransition, pointerOf, shiftKey, trDateKey, type DayDTO, type WorkoutLogDTO } from "@fitfloow/core";
 import { createFakeState, type FakeState } from "./fakeFetch";
 import * as fx from "./fixtures";
 
@@ -27,8 +27,14 @@ export function dayIndexOfKind(state: FakeState, kind: DayDTO["kind"]): number {
 
 /** Move the program pointer (the "current day") without touching anything else. */
 export function withDayIndex(state: FakeState, index: number): FakeState {
-  const len = state.program.days.length;
-  state.program = { ...state.program, currentIndex: len ? ((index % len) + len) % len : 0 };
+  const days = state.program.days;
+  const len = days.length;
+  if (len === 0) {
+    state.program = { ...state.program, currentDayId: null, currentIndex: 0 };
+    return state;
+  }
+  const next = jumpTransition(state.program, days[((index % len) + len) % len].id);
+  if (next) state.program = { ...state.program, currentDayId: next.currentDayId, currentIndex: next.currentIndex };
   return state;
 }
 
@@ -44,22 +50,29 @@ export function withRestDay(state: FakeState): FakeState {
   return withDayIndex(state, i === -1 ? 0 : i);
 }
 
-/** Today already logged: the done state (summary + "geri al"). */
+/** Today already logged: the planned day done, pointer moved on (exactly what `/program/complete` does). */
 export function withCompletedToday(state: FakeState, today = trDateKey()): FakeState {
-  const day = state.program.days[state.program.currentIndex];
+  const before = pointerOf(state.program);
+  const day = state.program.days[before.currentIndex];
   if (!day) return state;
-  const log = fx.makeLog(day, today, state.program.weekNumber);
+  const t = logDayTransition(state.program, day.id);
+  if (!t) return state;
+  const log = fx.makeLog(day, today, before.cycleNumber);
   state.logs = [log, ...state.logs.filter((l) => l.dateKey !== today)];
-  return withDayIndex(state, state.program.currentIndex + 1);
+  state.pointerMeta = { ...(state.pointerMeta ?? {}), [log.id]: { pointerBeforeId: t.before.currentDayId, pointerAfterId: t.after.currentDayId, cycleBefore: t.before.cycleNumber } };
+  state.program = { ...state.program, currentDayId: t.after.currentDayId, currentIndex: t.after.currentIndex, cycleNumber: t.after.cycleNumber, weekNumber: t.after.cycleNumber };
+  return state;
 }
 
-/** Today skipped: an off-day log, pointer moved on. */
+/** Today taken as a break (`/program/skip` on a training day): an off-day log, the pointer stays. */
 export function withSkippedToday(state: FakeState, today = trDateKey()): FakeState {
-  const day = state.program.days[state.program.currentIndex];
+  const before = pointerOf(state.program);
+  const day = state.program.days[before.currentIndex];
   if (!day) return state;
-  const log = fx.makeLog(day, today, state.program.weekNumber, true);
+  const log = fx.makeLog(day, today, before.cycleNumber, true);
   state.logs = [log, ...state.logs.filter((l) => l.dateKey !== today)];
-  return withDayIndex(state, state.program.currentIndex + 1);
+  state.pointerMeta = { ...(state.pointerMeta ?? {}), [log.id]: { pointerBeforeId: before.currentDayId, pointerAfterId: before.currentDayId, cycleBefore: before.cycleNumber } };
+  return state;
 }
 
 /** Brand-new user: program assigned, nothing logged yet (history empty state). */
@@ -70,7 +83,7 @@ export function withEmptyHistory(state: FakeState): FakeState {
 
 /** No program assigned — the "Program atanmamış" empty state. */
 export function withoutProgram(state: FakeState): FakeState {
-  state.program = { ...state.program, days: [], currentIndex: 0 };
+  state.program = { ...state.program, days: [], currentDayId: null, currentIndex: 0 };
   state.logs = [];
   return state;
 }

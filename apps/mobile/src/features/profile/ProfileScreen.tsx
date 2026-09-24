@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { ACTIVITY_TR, WEEKDAYS_TR_SHORT, isDateKey, type ActivityLevel, type Gender, type Weekday } from "@fitfloow/core";
 import { env } from "../../lib/env";
 import { fmtDate } from "../../lib/format";
@@ -60,11 +59,11 @@ export function ProfileScreen() {
 
       <Card>
         <View style={styles.identity}>
-          <LinearGradient colors={[...colors.gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
-            <Text variant="heading" color="onPrimary">
+          <View style={[styles.avatar, { backgroundColor: colors.primarySoft }]}>
+            <Text variant="heading" color="primary">
               {initials}
             </Text>
-          </LinearGradient>
+          </View>
           <View style={styles.identityTexts}>
             <Text variant="heading">{user.displayName}</Text>
             <Text variant="body" color="inkMuted">
@@ -187,7 +186,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 const styles = StyleSheet.create({
   identity: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
-  avatar: { width: 56, height: 56, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  avatar: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
   identityTexts: { flex: 1, gap: 2 },
   section: { gap: spacing.xs },
   sectionBody: { marginTop: spacing.sm },

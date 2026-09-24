@@ -30,9 +30,10 @@ async function renderBuilder() {
 describe("Program builder — weekly volume matrix", () => {
   it("computes Σ targetSets × muscle load over the cycle", async () => {
     await renderBuilder();
-    // Bench 4×1 + Incline 3×0.9 + DB Fly 4×0.9 + Dips 3×0.8 = 12,7 over a 7-day cycle.
+    // Bench 4×1 + Incline 3×0.9 + DB Fly 4×0.9 + Dips 3×0.8 = 12,7 over a 7-day cycle —
+    // inside the app-wide recommended 10–15.
     expect(within(matrixRow("Göğüs")).getByText("12,7")).toBeInTheDocument();
-    expect(within(matrixRow("Göğüs")).getByText("Az")).toBeInTheDocument();
+    expect(within(matrixRow("Göğüs")).getByText("Hedefte")).toBeInTheDocument();
   });
 
   it("shows a per-day breakdown alongside the weekly total", async () => {
@@ -43,17 +44,17 @@ describe("Program builder — weekly volume matrix", () => {
     expect(within(chest).getAllByText("·").length).toBeGreaterThan(0);
   });
 
-  it("recomputes live when a set count is edited and flags the target as met", async () => {
+  it("recomputes live when a set count is edited and flags too much volume", async () => {
     const user = userEvent.setup();
     await renderBuilder();
 
     await user.click(screen.getByRole("button", { name: /bench press set sayısı: 4/i }));
     const input = screen.getByRole("spinbutton", { name: /bench press set sayısı/i });
     await user.clear(input);
-    await user.type(input, "8{Enter}");
+    await user.type(input, "12{Enter}");
 
-    await waitFor(() => expect(within(matrixRow("Göğüs")).getByText("16,7")).toBeInTheDocument());
-    expect(within(matrixRow("Göğüs")).getByText("Hedefte")).toBeInTheDocument();
+    await waitFor(() => expect(within(matrixRow("Göğüs")).getByText("20,7")).toBeInTheDocument());
+    expect(within(matrixRow("Göğüs")).getByText("Fazla")).toBeInTheDocument();
   });
 
   it("switches the matrix between weekly and cycle basis", async () => {

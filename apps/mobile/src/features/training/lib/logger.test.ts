@@ -19,6 +19,7 @@ import {
 } from "./logger";
 
 const STRENGTH_DAY: DayDTO = {
+  id: "d1",
   order: 1,
   title: "Üst Vücut A",
   focus: "Göğüs · Sırt",
@@ -32,6 +33,7 @@ const STRENGTH_DAY: DayDTO = {
 };
 
 const RUN_DAY: DayDTO = {
+  id: "d3",
   order: 3,
   title: "Koşu",
   focus: "Tempo",
@@ -447,5 +449,16 @@ describe("logger — draft restore", () => {
     expect(restoreDraft(null, { dayOrder: 1, dateKey: "2026-09-10" })).toBeNull();
     expect(restoreDraft({ version: 99 }, { dayOrder: 1, dateKey: "2026-09-10" })).toBeNull();
     expect(restoreDraft({ version: 1 }, { dayOrder: 1, dateKey: "2026-09-10" })).toBeNull();
+  });
+
+  test("a draft is matched by day id when it has one, so reordering the program keeps it", () => {
+    const s = JSON.parse(JSON.stringify(make()));
+    expect(s.dayId).toBe("d1");
+    // Day d1 moved to position 3: same id → restored; another id at the old position → dropped.
+    expect(restoreDraft(s, { dayOrder: 3, dayId: "d1", dateKey: "2026-09-10" })).not.toBeNull();
+    expect(restoreDraft(s, { dayOrder: 1, dayId: "d9", dateKey: "2026-09-10" })).toBeNull();
+    // A pre-3.0 draft (no id) falls back to the order.
+    const { dayId: _drop, ...legacy } = s;
+    expect(restoreDraft(legacy, { dayOrder: 1, dayId: "d1", dateKey: "2026-09-10" })).not.toBeNull();
   });
 });

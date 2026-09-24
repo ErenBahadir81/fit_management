@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Copy, Plus, Save } from "lucide-react";
 import type { DayDTO, ExerciseDTO, ExerciseTargetDTO, MuscleDTO, ProgramTemplateDTO } from "@fitfloow/core";
+import { freshDayId } from "@fitfloow/core";
 import { cx } from "@/lib/cx";
 import { errorMessage, useDuplicateTemplate, useMuscles, useSaveTemplate, useTemplate } from "@/lib/queries";
 import { PageHeader } from "@/components/layout/PanelShell";
@@ -62,8 +63,8 @@ interface Draft {
   days: DayDTO[];
 }
 
-function emptyDay(order: number): DayDTO {
-  return { order, title: `${order}. Gün`, focus: "", kind: "strength", exercises: [], run: null, swim: null };
+function emptyDay(order: number, taken: readonly DayDTO[]): DayDTO {
+  return { id: freshDayId(taken.map((d) => d.id)), order, title: `${order}. Gün`, focus: "", kind: "strength", exercises: [], run: null, swim: null };
 }
 
 function Builder({ template, muscles }: { template: ProgramTemplateDTO; muscles: MuscleDTO[] }) {
@@ -116,7 +117,7 @@ function Builder({ template, muscles }: { template: ProgramTemplateDTO; muscles:
       return days;
     });
 
-  const addDay = () => patchDays((days) => [...days, emptyDay(days.length + 1)]);
+  const addDay = () => patchDays((days) => [...days, emptyDay(days.length + 1, days)]);
   const removeDay = (index: number) => patchDays((days) => days.filter((_, i) => i !== index));
   const moveDay = (index: number, delta: number) =>
     patchDays((days) => {

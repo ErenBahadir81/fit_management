@@ -6,6 +6,7 @@
 export * from "./types";
 export * from "./recovery";
 export * from "./volume";
+export * from "./volumeBands";
 export * from "./schedule";
 export * from "./program";
 export * from "./cardio";

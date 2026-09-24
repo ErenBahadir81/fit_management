@@ -4,6 +4,7 @@ import { makeQueryClient, renderHookUI } from "../../../__tests__/helpers";
 import { flooBus } from "../../mascot/events";
 import { setApi } from "../../lib/api";
 import { createFakeApi } from "../../lib/fake";
+import { trainingState, withCompletedToday, withRestDay, withSkippedToday } from "../../lib/fake/training";
 import {
   trainingKeys,
   useCompleteWorkout,
@@ -11,10 +12,12 @@ import {
   useExerciseCatalog,
   useJumpTo,
   useLastPerformances,
+  useLogDay,
   useProgram,
   useRecovery,
   useSkipDay,
   useTrainingStats,
+  useUndoLast,
   useUpdateProgram,
   useWorkouts,
 } from "./queries";
@@ -84,32 +87,74 @@ describe("training queries", () => {
 });
 
 describe("training mutations", () => {
-  test("skip advances the pointer optimistically before the server answers", async () => {
-    const client = api();
+  /** Mount `useProgram` on a fresh cache over the fake API (optionally in a given state). */
+  async function setup(state?: ReturnType<typeof trainingState>) {
+    const client = createFakeApi({ latencyMs: 0, signedIn: true, state });
+    setApi(client);
     const qc = makeQueryClient();
     const program = await renderHookUI(() => useProgram(), { queryClient: qc });
     await waitFor(() => expect(program.result.current.data).toBeTruthy());
-    const startIndex = program.result.current.data!.program.currentIndex;
+    const read = () => qc.getQueryData<ProgramView>(trainingKeys.program)!;
+    return { client, qc, read };
+  }
+  /** What the strip says about today and the next days — enough to compare cache and server. */
+  const strip = (v: ProgramView) => v.schedule.map((e) => `${e.status}:${e.day?.id ?? "-"}`);
+
+  test("skip on a training day is a break: today is marked, the pointer does not move (B2)", async () => {
+    const { client, qc, read } = await setup();
+    const before = read();
+    expect(before.current.day.kind).toBe("strength");
 
     const skip = await renderHookUI(() => useSkipDay(), { queryClient: qc });
     await act(async () => {
       skip.result.current.mutate("Yorgunum");
     });
 
-    const optimistic = qc.getQueryData<ProgramView>(trainingKeys.program)!;
+    const optimistic = read();
+    expect(optimistic.todayLog?.isBreak).toBe(true);
     expect(optimistic.todayLog?.isOffDay).toBe(true);
-    expect(optimistic.program.currentIndex).toBe((startIndex + 1) % optimistic.program.days.length);
+    expect(optimistic.todayLog?.dayId).toBeNull();
+    expect(optimistic.program.currentDayId).toBe(before.program.currentDayId);
+    expect(optimistic.program.currentIndex).toBe(before.program.currentIndex);
+    expect(optimistic.current.day.id).toBe(before.current.day.id); // still next
     expect(optimistic.schedule.find((s) => s.isToday)?.status).toBe("skipped");
+
     await waitFor(() => expect(skip.result.current.isSuccess).toBe(true));
-    expect((await client.training.program()).todayLog?.isOffDay).toBe(true);
+    const server = await client.training.program();
+    expect(server.todayLog?.isBreak).toBe(true);
+    expect(server.program.currentDayId).toBe(before.program.currentDayId);
+    expect(strip(server)).toEqual(strip(optimistic));
+  });
+
+  test("skip on a rest day does the rest day and the pointer advances (B1)", async () => {
+    const { client, qc, read } = await setup(withRestDay(trainingState()));
+    const before = read();
+    expect(before.current.day.kind).toBe("rest");
+    const next = before.program.days[(before.program.currentIndex + 1) % before.program.days.length];
+
+    const skip = await renderHookUI(() => useSkipDay(), { queryClient: qc });
+    await act(async () => {
+      skip.result.current.mutate(undefined);
+    });
+
+    const optimistic = read();
+    expect(optimistic.todayLog?.isBreak).toBe(false);
+    expect(optimistic.todayLog?.dayId).toBe(before.current.day.id);
+    expect(optimistic.todayLog?.kind).toBe("rest");
+    expect(optimistic.program.currentDayId).toBe(next.id);
+    expect(optimistic.current.day.id).toBe(next.id);
+    expect(optimistic.schedule.find((s) => s.isToday)?.status).toBe("done");
+
+    await waitFor(() => expect(skip.result.current.isSuccess).toBe(true));
+    const server = await client.training.program();
+    expect(server.program.currentDayId).toBe(next.id);
+    expect(server.todayLog?.isBreak).toBe(false);
+    expect(strip(server)).toEqual(strip(optimistic));
   });
 
   test("a failing skip rolls the cache back", async () => {
-    const client = api();
-    const qc = makeQueryClient();
-    const program = await renderHookUI(() => useProgram(), { queryClient: qc });
-    await waitFor(() => expect(program.result.current.data).toBeTruthy());
-    const before = qc.getQueryData<ProgramView>(trainingKeys.program)!;
+    const { client, qc, read } = await setup();
+    const before = read();
     jest.spyOn(client.training, "skip").mockRejectedValueOnce(new Error("boom"));
 
     const skip = await renderHookUI(() => useSkipDay(), { queryClient: qc });
@@ -117,31 +162,31 @@ describe("training mutations", () => {
       skip.result.current.mutate(undefined);
     });
     await waitFor(() => expect(skip.result.current.isError).toBe(true));
-    expect(qc.getQueryData<ProgramView>(trainingKeys.program)!.program.currentIndex).toBe(before.program.currentIndex);
-    expect(qc.getQueryData<ProgramView>(trainingKeys.program)!.todayLog).toBeNull();
+    expect(read().program.currentIndex).toBe(before.program.currentIndex);
+    expect(read().todayLog).toBeNull();
   });
 
-  test("jump moves the pointer to the chosen cycle day", async () => {
-    api();
-    const qc = makeQueryClient();
-    const program = await renderHookUI(() => useProgram(), { queryClient: qc });
-    await waitFor(() => expect(program.result.current.data).toBeTruthy());
+  test("jump moves the pointer to the chosen day, by id", async () => {
+    const { client, qc, read } = await setup();
+    const run = read().program.days.find((d) => d.kind === "run")!;
 
     const jump = await renderHookUI(() => useJumpTo(), { queryClient: qc });
     await act(async () => {
-      jump.result.current.mutate(2);
+      jump.result.current.mutate(run.id);
     });
-    const view = qc.getQueryData<ProgramView>(trainingKeys.program)!;
-    expect(view.program.currentIndex).toBe(2);
+    const view = read();
+    expect(view.program.currentDayId).toBe(run.id);
+    expect(view.program.currentIndex).toBe(view.program.days.indexOf(run));
     expect(view.current.day.title).toBe("Koşu");
+    expect(view.schedule.find((s) => s.isToday)?.day?.id).toBe(run.id);
     await waitFor(() => expect(jump.result.current.isSuccess).toBe(true));
+    const server = await client.training.program();
+    expect(server.program.currentDayId).toBe(run.id);
+    expect(strip(server)).toEqual(strip(view));
   });
 
   test("complete writes today's log optimistically and invalidates home + recovery", async () => {
-    api();
-    const qc = makeQueryClient();
-    const program = await renderHookUI(() => useProgram(), { queryClient: qc });
-    await waitFor(() => expect(program.result.current.data).toBeTruthy());
+    const { qc, read } = await setup();
     const invalidate = jest.spyOn(qc, "invalidateQueries");
     const emit = jest.spyOn(flooBus, "emit");
 
@@ -156,8 +201,10 @@ describe("training mutations", () => {
         rpe: 8,
       });
     });
-    const optimistic = qc.getQueryData<ProgramView>(trainingKeys.program)!;
+    const optimistic = read();
     expect(optimistic.todayLog?.isOffDay).toBe(false);
+    expect(optimistic.todayLog?.isBreak).toBe(false);
+    expect(optimistic.todayLog?.dayId).toBe("d1");
     expect(optimistic.todayLog?.durationMin).toBe(48);
     expect(optimistic.schedule.find((s) => s.isToday)?.status).toBe("done");
 
@@ -168,20 +215,126 @@ describe("training mutations", () => {
     emit.mockRestore();
   });
 
-  test("updateProgram replaces the days in the cache before the round trip", async () => {
-    api();
-    const qc = makeQueryClient();
-    const program = await renderHookUI(() => useProgram(), { queryClient: qc });
-    await waitFor(() => expect(program.result.current.data).toBeTruthy());
-    const days = program.result.current.data!.program.days;
-    const renamed = days.map((d, i) => (i === 0 ? { ...d, title: "Yeni Gün" } : d));
+  test("completing twice on the same day never advances the pointer twice (B3)", async () => {
+    const { client, qc, read } = await setup();
+    const input = { strength: [], run: null, swim: null, durationMin: 40, notes: null, rpe: 7 };
+    const complete = await renderHookUI(() => useCompleteWorkout(), { queryClient: qc });
+
+    await act(async () => {
+      complete.result.current.mutate(input);
+    });
+    expect(read().program.currentDayId).toBe("d2");
+    await waitFor(() => expect(complete.result.current.isSuccess).toBe(true));
+    await waitFor(async () => expect((await client.training.program()).program.currentDayId).toBe("d2"));
+    await waitFor(() => expect(read().todayLog?.id).not.toMatch(/^optimistic/));
+
+    await act(async () => {
+      complete.result.current.mutate({ ...input, durationMin: 55 });
+    });
+    const again = read();
+    expect(again.program.currentDayId).toBe("d2");
+    expect(again.todayLog?.dayId).toBe("d1");
+    expect(again.todayLog?.durationMin).toBe(55);
+    await waitFor(() => expect(complete.result.current.isSuccess).toBe(true));
+    const server = await client.training.program();
+    expect(server.program.currentDayId).toBe("d2");
+    expect(server.todayLog?.durationMin).toBe(55);
+    expect((await client.training.workouts({ limit: 50 })).logs.filter((l) => l.dateKey === server.todayLog?.dateKey)).toHaveLength(1);
+  });
+
+  test("logDay: another day than planned — the cycle continues after it, or with resumePlanned stays", async () => {
+    const { client, qc, read } = await setup();
+    const log = await renderHookUI(() => useLogDay(), { queryClient: qc });
+
+    await act(async () => {
+      log.result.current.mutate({ dayId: "d3" });
+    });
+    expect(read().todayLog?.dayId).toBe("d3");
+    expect(read().program.currentDayId).toBe("d4");
+    await waitFor(() => expect(log.result.current.isSuccess).toBe(true));
+    expect((await client.training.program()).program.currentDayId).toBe("d4");
+
+    // Same state, other answer: resumePlanned keeps the planned day next.
+    const second = await setup();
+    const log2 = await renderHookUI(() => useLogDay(), { queryClient: second.qc });
+    await act(async () => {
+      log2.result.current.mutate({ dayId: "d3", resumePlanned: true });
+    });
+    expect(second.read().program.currentDayId).toBe("d1");
+    await waitFor(() => expect(log2.result.current.isSuccess).toBe(true));
+    const server = await second.client.training.program();
+    expect(server.program.currentDayId).toBe("d1");
+    expect(strip(server)).toEqual(strip(second.read()));
+  });
+
+  test("updateProgram keeps the day ids, so a reorder keeps the pointer on the same day (B5)", async () => {
+    const { client, qc, read } = await setup();
+    const days = read().program.days;
+    const pointer = read().program.currentDayId;
+    const swapped = [days[1], days[0], ...days.slice(2)].map((d, i) => ({ ...d, order: i + 1 }));
+    const renamed = swapped.map((d) => (d.id === "d3" ? { ...d, title: "Yeni Gün" } : d));
 
     const update = await renderHookUI(() => useUpdateProgram(), { queryClient: qc });
     await act(async () => {
       update.result.current.mutate({ days: renamed });
     });
-    expect(qc.getQueryData<ProgramView>(trainingKeys.program)!.program.days[0].title).toBe("Yeni Gün");
+    const optimistic = read();
+    expect(optimistic.program.days.map((d) => d.id)).toEqual(renamed.map((d) => d.id));
+    expect(optimistic.program.days.find((d) => d.id === "d3")?.title).toBe("Yeni Gün");
+    expect(optimistic.program.currentDayId).toBe(pointer);
+    expect(optimistic.program.currentIndex).toBe(1);
+    expect(optimistic.current.day.id).toBe(pointer);
     await waitFor(() => expect(update.result.current.isSuccess).toBe(true));
+
+    const server = await client.training.program();
+    expect(server.program.days.map((d) => d.id)).toEqual(renamed.map((d) => d.id));
+    expect(server.program.currentDayId).toBe(pointer);
+    expect(server.program.currentIndex).toBe(1);
+  });
+
+  test("updateProgram: a new day without an id gets the same fresh id the server gives it", async () => {
+    const { client, qc, read } = await setup();
+    const days = read().program.days;
+    const { id: _none, ...fresh } = { ...days[0], title: "Ekstra" };
+    const update = await renderHookUI(() => useUpdateProgram(), { queryClient: qc });
+    await act(async () => {
+      update.result.current.mutate({ days: [...days, { ...fresh, order: days.length + 1 }] });
+    });
+    const optimisticIds = read().program.days.map((d) => d.id);
+    expect(optimisticIds).toHaveLength(days.length + 1);
+    await waitFor(() => expect(update.result.current.isSuccess).toBe(true));
+    expect((await client.training.program()).program.days.map((d) => d.id)).toEqual(optimisticIds);
+  });
+
+  test("undo takes today's break back and the server agrees", async () => {
+    const { client, qc, read } = await setup(withSkippedToday(trainingState()));
+    const before = read();
+    expect(before.todayLog?.isBreak).toBe(true);
+
+    const undo = await renderHookUI(() => useUndoLast(), { queryClient: qc });
+    await act(async () => {
+      undo.result.current.mutate();
+    });
+    expect(read().todayLog).toBeNull();
+    expect(read().schedule.find((s) => s.isToday)?.status).toBe("today");
+    expect(read().program.currentDayId).toBe(before.program.currentDayId);
+    await waitFor(() => expect(undo.result.current.isSuccess).toBe(true));
+    const server = await client.training.program();
+    expect(server.todayLog).toBeNull();
+    expect(server.program.currentDayId).toBe(before.program.currentDayId);
+  });
+
+  test("undo of a completed day puts the pointer back (server-side), then the cache follows", async () => {
+    const { client, qc, read } = await setup(withCompletedToday(trainingState()));
+    expect(read().program.currentDayId).toBe("d2");
+    const undo = await renderHookUI(() => useUndoLast(), { queryClient: qc });
+    await act(async () => {
+      undo.result.current.mutate();
+    });
+    await waitFor(() => expect(undo.result.current.isSuccess).toBe(true));
+    expect((await client.training.program()).program.currentDayId).toBe("d1");
+    await waitFor(() => expect(read().program.currentDayId).toBe("d1"));
+    expect(read().todayLog).toBeNull();
   });
 
   test("delete removes the log from every cached workout list", async () => {

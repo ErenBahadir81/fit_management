@@ -36,18 +36,16 @@ export interface WorkoutLogLike {
   date: string | number | Date;
   dateKey?: string;
   isOffDay?: boolean;
+  /** 3.0+: a day off outside the plan (see `isBreakLog`). */
+  isBreak?: boolean;
+  /** 3.0+: the program day that was done. */
+  dayId?: string | null;
   dayOrder?: number;
   strength?: ReadonlyArray<StrengthEntryLike>;
   run?: CardioEntryLike | null;
   swim?: CardioEntryLike | null;
 }
 
-/** Minimal program shape the pointer/schedule helpers need. */
-export interface ProgramLike<TDay = unknown> {
-  days: ReadonlyArray<TDay>;
-  currentIndex: number;
-  weekNumber?: number;
-}
 
 export const HOUR_MS = 3_600_000;
 export const WEEK_MS = 7 * DAY_MS;

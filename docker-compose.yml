@@ -1,5 +1,8 @@
 # Whole FitFloow backend, locally:  docker compose up --build
-#   mongo   :27017   vision  :8100   api  :4000   admin :3000
+#   mongo   127.0.0.1:27017 (auth on)   vision  :8100   api  :4000   admin :3000
+# Needs a .env next to this file — see .env.example (JWT_SECRET, MONGO_ROOT_*, MONGO_APP_*, SEED_*).
+# Mongo credentials are read only when the mongo-data volume is created; changing them later needs the
+# users changed inside Mongo (or a fresh volume).
 # The vision image bakes the 93 MB model in at build time, so the first build is the slow one.
 name: fitfloow
 
@@ -7,8 +10,18 @@ services:
   mongo:
     image: mongo:8
     restart: unless-stopped
-    ports: ["27017:27017"]
-    volumes: ["mongo-data:/data/db"]
+    # Loopback only: reachable from this host (mongosh, Compass) but never from the network.
+    # The api reaches it over the compose network as mongo:27017.
+    ports: ["127.0.0.1:27017:27017"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "${MONGO_ROOT_USER:?set MONGO_ROOT_USER in your .env}"
+      MONGO_INITDB_ROOT_PASSWORD: "${MONGO_ROOT_PASSWORD:?set MONGO_ROOT_PASSWORD in your .env}"
+      MONGO_APP_DB: fitfloow
+      MONGO_APP_USER: "${MONGO_APP_USER:?set MONGO_APP_USER in your .env}"
+      MONGO_APP_PASSWORD: "${MONGO_APP_PASSWORD:?set MONGO_APP_PASSWORD in your .env}"
+    volumes:
+      - mongo-data:/data/db
+      - ./deploy/mongo-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
@@ -41,12 +54,18 @@ services:
     ports: ["4000:4000"]
     environment:
       NODE_ENV: production
-      MONGO_URI: mongodb://mongo:27017/fitfloow
+      # Credentials must be URL-safe (e.g. `openssl rand -hex 24`), they are embedded in the URI.
+      MONGO_URI: "mongodb://${MONGO_APP_USER}:${MONGO_APP_PASSWORD}@mongo:27017/fitfloow?authSource=fitfloow"
       VISION_URL: http://vision:8100
       VISION_MOCK: "0"
       JWT_SECRET: "${JWT_SECRET:?set JWT_SECRET (min 16 chars) in your .env}"
       CORS_ORIGINS: "http://localhost:3000,http://localhost:8081"
       UPLOAD_DIR: /data/uploads
+      # Catalogs + migrations run on boot. The seed accounts (eren admin, inci) are created only when their
+      # password is set here (min 12 chars); unset → skipped. Remove them from .env after the first boot.
+      SEED_ON_BOOT: "${SEED_ON_BOOT:-1}"
+      SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD:-}"
+      SEED_USER_PASSWORD: "${SEED_USER_PASSWORD:-}"
     volumes: ["api-uploads:/data/uploads"]
     depends_on:
       mongo: { condition: service_healthy }

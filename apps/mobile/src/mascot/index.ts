@@ -19,3 +19,4 @@ export {
   type Trigger as FlooTrigger,
   type Mood as FlooModelMood,
 } from "./model";
+export * from "./voice";

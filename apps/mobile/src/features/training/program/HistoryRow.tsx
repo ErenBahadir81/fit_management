@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import type { WorkoutLogDTO } from "@fitfloow/core";
+import { isBreakLog, type WorkoutLogDTO } from "@fitfloow/core";
 import { fmtDate, fmtDuration, fmtInt, fmtNumber } from "../../../lib/format";
 import { relativeDayLabel } from "../../../lib/dates";
 import { useTheme } from "../../../theme/ThemeProvider";
@@ -57,12 +57,12 @@ export const HistoryRow = memo(function HistoryRow({ log, onPress, onDelete }: H
         }}
         style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
-        <View style={[styles.icon, { backgroundColor: log.isOffDay ? colors.warningSoft : colors.primarySoft }]}>
-          <Icon icon={log.isOffDay ? "skip" : KIND_ICON[log.kind]} size={18} color={log.isOffDay ? "warning" : "primary"} />
+        <View style={[styles.icon, { backgroundColor: isBreakLog(log) ? colors.warningSoft : colors.primarySoft }]}>
+          <Icon icon={isBreakLog(log) ? "skip" : KIND_ICON[log.kind]} size={18} color={isBreakLog(log) ? "warning" : "primary"} />
         </View>
         <View style={styles.texts}>
           <Text variant="bodyStrong" numberOfLines={1}>
-            {log.isOffDay ? "Atlandı" : log.title}
+            {isBreakLog(log) ? "Atlandı" : log.title}
           </Text>
           <Text variant="caption" color="inkMuted" tabular numberOfLines={1} testID={`history-meta-${log.id}`}>
             {relativeDayLabel(log.dateKey)}

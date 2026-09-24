@@ -61,7 +61,10 @@ export function useGoalPreview({ targetBodyFatPct, profile, enabled = true, debo
 function useGoalMutationEffects() {
   const qc = useQueryClient();
   return (goal: GoalDTO | null) => {
-    if (goal) qc.setQueryData<GoalView>(GOAL_KEY, (prev) => ({ goal, progress: prev?.goal?.id === goal.id ? (prev.progress ?? null) : null }));
+    if (goal) qc.setQueryData<GoalView>(GOAL_KEY, (prev) => {
+      const same = prev?.goal?.id === goal.id;
+      return { goal, progress: same ? (prev.progress ?? null) : null, feedback: same ? (prev.feedback ?? null) : null, adjustment: null };
+    });
     void qc.invalidateQueries({ queryKey: GOAL_KEY });
     void qc.invalidateQueries({ queryKey: HOME_QUERY_KEY });
     void qc.invalidateQueries({ queryKey: REPORT_KEYS.all });
@@ -120,7 +123,7 @@ export function useAbandonGoal() {
   return useMutation<GoalDTO, unknown, void>({
     mutationFn: async () => (await getApi().goals.abandon()).goal,
     onSuccess: () => {
-      qc.setQueryData<GoalView>(GOAL_KEY, { goal: null, progress: null });
+      qc.setQueryData<GoalView>(GOAL_KEY, { goal: null, progress: null, feedback: null, adjustment: null });
       after(null);
       void haptic.select();
     },
@@ -135,7 +138,7 @@ export function useCompleteGoal() {
   return useMutation<GoalDTO, unknown, void>({
     mutationFn: async () => (await getApi().goals.complete()).goal,
     onSuccess: (goal) => {
-      qc.setQueryData<GoalView>(GOAL_KEY, { goal: null, progress: null });
+      qc.setQueryData<GoalView>(GOAL_KEY, { goal: null, progress: null, feedback: null, adjustment: null });
       after(null);
       void haptic.success();
       flooBus.emit("goalHit", { goalId: goal.id });

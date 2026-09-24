@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { FlooCornerHost } from "../../src/mascot/voice";
 import { useTheme } from "../../src/theme";
 
 /**
@@ -17,6 +18,8 @@ export default function ModalsLayout() {
   return (
     <BottomSheetModalProvider>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      {/* Inside the modal's own view controller, so Floo can speak over the flow (see FlooCornerHost). */}
+      <FlooCornerHost presence="auto" />
     </BottomSheetModalProvider>
   );
 }

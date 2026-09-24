@@ -69,6 +69,8 @@ export function ProgramEditorSheet({ sheetRef, program, onClose }: ProgramEditor
   const updateDay = useCallback((index: number, day: DayDTO) => setDraft((prev) => (prev ?? program.days).map((d, i) => (i === index ? day : d))), [program.days]);
 
   const commit = useCallback(() => {
+    // Each day goes back with its `id` (the spread keeps it): the server keeps the pointer on the
+    // same day however the list was reordered (B5). A day added here would simply omit it.
     save.mutate(
       { name: program.name, days: days.map((d, i) => ({ ...d, order: i + 1 })) },
       {

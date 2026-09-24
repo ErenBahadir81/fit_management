@@ -28,7 +28,7 @@ describe("HomeScreen", () => {
     expect(screen.getByText(/kalan/)).toBeTruthy();
     expect(screen.getByTestId("home-goal-hero")).toBeTruthy();
     expect(screen.getByTestId("home-recovery")).toBeTruthy();
-    expect(screen.getByTestId("home-floo")).toBeTruthy();
+    expect(screen.getByTestId("home-header")).toBeTruthy();
   });
 
   test("renders instantly from a warm cache without ever mounting the skeleton", async () => {

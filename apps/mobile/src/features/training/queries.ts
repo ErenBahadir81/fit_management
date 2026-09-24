@@ -5,21 +5,32 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
-  advancePointer,
-  jumpTo as jumpPointer,
-  normalizeIndex,
+  buildSchedule,
+  currentIndexFor,
+  dayOfLog,
+  isBreakLog,
+  jumpTransition,
+  logDayTransition,
+  normalizeProgramInput,
+  pointerOf,
+  programMode,
+  reconcilePointer,
   trDateKey,
   type CompleteWorkoutInput,
+  type DayDTO,
   type ExerciseDTO,
   type LastPerformance,
   type MuscleDTO,
+  type ProgramDTO,
   type ProgramInput,
   type ProgramView,
   type RecoveryView,
   type TrainingStats,
   type WorkoutLogDTO,
+  type WorkoutLogLike,
 } from "@fitfloow/core";
 import { flooBus } from "../../mascot/events";
+import type { LogDayRequest } from "@fitfloow/api-client";
 import { getApi } from "../../lib/api";
 import { describeError } from "../../lib/errors";
 import { haptic } from "../../lib/haptics";
@@ -128,24 +139,38 @@ export function useInvalidateTraining() {
 }
 
 /* ----------------------------- optimistic helpers -------------------------- */
+/*
+ * Every optimistic write below mirrors `apps/api/src/modules/training/program.routes.ts` through
+ * the same core transitions (`logDayTransition`, `jumpTransition`, `reconcilePointer`,
+ * `currentIndexFor`, `buildSchedule`), so the cache and the server can never disagree on where
+ * the pointer is (B2). The server's answer replaces the guess on settle anyway.
+ */
 
-function todayEntry(view: ProgramView, patch: Partial<ProgramView["schedule"][number]>): ProgramView["schedule"] {
-  return view.schedule.map((s) => (s.isToday ? { ...s, ...patch } : s));
-}
+type LogFields = Partial<CompleteWorkoutInput> | null;
 
 /** A stand-in log so the UI can settle immediately; the server's real log replaces it on success. */
-function draftLog(view: ProgramView, input: CompleteWorkoutInput | null, dateKey: string): WorkoutLogDTO {
-  const day = view.current.day;
-  const isOffDay = input === null;
+export function draftLog(
+  view: ProgramView,
+  day: DayDTO | null,
+  input: LogFields,
+  dateKey: string,
+  opts: { isBreak?: boolean; id?: string } = {}
+): WorkoutLogDTO {
+  const isBreak = opts.isBreak === true;
+  const cycleNumber = view.program.cycleNumber ?? view.program.weekNumber;
   return {
-    id: `optimistic-${dateKey}`,
+    id: opts.id ?? `optimistic-${dateKey}`,
     date: new Date().toISOString(),
     dateKey,
+    dayId: isBreak ? null : (day?.id ?? null),
     dayOrder: day?.order ?? 0,
-    weekNumber: view.program.weekNumber,
-    title: day?.title ?? "",
-    kind: day?.kind ?? "rest",
-    isOffDay,
+    cycleNumber,
+    weekNumber: cycleNumber,
+    isBreak,
+    title: isBreak ? "Ara" : (day?.title ?? ""),
+    kind: isBreak ? "rest" : (day?.kind ?? "rest"),
+    // A rest *day* is an off-day too, but it is done — not a break.
+    isOffDay: isBreak || day?.kind === "rest",
     strength: (input?.strength ?? []).map((e) => ({
       name: e.name,
       muscles: e.muscles ?? [],
@@ -181,19 +206,122 @@ function draftLog(view: ProgramView, input: CompleteWorkoutInput | null, dateKey
   };
 }
 
-/** Writes today's log + the advanced pointer into the cached composite. */
-function applySession(view: ProgramView, input: CompleteWorkoutInput | null, dateKey: string): ProgramView {
-  const log = draftLog(view, input, dateKey);
-  const pointer = advancePointer(view.program);
-  const days = view.program.days;
-  const index = normalizeIndex(pointer.currentIndex, days.length);
+/**
+ * Re-derives `current` and the strip for a changed program/today-log, exactly as `GET /program`
+ * does. The strip's logged dates are rebuilt from the entries themselves (the view carries no
+ * other logs), with today's entry taken from `todayLog`.
+ */
+export function recompose(view: ProgramView, program: ProgramDTO, todayLog: WorkoutLogDTO | null, dateKey: string): ProgramView {
+  const days = program.days;
+  const todayAt = view.schedule.findIndex((s) => s.dateKey === dateKey);
+  const logs: WorkoutLogLike[] = view.schedule
+    .filter((s) => s.dateKey !== dateKey && s.logId !== null)
+    .map((s) => ({ id: s.logId ?? undefined, date: s.dateKey, dateKey: s.dateKey, dayId: s.day?.id ?? null, dayOrder: s.day?.order, isBreak: s.status === "skipped" }));
+  if (todayLog) logs.push(todayLog);
+  const index = currentIndexFor(program, dateKey, Boolean(todayLog));
+  const schedule =
+    todayAt >= 0 && days.length > 0
+      ? buildSchedule(program, logs, dateKey, { count: view.schedule.length, daysBefore: todayAt })
+      : view.schedule;
   return {
     ...view,
-    program: { ...view.program, currentIndex: index, weekNumber: pointer.weekNumber, lastActionAt: log.date },
+    program,
     current: days.length ? { index, day: days[index] } : view.current,
-    todayLog: log,
-    schedule: todayEntry(view, { status: input === null ? "skipped" : "done", logId: log.id }),
+    todayLog,
+    schedule,
   };
+}
+
+/** The day `complete`/`skip` mean when no day is named (server's `plannedDayFor`). */
+export function plannedDay(view: ProgramView, dateKey: string): DayDTO | null {
+  const days = view.program.days;
+  if (days.length === 0) return null;
+  const today = view.todayLog;
+  if (today && !isBreakLog(today)) {
+    const done = dayOfLog(days, today);
+    if (done) return done;
+  }
+  return days[currentIndexFor(view.program, dateKey, false)] ?? null;
+}
+
+/**
+ * "Today I did `dayId`" (server's `logDay`): re-logging the day already done today edits it in
+ * place and never moves the pointer twice (B3); anything else writes today's log and moves the
+ * pointer via `logDayTransition`.
+ */
+export function applyLogDay(
+  view: ProgramView,
+  dayId: string,
+  input: LogFields,
+  dateKey: string,
+  opts: { resumePlanned?: boolean } = {}
+): ProgramView {
+  const program = view.program;
+  const day = program.days.find((d) => d.id === dayId) ?? null;
+  if (!day) return view;
+  const existing = view.todayLog;
+
+  if (existing && !isBreakLog(existing) && dayOfLog(program.days, existing)?.id === dayId) {
+    const log = { ...draftLog(view, day, input, dateKey, { id: existing.id }), cycleNumber: existing.cycleNumber, weekNumber: existing.weekNumber };
+    return recompose(view, program, log, dateKey);
+  }
+
+  // Replacing a *done* log of another day: the server first takes that log's pointer move back,
+  // which the client cannot see (logs carry no pointer history). Only a non-resume move lands on a
+  // known day (the one after `dayId`), so the guess stays exact there and waits for the server otherwise.
+  const replacingDone = Boolean(existing && !isBreakLog(existing));
+  const t = logDayTransition(program, dayId, { resumePlanned: opts.resumePlanned });
+  if (!t) return view;
+  const weekly = programMode(program) === "weekly";
+  const move = replacingDone && opts.resumePlanned && !weekly ? pointerOf(program) : t.after;
+  const cycleNumber = weekly || replacingDone ? pointerOf(program).cycleNumber : move.cycleNumber;
+  const log = { ...draftLog(view, day, input, dateKey), cycleNumber: t.before.cycleNumber, weekNumber: t.before.cycleNumber };
+  const next: ProgramDTO = {
+    ...program,
+    currentDayId: move.currentDayId,
+    currentIndex: move.currentIndex,
+    cycleNumber,
+    weekNumber: cycleNumber,
+    lastActionAt: log.date,
+  };
+  return recompose(view, next, log, dateKey);
+}
+
+/**
+ * `POST /program/skip` (B1/B2): on a rest day the rest day is *done* and the cycle moves on; on any
+ * other day it is a break — an off-day log, the pointer stays. A day that already has a log is
+ * left as it is (the server answers idempotently or refuses).
+ */
+export function applySkip(view: ProgramView, reason: string | undefined, dateKey: string): ProgramView {
+  if (view.todayLog) return view;
+  const days = view.program.days;
+  if (days.length === 0) return view;
+  const planned = days[currentIndexFor(view.program, dateKey, false)];
+  if (!planned) return view;
+  if (planned.kind === "rest") return applyLogDay(view, planned.id, { notes: reason ?? null }, dateKey);
+  const log = draftLog(view, planned, { notes: reason ?? null }, dateKey, { isBreak: true });
+  return recompose(view, { ...view.program, lastActionAt: log.date }, log, dateKey);
+}
+
+/** `POST /program/jump`: move the pointer by id, log nothing. */
+export function applyJump(view: ProgramView, dayId: string, dateKey: string): ProgramView {
+  const next = jumpTransition(view.program, dayId);
+  if (!next) return view;
+  return recompose(view, { ...view.program, currentDayId: next.currentDayId, currentIndex: next.currentIndex }, view.todayLog, dateKey);
+}
+
+/** `PUT /program`: days keep their ids, so the pointer stays on the same day (B5). */
+export function applyProgramUpdate(view: ProgramView, input: ProgramInput, dateKey: string): ProgramView {
+  const mode = input.mode ?? programMode(view.program);
+  // Same id rules as the server (kept when known, fresh `d<n>` otherwise) — muscles stay as sent.
+  const { days } = normalizeProgramInput(input.days, [], { mode, existingIds: view.program.days.map((d) => d.id) });
+  const pointer = reconcilePointer(view.program, days);
+  return recompose(
+    view,
+    { ...view.program, name: input.name ?? view.program.name, mode, days, currentDayId: pointer.currentDayId, currentIndex: pointer.currentIndex },
+    view.todayLog,
+    dateKey
+  );
 }
 
 async function snapshotProgram(qc: QueryClient) {
@@ -221,16 +349,19 @@ function useRollback() {
   );
 }
 
-/** `POST /program/skip` — today becomes an off-day, the pointer moves on. */
+/**
+ * `POST /program/skip` — "Dinlendim" / "bugün ara". A rest day is done and the pointer moves on;
+ * a training day becomes a break and stays next (see `applySkip`).
+ */
 export function useSkipDay() {
   const qc = useQueryClient();
   const invalidate = useInvalidateTraining();
   const rollback = useRollback();
   return useMutation<{ log: WorkoutLogDTO }, unknown, string | undefined, ProgramCtx>({
     mutationFn: async (reason) => getApi().training.skip(reason),
-    onMutate: async () => {
+    onMutate: async (reason) => {
       const prev = await snapshotProgram(qc);
-      if (prev) qc.setQueryData(trainingKeys.program, applySession(prev, null, trDateKey()));
+      if (prev) qc.setQueryData(trainingKeys.program, applySkip(prev, reason, trDateKey()));
       return { prev };
     },
     onError: (e, _v, ctx) => rollback(ctx, e, "Gün atlanamadı. Tekrar dene."),
@@ -241,7 +372,7 @@ export function useSkipDay() {
   });
 }
 
-/** `POST /program/complete` — the finish action of the workout logger. */
+/** `POST /program/complete` — the finish action of the workout logger (today's planned day). */
 export function useCompleteWorkout() {
   const qc = useQueryClient();
   const invalidate = useInvalidateTraining();
@@ -250,7 +381,11 @@ export function useCompleteWorkout() {
     mutationFn: async (input) => getApi().training.complete(input),
     onMutate: async (input) => {
       const prev = await snapshotProgram(qc);
-      if (prev) qc.setQueryData(trainingKeys.program, applySession(prev, input, trDateKey()));
+      if (prev) {
+        const dateKey = trDateKey();
+        const day = plannedDay(prev, dateKey);
+        if (day) qc.setQueryData(trainingKeys.program, applyLogDay(prev, day.id, input, dateKey));
+      }
       return { prev };
     },
     onError: (e, _v, ctx) => rollback(ctx, e, "Antrenman kaydedilemedi. Tekrar dene."),
@@ -262,23 +397,41 @@ export function useCompleteWorkout() {
   });
 }
 
-/** `POST /program/jump` — "buradan devam et". */
+/**
+ * `POST /program/log-day` — "Bugün başka bir şey yaptım": today I did `dayId` (any day of the
+ * program). The cycle continues after that day, or with `resumePlanned` keeps the planned day next.
+ */
+export function useLogDay() {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateTraining();
+  const rollback = useRollback();
+  return useMutation<{ log: WorkoutLogDTO }, unknown, LogDayRequest, ProgramCtx>({
+    mutationFn: async (input) => getApi().training.logDay(input),
+    onMutate: async (input) => {
+      const prev = await snapshotProgram(qc);
+      if (prev) {
+        const { dayId, resumePlanned, ...fields } = input;
+        qc.setQueryData(trainingKeys.program, applyLogDay(prev, dayId, fields, trDateKey(), { resumePlanned }));
+      }
+      return { prev };
+    },
+    onError: (e, _v, ctx) => rollback(ctx, e, "Gün kaydedilemedi. Tekrar dene."),
+    onSuccess: () => {
+      void haptic.success();
+      invalidate();
+    },
+  });
+}
+
+/** `POST /program/jump` — "buradan devam et", by day id. */
 export function useJumpTo() {
   const qc = useQueryClient();
   const rollback = useRollback();
-  return useMutation<unknown, unknown, number, ProgramCtx>({
-    mutationFn: async (index) => getApi().training.jump(index),
-    onMutate: async (index) => {
+  return useMutation<unknown, unknown, string, ProgramCtx>({
+    mutationFn: async (dayId) => getApi().training.jump(dayId),
+    onMutate: async (dayId) => {
       const prev = await snapshotProgram(qc);
-      if (prev) {
-        const pointer = jumpPointer(prev.program, index);
-        const days = prev.program.days;
-        qc.setQueryData(trainingKeys.program, {
-          ...prev,
-          program: { ...prev.program, currentIndex: pointer.currentIndex },
-          current: days.length ? { index: pointer.currentIndex, day: days[pointer.currentIndex] } : prev.current,
-        } satisfies ProgramView);
-      }
+      if (prev) qc.setQueryData(trainingKeys.program, applyJump(prev, dayId, trDateKey()));
       return { prev };
     },
     onError: (e, _v, ctx) => rollback(ctx, e, "Gün değiştirilemedi."),
@@ -298,15 +451,7 @@ export function useUpdateProgram() {
     mutationFn: async (input) => getApi().training.updateProgram(input),
     onMutate: async (input) => {
       const prev = await snapshotProgram(qc);
-      if (prev) {
-        const days = input.days.map((d, i) => ({ ...d, order: i + 1 })) as ProgramView["program"]["days"];
-        const index = normalizeIndex(prev.program.currentIndex, days.length);
-        qc.setQueryData(trainingKeys.program, {
-          ...prev,
-          program: { ...prev.program, name: input.name ?? prev.program.name, days, currentIndex: index },
-          current: days.length ? { index, day: days[index] } : prev.current,
-        } satisfies ProgramView);
-      }
+      if (prev) qc.setQueryData(trainingKeys.program, applyProgramUpdate(prev, input, trDateKey()));
       return { prev };
     },
     onError: (e, _v, ctx) => rollback(ctx, e, "Program kaydedilemedi. Tekrar dene."),
@@ -340,13 +485,29 @@ export function useDeleteWorkout() {
   });
 }
 
-/** `POST /program/undo-last` — undo today's complete/skip. */
+/**
+ * Taking today's break back is exact on the client (a break never moved the pointer). A done day's
+ * undo depends on pointer history the client does not have (`undoTransition` runs on the server),
+ * so that one simply waits for the refetch.
+ */
+export function applyUndoBreak(view: ProgramView, dateKey: string): ProgramView {
+  if (!view.todayLog || !isBreakLog(view.todayLog)) return view;
+  return recompose(view, view.program, null, dateKey);
+}
+
+/** `POST /program/undo-last` — undo today's log (complete, rest day, other day or break). */
 export function useUndoLast() {
+  const qc = useQueryClient();
   const invalidate = useInvalidateTraining();
-  const toast = useToast();
-  return useMutation<unknown, unknown, void>({
+  const rollback = useRollback();
+  return useMutation<unknown, unknown, void, ProgramCtx>({
     mutationFn: async () => getApi().training.undoLast(),
-    onError: (e) => toast.show({ message: describeError(e, "Geri alınamadı."), kind: "error" }),
+    onMutate: async () => {
+      const prev = await snapshotProgram(qc);
+      if (prev) qc.setQueryData(trainingKeys.program, applyUndoBreak(prev, trDateKey()));
+      return { prev };
+    },
+    onError: (e, _v, ctx) => rollback(ctx, e, "Geri alınamadı."),
     onSuccess: () => {
       void haptic.select();
       invalidate();

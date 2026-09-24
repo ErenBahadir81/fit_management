@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { zExerciseInput, zExerciseUpdate, zId, type MuscleLoad } from "@fitfloow/core";
+import { exerciseNameKey, zExerciseInput, zExerciseUpdate, zId, type MuscleLoad } from "@fitfloow/core";
 import { Exercise, toExerciseDTO, type ExerciseDoc } from "../../models/exercise";
 import { Muscle } from "../../models/muscle";
 import { AppError } from "../../lib/errors";
@@ -8,10 +8,8 @@ import { escapeRegex, isDuplicateKeyError, toObjectId } from "./users.service";
 
 const zIdParams = z.object({ id: zId });
 
-/** Case-insensitive uniqueness key for exercise names (stored as `nameKey`). */
-export function exerciseNameKey(name: string): string {
-  return name.trim().toLowerCase();
-}
+/** Case- and I/İ/ı-insensitive uniqueness key for exercise names (stored as `nameKey`, B8). */
+export { exerciseNameKey };
 
 /** Every referenced muscle key must exist in the catalog (active or not). */
 export async function assertMuscleKeys(muscles: MuscleLoad[] | undefined): Promise<void> {

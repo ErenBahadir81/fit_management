@@ -24,7 +24,7 @@ describe("TabBar", () => {
     for (const t of TAB_ITEMS) expect(screen.getByLabelText(t.label)).toBeTruthy();
     expect(screen.getByLabelText("Ana Sayfa").props.accessibilityState).toMatchObject({ selected: true });
     const pill = screen.getByTestId("tabbar-pill");
-    expect(pill).toHaveAnimatedStyle({ transform: [{ translateX: 0 }] });
+    expect(pill).toHaveAnimatedStyle({ transform: [{ translateX: 12 }] });
 
     await act(async () => {
       await fireEvent.press(screen.getByLabelText("Vücut"));
@@ -39,8 +39,8 @@ describe("TabBar", () => {
     await act(async () => {
       jest.advanceTimersByTime(2000);
     });
-    // 5 tabs in (400 − 2×gutter) → each 72 wide → index 2 at 144
-    expect(screen.getByTestId("tabbar-pill")).toHaveAnimatedStyle({ transform: [{ translateX: 144 }] });
+    // Docked bar, 5 tabs in 400 → each 80 wide; the 56-wide pill centres under index 2 at 160 + 12
+    expect(screen.getByTestId("tabbar-pill")).toHaveAnimatedStyle({ transform: [{ translateX: 172 }] });
   });
 
   test("pressing the active tab again does not fire onChange", async () => {

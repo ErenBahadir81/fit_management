@@ -61,6 +61,10 @@ export const WARNING_TR: Record<GoalWarning, { label: string; tone: Tone }> = {
   LONG_HORIZON: { label: "Bir yıldan uzun sürer", tone: "warning" },
   NO_BODY_ENTRY: { label: "Önce bir ölçüm gerekli", tone: "danger" },
   ALPERT_LIMITED: { label: "Yağ mobilizasyonu hızı sınırladı", tone: "neutral" },
+  BULK_BF_CEILING: { label: "Yağ oranı bulk tavanını aşıyor", tone: "warning" },
+  NEAR_NATURAL_LIMIT: { label: "Doğal kas sınırına yakın, kazanım yavaş", tone: "neutral" },
+  RECOMP_SLOW: { label: "Bu seviyede rekomp yavaş ilerler", tone: "warning" },
+  TARGET_NOT_BELOW_CURRENT: { label: "Hedef şu anki oranın altında olmalı", tone: "danger" },
 };
 
 export interface InstantPlanInput {

@@ -32,18 +32,22 @@ export const TAB_ITEMS: readonly TabItem[] = [
   tab("profile", "Profil", "profile"),
 ];
 
-export const TAB_BAR_HEIGHT = 64;
-export const TAB_BAR_MARGIN = spacing.lg;
+export const TAB_BAR_HEIGHT = 56;
+/** Kept for callers that pad by it; the bar is docked now, so there is no margin under it. */
+export const TAB_BAR_MARGIN = 0;
+/** The pill behind the active icon (Material-style indicator, not a whole-tab highlight). */
+const PILL_WIDTH = 56;
+const PILL_HEIGHT = 30;
 
 export function tabIndexForRoute(name: string): number {
   const i = TAB_ITEMS.findIndex((t) => t.name === name);
   return i === -1 ? 0 : i;
 }
 
-/** Space a scrolling screen must reserve at the bottom so content clears the floating bar. */
+/** Space a scrolling screen must reserve at the bottom so content clears the tab bar. */
 export function useTabBarSpace(): number {
   const insets = useSafeAreaInsets();
-  return TAB_BAR_HEIGHT + TAB_BAR_MARGIN + Math.max(insets.bottom, spacing.sm);
+  return TAB_BAR_HEIGHT + Math.max(insets.bottom, spacing.xs);
 }
 
 export interface TabBarProps {
@@ -56,74 +60,81 @@ export interface TabBarProps {
   insetBottom?: number;
 }
 
-/** Floating pill tab bar: the indicator slides with a spring, switching gives a selection haptic. */
+/**
+ * Docked, flat tab bar: opaque surface, one hairline on top, no float and no glow. The active tab
+ * gets a soft pill behind its icon that slides over with a spring, the filled glyph and the primary
+ * label; switching gives a selection haptic.
+ */
 export function TabBar({ activeIndex, onChange, items = TAB_ITEMS, width, insetBottom }: TabBarProps) {
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
   const dims = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const reduce = useReducedMotion();
-  const barWidth = (width ?? dims.width) - spacing.gutter * 2;
+  const barWidth = width ?? dims.width;
   const tabWidth = barWidth / items.length;
-  const x = useSharedValue(activeIndex * tabWidth);
+  const pillX = (i: number) => i * tabWidth + (tabWidth - PILL_WIDTH) / 2;
+  const x = useSharedValue(pillX(activeIndex));
   useEffect(() => {
-    x.value = reduce ? withTiming(activeIndex * tabWidth, timing.reduced) : withSpring(activeIndex * tabWidth, springs.snappy);
+    const to = activeIndex * tabWidth + (tabWidth - PILL_WIDTH) / 2;
+    x.set(reduce ? withTiming(to, timing.reduced) : withSpring(to, springs.snappy));
   }, [activeIndex, tabWidth, reduce, x]);
-  const pill = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
-  const bottom = (insetBottom ?? Math.max(insets.bottom, spacing.sm)) + 0;
+  const pill = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
+  const bottom = insetBottom ?? Math.max(insets.bottom, spacing.xs);
 
   return (
-    <View pointerEvents="box-none" style={[styles.host, { bottom, paddingHorizontal: spacing.gutter }]}>
-      <View
-        accessibilityRole="tablist"
-        style={[styles.bar, { width: barWidth, backgroundColor: colors.tabBar, borderColor: colors.border }, shadows.elevated]}
-      >
-        <Animated.View testID="tabbar-pill" pointerEvents="none" style={[styles.pill, { width: tabWidth - 8, backgroundColor: colors.primarySoft }, pill]} />
-        {items.map((item, i) => {
-          const active = i === activeIndex;
-          return (
-            <Pressable
-              key={item.name}
-              onPress={() => {
-                if (active) return;
-                void haptic.select();
-                onChange(i);
-              }}
-              haptic="none"
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={item.label}
-              testID={`tab-${item.name}`}
-              style={[styles.tab, { width: tabWidth }]}
-            >
-              <TabIcon name={active ? item.iconActive : item.icon} active={active} />
-              <Text variant="caption" color={active ? "primary" : "inkMuted"} numberOfLines={1}>
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+    <View
+      accessibilityRole="tablist"
+      style={[styles.bar, { paddingBottom: bottom, backgroundColor: colors.tabBar, borderTopColor: colors.tabBarBorder }]}
+    >
+      <Animated.View testID="tabbar-pill" pointerEvents="none" style={[styles.pill, { backgroundColor: colors.primarySoft }, pill]} />
+      {items.map((item, i) => {
+        const active = i === activeIndex;
+        return (
+          <Pressable
+            key={item.name}
+            onPress={() => {
+              if (active) return;
+              void haptic.select();
+              onChange(i);
+            }}
+            haptic="none"
+            scaleTo={0.94}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={item.label}
+            testID={`tab-${item.name}`}
+            style={[styles.tab, { width: tabWidth }]}
+          >
+            <TabIcon name={active ? item.iconActive : item.icon} active={active} />
+            <Text variant="caption" color={active ? "primary" : "inkSubtle"} style={active ? styles.labelActive : undefined} numberOfLines={1}>
+              {item.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
+/** The icon lifts a touch when it becomes active (1 → 1.08, spring), and settles back when it leaves. */
 function TabIcon({ name, active }: { name: IconName; active: boolean }) {
   const reduce = useReducedMotion();
-  const s = useSharedValue(active ? 1 : 0.92);
+  const s = useSharedValue(active ? 1.04 : 1);
   useEffect(() => {
-    s.value = reduce ? withTiming(active ? 1 : 0.92, timing.reduced) : withSpring(active ? 1.08 : 0.92, springs.bouncy);
+    s.set(reduce ? withTiming(1, timing.reduced) : withSpring(active ? 1.04 : 1, springs.bouncy));
   }, [active, reduce, s]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: s.get() }] }));
   return (
-    <Animated.View style={style}>
-      <Icon name={name} size={22} color={active ? "primary" : "inkMuted"} />
+    <Animated.View style={[styles.icon, style]}>
+      <Icon name={name} size={22} color={active ? "primary" : "inkSubtle"} />
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  host: { position: "absolute", left: 0, right: 0, alignItems: "center" },
-  bar: { height: TAB_BAR_HEIGHT, borderRadius: radii.pill, flexDirection: "row", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
-  pill: { position: "absolute", left: 4, top: 6, bottom: 6, borderRadius: radii.pill },
-  tab: { height: TAB_BAR_HEIGHT, alignItems: "center", justifyContent: "center", gap: 2 },
+  bar: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth },
+  pill: { position: "absolute", left: 0, top: 6, width: PILL_WIDTH, height: PILL_HEIGHT, borderRadius: radii.pill },
+  tab: { height: TAB_BAR_HEIGHT, alignItems: "center", justifyContent: "flex-start", paddingTop: 6, gap: 2 },
+  icon: { height: PILL_HEIGHT, justifyContent: "center" },
+  labelActive: { fontWeight: "700" },
 });

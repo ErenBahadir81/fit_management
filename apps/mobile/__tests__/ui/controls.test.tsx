@@ -6,6 +6,8 @@ import { Stepper } from "../../src/ui/Stepper";
 import { Segmented } from "../../src/ui/Segmented";
 import { Toggle } from "../../src/ui/Toggle";
 import { TextField } from "../../src/ui/TextField";
+import { dark } from "../../src/theme/tokens";
+import { ThemeProvider } from "../../src/theme/ThemeProvider";
 
 describe("Stepper", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -55,6 +57,16 @@ describe("Toggle", () => {
     await fireEvent.press(el);
     expect(onChange).toHaveBeenCalledWith(true);
   });
+  test("in dark the knob stays light (ink), not onPrimary, which is navy there", async () => {
+    await renderUI(
+      <ThemeProvider initialMode="dark">
+        <Toggle value={false} onChange={() => {}} testID="tg2" accessibilityLabel="Bildirim" />
+      </ThemeProvider>
+    );
+    const json = JSON.stringify(screen.toJSON());
+    expect(json).toContain(`"backgroundColor":"${dark.ink}"`);
+    expect(json).not.toContain(`"backgroundColor":"${dark.onPrimary}"`);
+  });
 });
 
 describe("TextField", () => {
@@ -66,5 +78,9 @@ describe("TextField", () => {
     expect(onChangeText).toHaveBeenCalledWith("eren");
     expect(screen.getByText("Zorunlu")).toBeTruthy();
     expect(screen.getByTestId("tf").props.accessibilityLabel).toBe("Kullanıcı adı");
+  });
+  test("idle edge is controlBorder (3:1), not the card hairline", async () => {
+    await renderUI(<TextField label="E-posta" value="" onChangeText={() => {}} testID="tf2" />);
+    expect(JSON.stringify(screen.toJSON())).toContain(`"borderColor":"rgba(133, 148, 165, 1)"`); // light.controlBorder #8594A5
   });
 });

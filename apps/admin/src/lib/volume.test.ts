@@ -42,7 +42,7 @@ const muscles: MuscleDTO[] = [
 ];
 
 function day(order: number, title: string, exercises: DayDTO["exercises"], kind: DayDTO["kind"] = "strength"): DayDTO {
-  return { order, title, focus: "", kind, exercises, run: null, swim: null };
+  return { id: `d${order}`, order, title, focus: "", kind, exercises, run: null, swim: null };
 }
 
 const days: DayDTO[] = [
@@ -106,23 +106,24 @@ describe("templateVolume", () => {
   });
 });
 
-describe("volumeStatus", () => {
+describe("volumeStatus — the app-wide bands (recommended 10–15, soft warning from ~20)", () => {
   it("marks nothing trained as none", () => {
-    expect(volumeStatus(0, { min: 10, max: 20 })).toBe("none");
+    expect(volumeStatus(0)).toBe("none");
   });
-  it("marks below the minimum as under", () => {
-    expect(volumeStatus(6, { min: 10, max: 20 })).toBe("under");
+  it("below the recommended 10 (with half a set of slack) is under", () => {
+    expect(volumeStatus(6)).toBe("under");
+    expect(volumeStatus(9.6)).toBe("in");
   });
-  it("marks inside the band as in", () => {
-    expect(volumeStatus(12, { min: 10, max: 20 })).toBe("in");
-    expect(volumeStatus(10, { min: 10, max: 20 })).toBe("in");
-    expect(volumeStatus(20, { min: 10, max: 20 })).toBe("in");
+  it("10 to 19 is fine", () => {
+    expect(volumeStatus(10)).toBe("in");
+    expect(volumeStatus(15)).toBe("in");
+    expect(volumeStatus(19)).toBe("in");
   });
-  it("marks above the maximum as over", () => {
-    expect(volumeStatus(24, { min: 10, max: 20 })).toBe("over");
+  it("from ~20 it is over", () => {
+    expect(volumeStatus(20)).toBe("over");
+    expect(volumeStatus(24)).toBe("over");
   });
-  it("treats a missing minimum as zero", () => {
-    expect(volumeStatus(3, { max: 18 })).toBe("in");
-    expect(volumeStatus(19, { max: 18 })).toBe("over");
+  it("rows carry the recommended band as target", () => {
+    expect(templateVolume(days, muscles)[0].target).toEqual({ min: 10, max: 15 });
   });
 });

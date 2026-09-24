@@ -160,9 +160,11 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   // itself: once when the program lands (during render, the React-sanctioned way to derive state
   // from a prop change) and again every time the tab regains focus.
   const dayOrder = view?.current?.day?.order ?? null;
-  const [resume, setResume] = useState<{ forDay: number | null; value: ResumeState | null }>(() => ({ forDay: dayOrder, value: readResumeFor(dayOrder) }));
-  if (resume.forDay !== dayOrder) setResume({ forDay: dayOrder, value: readResumeFor(dayOrder) });
-  useFocusEffect(useCallback(() => setResume({ forDay: dayOrder, value: readResumeFor(dayOrder) }), [dayOrder]));
+  const dayId = view?.current?.day?.id ?? null;
+  const dayKey = dayOrder === null ? null : `${dayId ?? ""}#${dayOrder}`;
+  const [resume, setResume] = useState<{ forDay: string | null; value: ResumeState | null }>(() => ({ forDay: dayKey, value: readResumeFor(dayOrder, dayId) }));
+  if (resume.forDay !== dayKey) setResume({ forDay: dayKey, value: readResumeFor(dayOrder, dayId) });
+  useFocusEffect(useCallback(() => setResume({ forDay: dayKey, value: readResumeFor(dayOrder, dayId) }), [dayKey, dayOrder, dayId]));
 
   const start = useCallback(() => router.push("/(modals)/workout"), [router]);
   const confirmSkip = useCallback(
@@ -172,10 +174,14 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
     },
     [skip, skipSheet, toast]
   );
+  // "Dinlendim, devam et" on a rest day *does* the rest day (the server moves the cycle on, B1) —
+  // there is nothing to skip, so no reason sheet.
+  const restDone = useCallback(() => skip.mutate(undefined, { onSuccess: () => toast.show({ message: "Dinlenme günü tamam", kind: "success" }) }), [skip, toast]);
+  const onSkip = currentDay?.kind === "rest" ? restDone : skipSheet.present;
   const confirmJump = useCallback(
-    (index: number) => {
+    (dayId: string) => {
       jumpSheet.dismiss();
-      jump.mutate(index);
+      jump.mutate(dayId);
     },
     [jump, jumpSheet]
   );
@@ -206,11 +212,11 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
                     <CurrentDayCard
                       day={currentDay}
                       todayLog={view.todayLog}
-                      weekNumber={view.program.weekNumber}
+                      cycleNumber={view.program.cycleNumber}
                       resume={resume.value}
                       busy={busy}
                       onStart={start}
-                      onSkip={skipSheet.present}
+                      onSkip={onSkip}
                       onJump={jumpSheet.present}
                       onUndo={onUndoToday}
                       onOpenLog={showLog}
@@ -238,7 +244,7 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
         </Reveal>
       </View>
     ),
-    [tab, onTab, view, hasProgram, editorSheet.present, selected, onSelectDay, currentDay, resume.value, busy, start, skipSheet.present, jumpSheet.present, onUndoToday, showLog, sessionCount]
+    [tab, onTab, view, hasProgram, editorSheet.present, selected, onSelectDay, currentDay, resume.value, busy, start, onSkip, jumpSheet.present, onUndoToday, showLog, sessionCount]
   );
 
   const renderItem = useCallback<ListRenderItem<Row>>(
@@ -286,7 +292,7 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
       {pending ? <UndoBar message="Kayıt silindi" onUndo={undoDelete} bottom={tabSpace + spacing.md} /> : null}
 
       <SkipSheet sheetRef={skipSheet.ref} dayTitle={currentDay?.title ?? ""} busy={skip.isPending} onConfirm={confirmSkip} onCancel={skipSheet.dismiss} />
-      <JumpSheet sheetRef={jumpSheet.ref} days={view?.program.days ?? []} currentIndex={view?.program.currentIndex ?? 0} onSelect={confirmJump} />
+      <JumpSheet sheetRef={jumpSheet.ref} days={view?.program.days ?? []} currentDayId={view?.program.currentDayId ?? null} onSelect={confirmJump} />
       <LogDetailSheet sheetRef={logSheet.ref} log={openLog} muscles={muscles.data ?? NO_MUSCLES} onDelete={requestDelete} />
       {view ? <ProgramEditorSheet sheetRef={editorSheet.ref} program={view.program} onClose={editorSheet.dismiss} /> : null}
     </Screen>
@@ -294,9 +300,9 @@ function ProgramPane({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
 }
 
 /** How far into today's session the stored draft got, or `null` when there is nothing to resume. */
-function readResumeFor(dayOrder: number | null): ResumeState | null {
+function readResumeFor(dayOrder: number | null, dayId: string | null): ResumeState | null {
   if (dayOrder === null) return null;
-  const draft = restoreDraft(readDraft(), { dayOrder, dateKey: todayKey() });
+  const draft = restoreDraft(readDraft(), { dayOrder, dayId, dateKey: todayKey() });
   if (!draft) return null;
   const done = doneSets(draft);
   return done > 0 ? { doneSets: done, totalSets: totalSets(draft) } : null;

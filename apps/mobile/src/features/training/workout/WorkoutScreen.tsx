@@ -203,7 +203,7 @@ export function WorkoutScreen() {
   }, [presentLeave, router, state]);
 
   /* -------------------------- the session, summarised ----------------------- */
-  const previous = useMemo(() => (state ? findLastSameDay(history.data ?? [], state.dayOrder, state.dateKey) : null), [history.data, state]);
+  const previous = useMemo(() => (state ? findLastSameDay(history.data ?? [], state.dayOrder, state.dateKey, state.dayId) : null), [history.data, state]);
   const summary = useMemo(
     () => (state ? compareToLast({ tonnageKg: totalTonnage(state), sets: doneSets(state) }, previous) : null),
     [previous, state]

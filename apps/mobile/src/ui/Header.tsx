@@ -1,5 +1,7 @@
 import React from "react";
 import { StyleSheet, View, type ViewProps } from "react-native";
+import { useFloo } from "../mascot/voice/FlooVoiceProvider";
+import { FLOO_CORNER_INSET } from "../mascot/voice/FlooCorner";
 import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing } from "../theme/tokens";
 import { Icon } from "./Icon";
@@ -41,10 +43,15 @@ function IconButton({ action }: { action: HeaderAction }) {
   );
 }
 
-/** Screen header. Large title by default; one optional action each side. */
+/**
+ * Screen header. Large title by default; one optional action each side. On tab screens the large
+ * header leaves room on its right for the corner Floo, so the title and actions never run under it.
+ */
 export function Header({ title, subtitle, eyebrow, left, right, compact, trailing, style, ...rest }: HeaderProps) {
+  const floo = useFloo();
+  const reserve = !compact && floo.enabled && floo.presence === "idle";
   return (
-    <View {...rest} style={[styles.wrap, style]}>
+    <View {...rest} style={[styles.wrap, reserve && { paddingRight: FLOO_CORNER_INSET }, style]}>
       {left && <IconButton action={left} />}
       <View style={styles.texts}>
         {eyebrow ? (

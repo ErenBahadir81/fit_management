@@ -45,8 +45,13 @@ export interface WorkoutLogDoc {
   programId: Types.ObjectId | null;
   date: Date;
   dateKey: string;
+  /** The program day done (3.0+); `null` for breaks and pre-3.0 logs. */
+  dayId?: string | null;
   dayOrder: number;
+  /** The cycle pass this log belongs to (named `weekNumber` since v1). */
   weekNumber: number;
+  /** 3.0+: a day off outside the plan — nothing done, the pointer did not move. */
+  isBreak?: boolean;
   title: string;
   kind: "strength" | "run" | "swim" | "stretch" | "rest";
   isOffDay: boolean;
@@ -56,7 +61,12 @@ export interface WorkoutLogDoc {
   durationMin: number | null;
   notes: string | null;
   rpe: number | null;
+  /** Legacy (pre-3.0) pointer index before this log. */
   pointerBefore: number | null;
+  /** 3.0+: the pointer (day id) before/after this log and the cycle count before it — for undo. */
+  pointerBeforeId?: string | null;
+  pointerAfterId?: string | null;
+  cycleBefore?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -67,11 +77,13 @@ const WorkoutLogSchema = new Schema<WorkoutLogDoc>(
     programId: { type: Schema.Types.ObjectId, ref: "Program", default: null },
     date: { type: Date, default: Date.now },
     dateKey: { type: String, required: true },
+    dayId: { type: String, default: null },
     dayOrder: { type: Number, default: 0 },
     weekNumber: { type: Number, default: 1 },
     title: { type: String, default: "" },
     kind: { type: String, enum: ["strength", "run", "swim", "stretch", "rest"], default: "strength" },
     isOffDay: { type: Boolean, default: false },
+    isBreak: { type: Boolean },
     strength: { type: [StrengthEntrySchema], default: [] },
     run: { type: CardioEntrySchema, default: null },
     swim: { type: CardioEntrySchema, default: null },
@@ -79,11 +91,20 @@ const WorkoutLogSchema = new Schema<WorkoutLogDoc>(
     notes: { type: String, default: null },
     rpe: { type: Number, default: null },
     pointerBefore: { type: Number, default: null },
+    pointerBeforeId: { type: String, default: null },
+    pointerAfterId: { type: String, default: null },
+    cycleBefore: { type: Number, default: null },
   },
   { timestamps: true }
 );
 WorkoutLogSchema.index({ userId: 1, date: -1 });
-WorkoutLogSchema.index({ userId: 1, dateKey: 1 });
+/**
+ * One log per user per Türkiye day (B9): a second write for the same day is an edit, never a
+ * second row. Pre-3.0 databases carry a non-unique index with the default name; the training
+ * module's startup migration swaps it (see `modules/training/migrate.ts`).
+ */
+export const WORKOUT_DAY_INDEX = "userId_dateKey_unique";
+WorkoutLogSchema.index({ userId: 1, dateKey: 1 }, { unique: true, name: WORKOUT_DAY_INDEX });
 
 export const WorkoutLog: Model<WorkoutLogDoc> = (mongoose.models.WorkoutLog as Model<WorkoutLogDoc>) || model<WorkoutLogDoc>("WorkoutLog", WorkoutLogSchema);
 
@@ -120,8 +141,11 @@ export function toWorkoutLogDTO(l: WorkoutLogDoc): WorkoutLogDTO {
     id: String(l._id),
     date: l.date.toISOString(),
     dateKey: l.dateKey,
+    dayId: l.dayId ?? null,
     dayOrder: l.dayOrder,
-    weekNumber: l.weekNumber,
+    cycleNumber: Math.max(1, l.weekNumber ?? 1),
+    weekNumber: Math.max(1, l.weekNumber ?? 1),
+    isBreak: typeof l.isBreak === "boolean" ? l.isBreak : l.isOffDay === true && !l.dayId,
     title: l.title,
     kind: l.kind,
     isOffDay: l.isOffDay,
