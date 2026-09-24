@@ -24,6 +24,21 @@ import {
   type WeighInDTO,
   type WorkoutLogDTO,
   type DietTargetDTO,
+  currentIndexFor,
+  dayOfLog,
+  isBreakLog,
+  isValidIndex,
+  jumpTransition,
+  logDayTransition,
+  normalizeProgramInput,
+  pointerOf,
+  programMode,
+  reconcilePointer,
+  undoTransition,
+  type DayDTO,
+  type DayInputLike,
+  type LogPointerLike,
+  type PointerState,
 } from "@fitfloow/core";
 import * as fx from "./fixtures";
 import * as domain from "./domain";
@@ -58,6 +73,8 @@ export interface FakeState {
   foods: typeof fx.FOODS;
   /** Session tokens accepted by the fake (rotates on refresh). */
   sessions: Set<string>;
+  /** Per-log pointer history (`pointerBeforeId`…), which the API stores on the log but never sends. */
+  pointerMeta: Record<string, LogPointerLike>;
 }
 
 export function createFakeState(today = trDateKey()): FakeState {
@@ -76,6 +93,7 @@ export function createFakeState(today = trDateKey()): FakeState {
     target: { ...fx.DEFAULT_TARGET },
     foods: [...fx.FOODS],
     sessions: new Set(),
+    pointerMeta: {},
   };
 }
 
@@ -111,6 +129,7 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   const today = opts.today ?? (() => trDateKey());
   // Fixtures are built for the same "today" the routes answer with, so an injected clock is coherent.
   const state = opts.state ?? createFakeState(today());
+  state.pointerMeta ??= {};
   const latency = opts.latencyMs ?? 350;
   let tokenSeq = 1;
 
@@ -129,6 +148,81 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
 
   const md = () => state.user.measurementDay as Weekday;
   const programView = () => fx.makeProgramView(today(), state.program, state.logs, md());
+
+  /* --- training: the same core transitions the API runs (program.routes.ts) --- */
+  const nowIso = () => new Date().toISOString();
+  const todayLog = () => state.logs.find((l) => l.dateKey === today()) ?? null;
+  const setPointer = (p: PointerState, touch = true) => {
+    state.program = {
+      ...state.program,
+      currentDayId: p.currentDayId,
+      currentIndex: p.currentIndex,
+      cycleNumber: p.cycleNumber,
+      weekNumber: p.cycleNumber,
+      lastActionAt: touch ? nowIso() : state.program.lastActionAt,
+    };
+  };
+  /** A log plus the pointer history the API keeps on it (not part of the DTO). */
+  const pointerLog = (log: WorkoutLogDTO): LogPointerLike => ({ isBreak: log.isBreak, isOffDay: log.isOffDay, ...(state.pointerMeta[log.id] ?? {}) });
+  /** The day `complete` means: today's done day when re-completing (B3), else the planned one. */
+  const plannedDayFor = (existing: WorkoutLogDTO | null): DayDTO => {
+    const days = state.program.days;
+    if (existing && !isBreakLog(existing)) {
+      const done = dayOfLog(days, existing);
+      if (done) return done;
+    }
+    return days[currentIndexFor(state.program, today(), false)];
+  };
+  const cardioFrom = (raw: unknown, target: DayDTO["run"]): WorkoutLogDTO["run"] => {
+    const segs = (raw as { segments?: { km: number; min: number }[] } | null)?.segments;
+    if (!Array.isArray(segs) || segs.length === 0) return null;
+    const totalKm = round(segs.reduce((a, x) => a + Number(x.km || 0), 0), 2);
+    const totalMin = round(segs.reduce((a, x) => a + Number(x.min || 0), 0), 1);
+    return { segments: segs, totalKm, totalMin, targetKm: target?.targetKm ?? 0, targetMin: target?.targetMin ?? 0 };
+  };
+  const fillLog = (log: WorkoutLogDTO, day: DayDTO, body: Record<string, unknown>): WorkoutLogDTO => {
+    const next = { ...log };
+    if (Array.isArray(body.strength) && body.strength.length) next.strength = body.strength as WorkoutLogDTO["strength"];
+    if (body.run !== undefined && body.run !== null) next.run = cardioFrom(body.run, day.run);
+    if (body.swim !== undefined && body.swim !== null) next.swim = cardioFrom(body.swim, day.swim);
+    if (body.durationMin != null) next.durationMin = Number(body.durationMin);
+    if (body.notes != null) next.notes = String(body.notes);
+    if (body.rpe != null) next.rpe = Number(body.rpe);
+    return next;
+  };
+  /**
+   * "Today I did `dayId`" — mirrors the API's `logDay`: re-logging today's day edits it in place
+   * (the pointer never moves twice, B3); replacing today's log first takes its pointer move back.
+   */
+  const logDay = (body: Record<string, unknown>): Result => {
+    const days = state.program.days;
+    if (days.length === 0) return err(409, "CONFLICT", "Program boş, önce günleri ekle");
+    const dayId = String(body.dayId ?? "");
+    const day = days.find((d) => d.id === dayId);
+    if (!day) return err(400, "VALIDATION", "Bu gün programda yok");
+    const existing = todayLog();
+
+    if (existing && !isBreakLog(existing) && existing.dayId === dayId) {
+      const edited = fillLog(existing, day, body);
+      state.logs = state.logs.map((l) => (l.id === existing.id ? edited : l));
+      return ok({ log: edited, program: state.program });
+    }
+
+    const base = existing ? undoTransition(state.program, pointerLog(existing)) : pointerOf(state.program);
+    const t = logDayTransition({ mode: state.program.mode, days, currentDayId: base.currentDayId, cycleNumber: base.cycleNumber }, dayId, {
+      resumePlanned: body.resumePlanned === true,
+    });
+    if (!t) return err(400, "VALIDATION", "Bu gün programda yok");
+    const log = fillLog({ ...fx.makeLog(day, today(), t.before.cycleNumber), date: nowIso() }, day, body);
+    if (existing) {
+      state.logs = state.logs.filter((l) => l.id !== existing.id);
+      delete state.pointerMeta[existing.id];
+    }
+    state.logs.unshift(log);
+    state.pointerMeta[log.id] = { pointerBeforeId: t.before.currentDayId, pointerAfterId: t.after.currentDayId, cycleBefore: t.before.cycleNumber };
+    setPointer(programMode(state.program) === "weekly" ? { ...t.after, cycleNumber: state.program.cycleNumber } : t.after);
+    return ok({ log, program: state.program });
+  };
   const recovery = () => fx.makeRecovery(today(), state.logs, md());
   const trends = (days: number) => fx.makeTrends(state.weighIns, state.bodyEntries, days, today());
   const progress = () => (state.goal && state.goal.status === "active" ? domain.progressFor(today(), state.goal, state.weighIns, state.bodyEntries, state.mealEntries) : null);
@@ -288,45 +382,62 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   // training
   on("GET", "/program", () => ok(programView()));
   on("PUT", "/program", ({ body }) => {
-    const days = (body.days as typeof state.program.days) ?? state.program.days;
-    state.program = { ...state.program, name: (body.name as string) ?? state.program.name, days, currentIndex: Math.min(state.program.currentIndex, days.length - 1), lastActionAt: new Date().toISOString() };
+    const mode = body.mode === "weekly" || body.mode === "cycle" ? body.mode : programMode(state.program);
+    const input = Array.isArray(body.days) ? (body.days as DayInputLike[]) : state.program.days;
+    // Days keep the ids they were sent with, so the pointer stays on the same day (B5).
+    const { days, errors } = normalizeProgramInput(input, fx.EXERCISES, { mode, existingIds: state.program.days.map((d) => d.id) });
+    if (errors.length > 0) return err(400, "VALIDATION", errors[0]);
+    const pointer = reconcilePointer(state.program, days);
+    state.program = { ...state.program, name: (body.name as string) ?? state.program.name, mode, days };
+    setPointer(pointer);
     return ok({ program: state.program });
   });
   on("POST", "/program/jump", ({ body }) => {
-    const index = Number(body.index);
-    if (!(index >= 0 && index < state.program.days.length)) return err(400, "VALIDATION", "Geçersiz gün");
-    state.program = { ...state.program, currentIndex: index, lastActionAt: new Date().toISOString() };
+    const days = state.program.days;
+    let dayId: string | null = typeof body.dayId === "string" ? body.dayId : null;
+    if (dayId === null) {
+      const index = Number(body.index);
+      if (!isValidIndex(index, days.length)) return err(400, "VALIDATION", `Gün 0..${days.length - 1} arasında olmalı`);
+      dayId = days[index].id;
+    }
+    const next = jumpTransition(state.program, dayId);
+    if (!next) return err(400, "VALIDATION", "Bu gün programda yok");
+    setPointer(next);
     return ok({ program: state.program });
   });
-  const advance = () => {
-    const next = (state.program.currentIndex + 1) % state.program.days.length;
-    state.program = { ...state.program, currentIndex: next, weekNumber: next === 0 ? state.program.weekNumber + 1 : state.program.weekNumber, lastActionAt: new Date().toISOString() };
-  };
+  on("POST", "/program/log-day", ({ body }) => logDay(body));
   on("POST", "/program/complete", ({ body }) => {
-    const day = state.program.days[state.program.currentIndex];
-    const log = fx.makeLog(day, today(), state.program.weekNumber);
-    if (Array.isArray(body.strength) && body.strength.length) log.strength = body.strength as WorkoutLogDTO["strength"];
-    if (body.durationMin != null) log.durationMin = Number(body.durationMin);
-    if (body.notes != null) log.notes = String(body.notes);
-    if (body.rpe != null) log.rpe = Number(body.rpe);
-    state.logs.unshift(log);
-    advance();
-    return ok({ log, program: state.program });
+    if (state.program.days.length === 0) return err(409, "CONFLICT", "Program boş, önce günleri ekle");
+    const day = plannedDayFor(todayLog());
+    return logDay({ ...body, dayId: day.id, resumePlanned: false });
   });
-  on("POST", "/program/skip", () => {
-    const day = state.program.days[state.program.currentIndex];
-    const log = fx.makeLog(day, today(), state.program.weekNumber, true);
+  on("POST", "/program/skip", ({ body }) => {
+    const reason = typeof body.reason === "string" ? body.reason : null;
+    const days = state.program.days;
+    if (days.length === 0) return err(409, "CONFLICT", "Program boş, önce günleri ekle");
+    const existing = todayLog();
+    if (existing) {
+      if (!isBreakLog(existing) && existing.kind !== "rest") return err(409, "CONFLICT", "Bugün zaten tamamlandı");
+      return ok({ log: existing, program: state.program });
+    }
+    const planned = days[currentIndexFor(state.program, today(), false)];
+    // B1: a rest day is *done* and the cycle moves on …
+    if (planned.kind === "rest") return logDay({ dayId: planned.id, notes: reason });
+    // … any other day becomes a break: an off-day log, the pointer stays on the planned day.
+    const pointer = pointerOf(state.program);
+    const log = { ...fx.makeLog(planned, today(), pointer.cycleNumber, true), date: nowIso(), notes: reason };
     state.logs.unshift(log);
-    advance();
+    state.pointerMeta[log.id] = { pointerBeforeId: pointer.currentDayId, pointerAfterId: pointer.currentDayId, cycleBefore: pointer.cycleNumber };
+    state.program = { ...state.program, lastActionAt: nowIso() };
     return ok({ log, program: state.program });
   });
   on("POST", "/program/undo-last", () => {
     const i = state.logs.findIndex((l) => l.dateKey === today());
-    if (i === -1) return err(404, "NOT_FOUND", "Bugün geri alınacak kayıt yok");
-    state.logs.splice(i, 1);
-    const prev = (state.program.currentIndex - 1 + state.program.days.length) % state.program.days.length;
-    state.program = { ...state.program, currentIndex: prev };
-    return ok({ program: state.program });
+    if (i === -1) return err(404, "NOT_FOUND", "Geri alınacak bugüne ait kayıt yok");
+    const [last] = state.logs.splice(i, 1);
+    setPointer(undoTransition(state.program, pointerLog(last)));
+    delete state.pointerMeta[last.id];
+    return ok({ program: state.program, deletedLogId: last.id });
   });
   on("GET", "/workouts", ({ query }) => {
     let logs = state.logs;
@@ -346,7 +457,12 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
     return ok({ log: state.logs[i] });
   });
   on("DELETE", "/workouts/:id", ({ params }) => {
+    const log = state.logs.find((l) => l.id === params.id);
+    if (!log) return err(404, "NOT_FOUND", "Antrenman bulunamadı");
     state.logs = state.logs.filter((l) => l.id !== params.id);
+    // B4: a log that still owns the pointer hands it back.
+    setPointer(undoTransition(state.program, pointerLog(log)), false);
+    delete state.pointerMeta[log.id];
     return noContent();
   });
   // C1 — "last time you did this". Empty is a valid answer; the fake never 404s here either.

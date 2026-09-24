@@ -102,6 +102,8 @@ describe("ProgramScreen", () => {
 
     await waitFor(() => expect(screen.getAllByText("Bugün atlandı").length).toBeGreaterThan(0));
     expect(qc.getQueryData<{ todayLog: { isOffDay: boolean } | null }>(trainingKeys.program)?.todayLog?.isOffDay).toBe(true);
+    // A break: the planned day stays next.
+    expect(qc.getQueryData<{ program: { currentDayId: string } }>(trainingKeys.program)?.program.currentDayId).toBe("d1");
   });
 
   test("the jump sheet lists the cycle days and moves the pointer", async () => {
@@ -118,6 +120,20 @@ describe("ProgramScreen", () => {
     await waitFor(() => expect(screen.getByText("Dinlenme günü")).toBeTruthy());
     expect(screen.queryByTestId("start-workout")).toBeNull();
     expect(screen.getByTestId("skip-day")).toBeTruthy();
+  });
+
+  test("'Dinlendim, devam et' on a rest day does the rest day — no skip sheet, the cycle moves on (B1)", async () => {
+    const { api, qc } = await mount(withRestDay(trainingState()));
+    await waitFor(() => expect(screen.getByText("Dinlenme günü")).toBeTruthy());
+    const restId = qc.getQueryData<{ program: { currentDayId: string } }>(trainingKeys.program)!.program.currentDayId;
+    await fireEvent.press(screen.getByTestId("skip-day"));
+
+    await waitFor(() => expect(screen.getByText("Bugün tamamlandı")).toBeTruthy());
+    expect(screen.queryByText("Bugün atlandı")).toBeNull();
+    const server = await api.training.program();
+    expect(server.todayLog?.dayId).toBe(restId);
+    expect(server.todayLog?.isBreak).toBe(false);
+    expect(server.program.currentDayId).not.toBe(restId);
   });
 
   test("a completed day shows the summary with undo", async () => {
@@ -200,6 +216,7 @@ describe("ProgramScreen", () => {
 
     const before = (await api.training.program()).program.days.map((d) => d.title);
     await fireEvent(screen.getByTestId("editor-day-1"), "accessibilityAction", { nativeEvent: { actionName: "moveUp" } });
+    const update = jest.spyOn(api.training, "updateProgram");
     await fireEvent.press(screen.getByTestId("editor-save"));
 
     await waitFor(() => {
@@ -207,6 +224,14 @@ describe("ProgramScreen", () => {
       expect(after[0]).toBe(before[1]);
       expect(after[1]).toBe(before[0]);
     });
+    // The editor sent every day's id back, so the pointer followed its day to position 2 (B5).
+    expect(update.mock.calls[0][0].days.map((d) => d.id)).toEqual(["d2", "d1", "d3", "d4", "d5", "d6"]);
+    await waitFor(async () => expect((await api.training.program()).program.days.map((d) => d.id).slice(0, 2)).toEqual(["d2", "d1"]));
+    const server = await api.training.program();
+    expect(server.program.currentDayId).toBe("d1");
+    expect(server.program.currentIndex).toBe(1);
+    expect(server.current.day.id).toBe("d1");
+    update.mockRestore();
   });
 
   test("the day editor edits targets and adds a catalog exercise", async () => {

@@ -22,12 +22,13 @@ const KIND_ICON: Record<DayDTO["kind"], AppIcon> = {
 export interface JumpSheetProps {
   sheetRef: React.RefObject<SheetRef | null>;
   days: readonly DayDTO[];
-  currentIndex: number;
-  onSelect: (index: number) => void;
+  /** The program pointer (`program.currentDayId`) — the day the cycle continues from. */
+  currentDayId: string | null;
+  onSelect: (dayId: string) => void;
 }
 
 /** "Buradan devam et": pick which cycle day the program should continue from. */
-export function JumpSheet({ sheetRef, days, currentIndex, onSelect }: JumpSheetProps) {
+export function JumpSheet({ sheetRef, days, currentDayId, onSelect }: JumpSheetProps) {
   const { colors } = useTheme();
   return (
     <Sheet ref={sheetRef} title="Buradan devam et">
@@ -38,12 +39,12 @@ export function JumpSheet({ sheetRef, days, currentIndex, onSelect }: JumpSheetP
         <View style={styles.list}>
           {days.map((day, index) => {
             const counts = dayCounts(day);
-            const current = index === currentIndex;
+            const current = day.id === currentDayId;
             const meta = day.kind === "rest" ? "Dinlenme" : counts.km > 0 ? `${fmtNumber(counts.km, 1)} km · ${counts.min} dk` : `${counts.exercises} hareket · ${counts.sets} set`;
             return (
               <Pressable
-                key={`${day.order}-${day.title}`}
-                onPress={() => onSelect(index)}
+                key={day.id}
+                onPress={() => onSelect(day.id)}
                 haptic="select"
                 testID={`jump-day-${index}`}
                 accessibilityState={{ selected: current }}

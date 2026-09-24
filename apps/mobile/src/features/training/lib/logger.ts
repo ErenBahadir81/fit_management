@@ -61,6 +61,8 @@ export interface LoggerState {
   programId: string;
   dayIndex: number;
   dayOrder: number;
+  /** The program day's stable id (3.0). Absent in drafts written before it; `dayOrder` then identifies the day. */
+  dayId?: string | null;
   title: string;
   focus: string;
   kind: DayKind;
@@ -144,6 +146,7 @@ export function createLoggerState(opts: CreateLoggerOptions): LoggerState {
     programId: opts.programId,
     dayIndex: opts.dayIndex,
     dayOrder: day.order,
+    dayId: day.id ?? null,
     title: day.title,
     focus: day.focus ?? "",
     kind: day.kind,
@@ -507,11 +510,14 @@ function migrateV1(draft: PersistedDraft): LoggerState {
  * another date or a schema this build does not know is dropped rather than confusing the user;
  * an older but readable schema is migrated so a mid-session app update never loses logged work.
  */
-export function restoreDraft(raw: unknown, expect: { dayOrder: number; dateKey: string }): LoggerState | null {
+export function restoreDraft(raw: unknown, expect: { dayOrder: number; dayId?: string | null; dateKey: string }): LoggerState | null {
   if (!raw || typeof raw !== "object") return null;
   const d = raw as PersistedDraft;
   if (typeof d.version !== "number" || d.version < 1 || d.version > DRAFT_VERSION) return null;
-  if (d.dayOrder !== expect.dayOrder || d.dateKey !== expect.dateKey) return null;
+  if (d.dateKey !== expect.dateKey) return null;
+  // Prefer the stable day id (survives reordering); fall back to the order for pre-3.0 drafts.
+  const sameDay = typeof d.dayId === "string" && d.dayId && expect.dayId ? d.dayId === expect.dayId : d.dayOrder === expect.dayOrder;
+  if (!sameDay) return null;
   if (!Array.isArray(d.exercises) || typeof d.startedAt !== "number") return null;
   return d.version === DRAFT_VERSION ? (d as LoggerState) : migrateV1(d);
 }

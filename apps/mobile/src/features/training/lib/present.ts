@@ -208,11 +208,15 @@ export function logSummary(log: WorkoutLogDTO): LogSummary {
 
 /* ---------------------- "how did that go vs last time" --------------------- */
 
-/** The newest earlier session of the same cycle day. Off-days never count as a comparison. */
-export function findLastSameDay(logs: readonly WorkoutLogDTO[], dayOrder: number, exceptDateKey: string): WorkoutLogDTO | null {
+/**
+ * The newest earlier session of the same cycle day. Off-days never count as a comparison. The day
+ * is matched by id when both sides carry one (3.0), else by its order (pre-3.0 logs and drafts).
+ */
+export function findLastSameDay(logs: readonly WorkoutLogDTO[], dayOrder: number, exceptDateKey: string, dayId?: string | null): WorkoutLogDTO | null {
+  const same = (l: WorkoutLogDTO) => (dayId && l.dayId ? l.dayId === dayId : l.dayOrder === dayOrder);
   return (
     [...(logs ?? [])]
-      .filter((l) => !l.isOffDay && l.dayOrder === dayOrder && l.dateKey < exceptDateKey)
+      .filter((l) => !l.isOffDay && same(l) && l.dateKey < exceptDateKey)
       .sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1))[0] ?? null
   );
 }

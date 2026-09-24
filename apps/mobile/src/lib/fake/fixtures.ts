@@ -4,6 +4,10 @@
  */
 import {
   bodyComposition,
+  buildSchedule,
+  currentIndexFor,
+  programVolume,
+  weeklyVolume as coreWeeklyVolume,
   bodyFatCategory,
   ewma,
   goalMilestones,
@@ -118,20 +122,23 @@ const ex = (id: string, sets?: number, reps?: number, rir: number | null = 2) =>
 };
 
 export const PROGRAM_DAYS: DayDTO[] = [
-  { order: 1, title: "Üst Vücut A", focus: "Göğüs · Sırt · Omuz", kind: "strength", exercises: [ex("ex_bench"), ex("ex_row"), ex("ex_ohp"), ex("ex_curl")], run: null, swim: null },
-  { order: 2, title: "Alt Vücut", focus: "Bacak · Kalça · Karın", kind: "strength", exercises: [ex("ex_squat"), ex("ex_rdl"), ex("ex_plank", 3, 45, null)], run: null, swim: null },
-  { order: 3, title: "Koşu", focus: "Tempo koşusu", kind: "run", exercises: [], run: { targetKm: 5, targetMin: 30, label: "Tempo" }, swim: null },
-  { order: 4, title: "Dinlenme", focus: "", kind: "rest", exercises: [], run: null, swim: null },
-  { order: 5, title: "Üst Vücut B", focus: "Sırt · Göğüs · Kol", kind: "strength", exercises: [ex("ex_pullup"), ex("ex_bench", 3, 10), ex("ex_row", 3, 10), ex("ex_curl", 2, 15)], run: null, swim: null },
-  { order: 6, title: "Dinlenme", focus: "", kind: "rest", exercises: [], run: null, swim: null },
+  { id: "d1", order: 1, title: "Üst Vücut A", focus: "Göğüs · Sırt · Omuz", kind: "strength", exercises: [ex("ex_bench"), ex("ex_row"), ex("ex_ohp"), ex("ex_curl")], run: null, swim: null },
+  { id: "d2", order: 2, title: "Alt Vücut", focus: "Bacak · Kalça · Karın", kind: "strength", exercises: [ex("ex_squat"), ex("ex_rdl"), ex("ex_plank", 3, 45, null)], run: null, swim: null },
+  { id: "d3", order: 3, title: "Koşu", focus: "Tempo koşusu", kind: "run", exercises: [], run: { targetKm: 5, targetMin: 30, label: "Tempo" }, swim: null },
+  { id: "d4", order: 4, title: "Dinlenme", focus: "", kind: "rest", exercises: [], run: null, swim: null },
+  { id: "d5", order: 5, title: "Üst Vücut B", focus: "Sırt · Göğüs · Kol", kind: "strength", exercises: [ex("ex_pullup"), ex("ex_bench", 3, 10), ex("ex_row", 3, 10), ex("ex_curl", 2, 15)], run: null, swim: null },
+  { id: "d6", order: 6, title: "Dinlenme", focus: "", kind: "rest", exercises: [], run: null, swim: null },
 ];
 
 export function makeProgram(today: string): ProgramDTO {
   return {
     id: "p_demo",
     name: "Üst / Alt + Koşu",
+    mode: "cycle",
     days: PROGRAM_DAYS,
+    currentDayId: PROGRAM_DAYS[0].id,
     currentIndex: 0,
+    cycleNumber: 6,
     weekNumber: 6,
     startedAt: iso(shiftKey(today, -38)),
     lastActionAt: iso(shiftKey(today, -1), 18),
@@ -161,16 +168,25 @@ function workingKg(name: string, weekNumber: number): number | null {
   return round(Math.max(base * 0.7, base - 1.25 * (6 - weekNumber)), 1);
 }
 
-export function makeLog(day: DayDTO, dateKey: string, weekNumber: number, isOffDay = false): WorkoutLogDTO {
+/**
+ * A log of `day` on `dateKey`. `isBreak` makes it a break instead (a day off outside the plan,
+ * exactly like the API's `/program/skip` on a training day): no `dayId`, the cycle did not move.
+ * A done rest day is `isOffDay` but not a break.
+ */
+export function makeLog(day: DayDTO, dateKey: string, weekNumber: number, isBreak = false): WorkoutLogDTO {
   const r = rng(dateKey.length + weekNumber);
+  const isOffDay = isBreak || day.kind === "rest";
   return {
     id: nextId("log"),
     date: iso(dateKey, 18),
     dateKey,
+    dayId: isBreak ? null : day.id,
     dayOrder: day.order,
+    cycleNumber: weekNumber,
     weekNumber,
-    title: day.title,
-    kind: day.kind,
+    isBreak,
+    title: isBreak ? "Ara" : day.title,
+    kind: isBreak ? "rest" : day.kind,
     isOffDay,
     strength: isOffDay
       ? []
@@ -212,17 +228,9 @@ export function makeHistory(today: string): WorkoutLogDTO[] {
   return logs.reverse(); // newest first
 }
 
+/** The 7-day strip exactly as `GET /program` builds it (core `buildSchedule`, today first). */
 export function makeSchedule(today: string, program: ProgramDTO, logs: WorkoutLogDTO[]): ScheduleEntry[] {
-  const wd = keyWeekday(today);
-  const start = shiftKey(today, -wd); // Sunday-aligned week strip
-  return Array.from({ length: 7 }, (_, i) => {
-    const dateKey = shiftKey(start, i);
-    const log = logs.find((l) => l.dateKey === dateKey) ?? null;
-    const offset = i - wd;
-    const day = offset < 0 ? (log ? program.days.find((d) => d.order === log.dayOrder) ?? null : null) : program.days[(program.currentIndex + offset) % program.days.length];
-    const status: ScheduleEntry["status"] = log ? (log.isOffDay ? "skipped" : "done") : offset === 0 ? "today" : offset > 0 ? "upcoming" : "past";
-    return { dateKey, weekday: keyWeekday(dateKey), isToday: offset === 0, day, status, logId: log?.id ?? null };
-  });
+  return buildSchedule(program, logs, today);
 }
 
 export function weeklyVolume(logs: WorkoutLogDTO[], weekKey: string) {
@@ -238,12 +246,17 @@ export function weeklyVolume(logs: WorkoutLogDTO[], weekKey: string) {
 }
 
 export function makeProgramView(today: string, program: ProgramDTO, logs: WorkoutLogDTO[], measurementDay: Weekday): ProgramView {
+  const todayLog = logs.find((l) => l.dateKey === today) ?? null;
+  const index = currentIndexFor(program, today, Boolean(todayLog));
   return {
     program,
-    current: { index: program.currentIndex, day: program.days[program.currentIndex] },
-    todayLog: logs.find((l) => l.dateKey === today) ?? null,
+    current: { index, day: program.days[index] },
+    todayLog,
     schedule: makeSchedule(today, program, logs),
-    weeklyVolume: [...weeklyVolume(logs, weekKeyFor(today, measurementDay))],
+    // Like `GET /program`: core `weeklyVolume` — a rolling 7-day window rated on the global 10–15
+    // band. The window ends at the close of the (Türkiye) day so today's sessions always count.
+    weeklyVolume: coreWeeklyVolume(logs, MUSCLES, `${today}T23:59:59.999Z`),
+    plannedVolume: programVolume(program.days, MUSCLES, { mode: program.mode, catalog: EXERCISES }),
   };
 }
 
