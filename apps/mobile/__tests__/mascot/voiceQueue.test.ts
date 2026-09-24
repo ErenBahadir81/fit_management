@@ -54,6 +54,27 @@ describe("Floo voice queue", () => {
     expect(s.pending.map((p) => p.text)).toEqual(["water again"]);
   });
 
+  it("a waiting line said again keeps its place in line and its age", () => {
+    let s = say(EMPTY_QUEUE, "showing", {}, T0);
+    s = say(s, "greeting", { dedupeKey: "g", priority: "low" }, T0);
+    s = say(s, "other", { priority: "low" }, T0 + 1000);
+    // A screen remounts and says its line again: it must not jump behind "other" or look new.
+    s = say(s, "greeting (again)", { dedupeKey: "g", priority: "low" }, T0 + STALE_MS - 1000);
+    expect(s.pending.map((p) => p.text)).toEqual(["greeting (again)", "other"]);
+    // ...so it still goes stale on its original clock.
+    s = advance(s, T0 + STALE_MS + 1);
+    expect(s.current?.text).toBe("other");
+  });
+
+  it("but a waiting line that already went stale is replaced by a fresh one, not dropped with it", () => {
+    let s = say(EMPTY_QUEUE, "showing", { ttlMs: null }, T0);
+    s = say(s, "failed", { dedupeKey: "toast:failed", priority: "high" }, T0);
+    s = say(s, "failed", { dedupeKey: "toast:failed", priority: "high" }, T0 + STALE_MS + 60_000);
+    expect(s.pending.map((p) => p.text)).toEqual(["failed"]);
+    s = advance(s, T0 + STALE_MS + 61_000);
+    expect(s.current?.text).toBe("failed");
+  });
+
   it("ignores empty text", () => {
     expect(say(EMPTY_QUEUE, "   ")).toBe(EMPTY_QUEUE);
   });

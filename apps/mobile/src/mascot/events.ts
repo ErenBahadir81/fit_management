@@ -299,24 +299,28 @@ export function describeFlooEvent(event: FlooEvent, opts: { now?: Date; rand?: (
     if (event.name === "volumeWarning" && p.band === "low") mood = "think";
   }
 
+  // Over target on a known day is a fact about that day: keyed by it, and said once.
+  const day = event.name === "overTarget" ? str(p.dateKey) : null;
   let key: string = event.name;
-  let once = false;
-  if (event.name === "volumeWarning") {
+  if (day) {
+    key = overTargetKey(day);
+  } else if (event.name === "volumeWarning") {
     const muscle = str(p.muscle);
     if (muscle) key = `${event.name}:${muscle}`;
   } else if (event.name === "goalHit") {
     const what = str(p.what);
     if (what) key = `${event.name}:${what}`;
-  } else if (event.name === "overTarget") {
-    const day = str(p.dateKey);
-    if (day) {
-      key = overTargetKey(day);
-      once = true;
-    }
   }
 
   const warning = event.name === "overTarget" || (event.name === "volumeWarning" && p.band !== "low");
-  const line: FlooLine = { key, text, mood, trigger: event.name, priority: PRIORITY[event.name], tone: warning ? "warning" : "neutral", ttlMs: ttlFor(text) };
-  if (once) line.once = true;
-  return line;
+  return {
+    key,
+    text,
+    mood,
+    trigger: event.name,
+    priority: PRIORITY[event.name],
+    tone: warning ? "warning" : "neutral",
+    ...(day ? { once: true as const } : {}),
+    ttlMs: ttlFor(text),
+  };
 }

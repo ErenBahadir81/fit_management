@@ -33,10 +33,30 @@ export function claimOnce(key: string, now = Date.now()): boolean {
 }
 
 /**
+ * The message to say for a "once" line, or null if `key` was already told. The key is used up in
+ * `onShow`, i.e. when the line is actually on screen: a line still waiting can be dropped unseen,
+ * and then it is said next time. Re-saying it meanwhile only re-queues it under the same dedupe
+ * key, in the same place. The one gate for `useFlooOnce` and `FlooEventBridge`.
+ */
+export function onceMessage(key: string, message: FlooMessage): FlooMessage | null {
+  if (wasSaid(key)) return null;
+  const onShow = message.onShow;
+  return {
+    dedupeKey: key,
+    ...message,
+    onShow: () => {
+      claimOnce(key);
+      onShow?.();
+    },
+  };
+}
+
+/**
  * Say `message` once per `key`, ever (well, for three days). For lines that come from state rather
  * than an event: "you're over target today", the day's greeting, a weekly nudge. Put the date in
  * the key when the line is daily (`over:2026-09-24`). Pass `null` while there is nothing to say.
  * Screens mount and remount constantly; without this the same warning would pop on every visit.
+ * The key is used up only once the line was on screen (see `onceMessage`).
  */
 export function useFlooOnce(key: string | null, message: FlooMessage | null): void {
   const { say, enabled, presence } = useFloo();
@@ -44,8 +64,8 @@ export function useFlooOnce(key: string | null, message: FlooMessage | null): vo
   const text = message?.text;
   useEffect(() => {
     if (!ready || !key || !message || !text) return;
-    if (!claimOnce(key)) return;
-    say({ dedupeKey: key, ...message });
+    const once = onceMessage(key, message);
+    if (once) say(once);
     // `message` is a fresh object each render; the key and text are what identify the line.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, key, text, say]);

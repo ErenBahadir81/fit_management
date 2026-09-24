@@ -142,11 +142,14 @@ export const zGoalAdjustmentAction = z.enum([
 export type GoalAdjustmentAction = z.infer<typeof zGoalAdjustmentAction>;
 
 export const zGoalAdjustmentKind = z.enum([
-  /** Progressing faster than planned (cut/recomp: losing faster; bulk: gaining faster → more fat). */
+  /**
+   * Progressing faster than planned (cut: losing faster; bulk: gaining faster → more fat; recomp:
+   * body fat falling faster, or lean mass falling — the deficit is too big for muscle).
+   */
   "ahead",
-  /** Progressing slower than planned. */
+  /** Progressing slower than planned (recomp: body fat falling slower than planned). */
   "behind",
-  /** Trend flat for two weeks. */
+  /** Trend flat (cut/bulk: weight for two weeks; recomp: body fat not falling). */
   "stalled",
   /** Target reached before the plan says. */
   "reached",
@@ -191,6 +194,13 @@ export const zGoalAdjustmentProposal = z.object({
   direction: zGoalDirection,
   /** Trend minus the plan's expected trend, kg (positive = heavier than planned). */
   deviationKg: z.number(),
+  /**
+   * Recomp: body fat on the measurement trend minus the plan, points, at the latest reading
+   * (positive = fatter than planned). What a recomp proposal is based on; null otherwise.
+   */
+  deviationBfPts: z.number().nullable().default(null),
+  /** Recomp: lean mass on the measurement trend minus the plan, kg (negative = less than planned); null otherwise. */
+  deviationLeanKg: z.number().nullable().default(null),
   mood: zMood,
   /** Floo trigger key for the mascot queue (T1/T2), e.g. "goal.adjust.ahead". */
   trigger: z.string(),
@@ -228,6 +238,11 @@ export const zGoalFeedback = z.object({
   /** Same as progress.onTrack, or "noData" before the first usable weigh-in. */
   status: z.enum(["ahead", "onTrack", "behind", "stalled", "noData", "reached"]),
   deviationKg: z.number().nullable(),
+  /**
+   * Recomp: body fat on the measurement trend minus the plan, points (positive = fatter than
+   * planned); null on cut/bulk and until there are enough readings to judge.
+   */
+  deviationBfPts: z.number().nullable().default(null),
   /** Planned weeks left minus projected weeks left (positive = finishing earlier). */
   weeksSaved: z.number().nullable(),
   /** 0–100 bars for the UI. */

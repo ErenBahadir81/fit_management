@@ -75,6 +75,7 @@ function HomeContent({ data, onProgram, onNutrition, onBody, onRoadmap, onSetGoa
     text: `Bugün hedefini ${fmtInt(over)} kcal aştın. Sorun değil, yarın biraz dengeleriz.`,
     priority: "high",
     mood: "worried",
+    trigger: "overTarget",
     action: { label: "Beslenmeye git", onPress: onNutrition },
   });
   return (

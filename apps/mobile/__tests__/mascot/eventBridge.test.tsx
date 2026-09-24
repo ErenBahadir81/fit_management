@@ -157,7 +157,7 @@ describe("FlooEventBridge", () => {
     expect(bubble()).toBe("Floo: Bugün hedefini 150 kcal aştın.");
   });
 
-  test("a day's line that waits while Floo is hidden is said, and remembered, once Floo is back", async () => {
+  test("while no Floo can be seen (onboarding owns its own), events are not saved up for later", async () => {
     function Host() {
       const [shown, setShown] = useState(false);
       return (
@@ -179,11 +179,15 @@ describe("FlooEventBridge", () => {
         </ToastProvider>
       </ThemeProvider>
     );
+    await emit("measurementLogged", { weightKg: 78.4 });
     await emit("overTarget", { overKcal: 150, dateKey: "2026-09-24" });
-    expect(wasSaid(overTargetKey("2026-09-24"))).toBe(false);
     await fireEvent.press(screen.getByTestId("show-host"));
-    expect(bubble()).toBe("Floo: Hedefi 150 kcal aştık, dert değil.");
-    expect(wasSaid(overTargetKey("2026-09-24"))).toBe(true);
+    // An "afiyet olsun" minutes after the meal, out of context, is worse than none.
+    expect(bubble()).toBeUndefined();
+    // And the day stays open for the home screen to tell.
+    expect(wasSaid(overTargetKey("2026-09-24"))).toBe(false);
+    await emit("goalHit");
+    expect(bubble()).toBe("Floo: Hedefine ulaştın! Tebrikler!");
   });
 
   test("and the other way round: once the home screen said it, a later crossing that day is silent", async () => {
