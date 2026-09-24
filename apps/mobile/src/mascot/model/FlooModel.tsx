@@ -3,7 +3,6 @@ import { View, type StyleProp, type ViewStyle } from "react-native";
 import { Blur, Canvas, Circle, Group, Oval, Path, Rect } from "@shopify/react-native-skia";
 import {
   Easing,
-  cancelAnimation,
   runOnJS,
   useAnimatedReaction,
   useDerivedValue,
@@ -11,7 +10,6 @@ import {
   useReducedMotion,
   useSharedValue,
   withDelay,
-  withRepeat,
   withSequence,
   withSpring,
   withTiming,
@@ -62,7 +60,11 @@ import {
   SPRING,
   SPRING_REDUCED,
   applyGesture,
+  BREATH_AMP,
+  BREATH_IN,
   applyWalk,
+  loopCurve,
+  resolveFront,
   stepSprings,
   trackIkTargets,
   type BodyXform,
@@ -262,6 +264,7 @@ export function FlooModel({
   const walkingSV = useSharedValue(walking ? 1 : 0);
   const loopsSV = useSharedValue(loops ? 1 : 0);
   const reduceSV = useSharedValue(reduce ? 1 : 0);
+  const [shiftPeriod] = useState(() => 9 + Math.random() * 3);
   /** Spring state, owned by the frame loop. Mutated in place on the UI thread, never observed. */
   const sim = useSharedValue({
     x: REST.slice(),
@@ -276,6 +279,11 @@ export function FlooModel({
     iStart: 0,
     walkAmt: 0,
     walkPhase: 0,
+    /** Idle loop phases (0…1) and the weight shift's period at tempo 1, s. Breath starts mid-rise
+     *  (value 0) and the shift at the centre, so the first frame matches the rest pose. */
+    bU: 0.5 / 2.15,
+    wU: 0.5 / 2.12,
+    wPeriod: shiftPeriod,
     primed: false,
     /** The frame's target pose, rebuilt in place every frame (no per-frame allocation). */
     tgt: REST.slice(),
@@ -294,8 +302,10 @@ export function FlooModel({
   // ── mood transitions ────────────────────────────────────────────────────
   useEffect(() => {
     const p: FlooParams = MOOD_PARAMS[mood];
-    const soft = (v: number) => (reduce ? withTiming(v, { duration: 150 }) : withSpring(v, springs.gentle));
-    const body = (v: number) => (reduce ? withTiming(v, { duration: 150 }) : withSpring(v, springs.bouncy));
+    // Reduced motion: a cross-fade, eased at both ends — the face over ≈ ¼ s, the body's shape
+    // a little slower, so nothing about the silhouette changes in one frame.
+    const soft = (v: number) => (reduce ? withTiming(v, { duration: 240, easing: Easing.inOut(Easing.quad) }) : withSpring(v, springs.gentle));
+    const body = (v: number) => (reduce ? withTiming(v, { duration: 360, easing: Easing.inOut(Easing.quad) }) : withSpring(v, springs.bouncy));
     squash.set(body(p.squash));
     lean.set(body(p.lean));
     hop.set(body(p.hop));
@@ -336,47 +346,16 @@ export function FlooModel({
   // ── idle loops ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!loops) {
-      cancelAnimation(breath);
-      cancelAnimation(wshift);
-      breath.set(0);
-      wshift.set(0);
+      // Breath and weight shift ease out in the frame loop; these are small enough to drop.
       microLean.set(0);
       blink.set(1);
       sacX.set(0);
       sacY.set(0);
       return;
     }
-    // Breath is a squash, not a scale: flatter on the way out, taller on the way in.
-    const d = 1400 / Math.max(0.35, MOOD_PARAMS[mood].tempo);
-    breath.set(
-      withRepeat(
-        withSequence(
-          withTiming(0.025, { duration: d, easing: Easing.inOut(Easing.sin) }),
-          withTiming(-0.025, { duration: d * 1.15, easing: Easing.inOut(Easing.sin) })
-        ),
-        -1,
-        false
-      )
-    );
-    // The weight shift: 8–12 s of leaning onto one foot and back. Deliberately much slower than
-    // the breath and on a prime-ish period, so the two never land on the same beat twice.
-    const w = (9000 + Math.random() * 3000) / Math.max(0.35, MOOD_PARAMS[mood].tempo);
-    wshift.set(
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: w, easing: Easing.inOut(Easing.sin) }),
-          withTiming(-1, { duration: w * 1.12, easing: Easing.inOut(Easing.sin) })
-        ),
-        -1,
-        false
-      )
-    );
-    return () => {
-      cancelAnimation(breath);
-      cancelAnimation(wshift);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loops, mood]);
+    // Breath and the weight shift are driven by phase in the frame loop (see there), so a mood
+    // change alters their speed without restarting them.
+  }, [loops, microLean, blink, sacX, sacY]);
 
   useEffect(() => {
     if (!loops) return;
@@ -567,7 +546,11 @@ export function FlooModel({
     }
 
     if (reduce) {
-      tBright.set(withSequence(withTiming(0.25, { duration: 150 }), withTiming(0, { duration: 200 })));
+      // No hop, squash or particles: a glow, and for a tap a smiling squint — an acknowledgement
+      // that reads without anything travelling. The gesture's key pose cross-fades in the rig.
+      const fade = { duration: 200, easing: Easing.inOut(Easing.quad) };
+      tBright.set(withSequence(withTiming(0.22, fade), withTiming(0, { duration: 320, easing: Easing.inOut(Easing.quad) })));
+      if (name === "tap") tSquint.set(withSequence(withTiming(0.4, fade), withDelay(120, withTiming(0, { duration: 260, easing: Easing.inOut(Easing.quad) }))));
       const ms = plan.gesture ? reducedGestureDuration(plan.gesture) : 400;
       const t = setTimeout(end, ms);
       return () => clearTimeout(t);
@@ -674,8 +657,23 @@ export function FlooModel({
     for (let i = 0; i < tgt.length; i++) tgt[i] = mr[i];
     const reduced = reduceSV.value > 0.5;
 
+    // Idle layer, by phase: a breath (a squash — taller on the way in, flatter on the way out) and
+    // an 8–12 s weight shift onto one foot and back, much slower than the breath and on its own
+    // period, so the two never land on the same beat twice. The mood's tempo sets their speed;
+    // with the loops off they ease out rather than snap.
     if (loopsSV.value > 0.5 && !reduced) {
-      // Idle layer: the shoulders rise a hair on the in-breath and the arms counter the weight shift.
+      const tp = Math.max(0.35, tempo.value);
+      st.bU = (st.bU + dt / ((BREATH_IN * 2.15) / tp)) % 1;
+      st.wU = (st.wU + dt / ((st.wPeriod * 2.12) / tp)) % 1;
+      breath.value = BREATH_AMP * loopCurve(st.bU, 1 / 2.15);
+      wshift.value = loopCurve(st.wU, 1 / 2.12);
+    } else if (breath.value !== 0 || wshift.value !== 0) {
+      const f = Math.min(1, dt * 8);
+      breath.value = Math.abs(breath.value) < 1e-4 ? 0 : breath.value * (1 - f);
+      wshift.value = Math.abs(wshift.value) < 1e-3 ? 0 : wshift.value * (1 - f);
+    }
+    if (loopsSV.value > 0.5 && !reduced) {
+      // The shoulders rise a hair on the in-breath and the arms counter the weight shift.
       const b = breath.value;
       const w = wshift.value;
       tgt[CH.L_sh] += b * 40 - w * 3.5;
@@ -761,9 +759,8 @@ export function FlooModel({
     } else {
       stepSprings(st.x, st.v, tgt, dt, SPRING.k, SPRING.z, SPRING.vmax);
     }
-    // Front/behind is a layer switch, not a motion: never spring it.
-    st.x[ARM_BASE.L + A.front] = tgt[ARM_BASE.L + A.front];
-    st.x[ARM_BASE.R + A.front] = tgt[ARM_BASE.R + A.front];
+    // Front/behind is a layer switch, not a motion: never sprung, flipped at the body's edge.
+    resolveFront(st.x, tgt);
     // Published in place: `modify` with forceUpdate notifies the geometry without a fresh array.
     rig.modify((out) => {
       "worklet";

@@ -815,6 +815,47 @@ export function trackIkTargets(x: number[], vel: number[], tgt: number[]): void 
   }
 }
 
+/** IK weight at which a reaching hand crosses the body's edge, near enough. */
+export const FRONT_AT_IK = 0.3;
+
+/**
+ * Decide, per arm, whether it is drawn in front of the body this frame. `front` is a layer switch,
+ * not a motion, so it must flip when the hand is at the body's edge, not over the belly. A pose
+ * asks for "in front" with its `front` channel; for an arm that is reaching (IK) the switch waits
+ * until the weight has carried the hand in (≥ FRONT_AT_IK), and on the way out it holds until the
+ * weight has carried the hand back out. Before this, a hand patting the belly vanished behind the
+ * body in one frame the moment the gesture's last key started, halfway through letting go.
+ */
+export function resolveFront(x: number[], tgt: readonly number[]): void {
+  "worklet";
+  for (let side = 0; side < 2; side++) {
+    const base = side === 0 ? ARM_BASE.L : ARM_BASE.R;
+    const w = x[base + A.ik];
+    const reaching = tgt[base + A.ik] > 0.001 || w > 0.02;
+    const want = tgt[base + A.front] > 0.5 || (x[base + A.front] > 0.5 && reaching && w > FRONT_AT_IK);
+    x[base + A.front] = want && (!reaching || w > FRONT_AT_IK) ? 1 : 0;
+  }
+}
+
+// ── idle loops ─────────────────────────────────────────────────────────────
+
+/**
+ * One cycle of an idle loop as a phase `u` ∈ [0, 1) → −1 … 1: rises from −1 to 1 over the first
+ * `rise` of the cycle and falls back over the rest, sine-eased both ways. Driven by a phase rather
+ * than a repeating tween, a loop can change speed (a mood's tempo) without restarting or jumping.
+ */
+export function loopCurve(u: number, rise: number): number {
+  "worklet";
+  const r = Math.max(0.05, Math.min(0.95, rise));
+  const t = u - Math.floor(u);
+  if (t < r) return -Math.cos((Math.PI * t) / r);
+  return Math.cos((Math.PI * (t - r)) / (1 - r));
+}
+
+/** Breath: in over `BREATH_IN` s, out over 1.15× that, at a mood tempo of 1. */
+export const BREATH_IN = 1.4;
+export const BREATH_AMP = 0.025;
+
 // ── walking ────────────────────────────────────────────────────────────────
 
 /** 0 → 1 → 0 over a swing, with zero slope at both ends: a foot leaves and lands softly. */
