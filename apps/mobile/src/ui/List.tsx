@@ -1,6 +1,7 @@
-import React from "react";
-import { Platform, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import React, { useMemo } from "react";
+import { Platform, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type ViewStyle } from "react-native";
 import { FlashList, type FlashListProps, type ListRenderItem as FlashListRenderItem } from "@shopify/flash-list";
+import { useScreenScroll } from "./Screen";
 
 export type ListRenderItem<T> = FlashListRenderItem<T>;
 export type ListProps<T> = Omit<FlashListProps<T>, "renderItem"> & {
@@ -25,7 +26,22 @@ function renderSlot(slot: React.ComponentType | React.ReactElement | null | unde
   return <C />;
 }
 
-function ListInner<T>(props: ListProps<T>, ref: React.Ref<unknown>) {
+function ListInner<T>(rawProps: ListProps<T>, ref: React.Ref<unknown>) {
+  // Inside a tab `Screen` the list's offset drives the top bar that keeps rows from sliding under
+  // the corner Floo. Horizontal lists never do; the caller's own `onScroll` still runs.
+  const screenScroll = useScreenScroll();
+  const own = rawProps.onScroll;
+  const onScroll = useMemo(
+    () =>
+      screenScroll && !rawProps.horizontal
+        ? (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            screenScroll(e);
+            own?.(e);
+          }
+        : own,
+    [own, rawProps.horizontal, screenScroll]
+  );
+  const props = onScroll === own ? rawProps : { ...rawProps, onScroll, scrollEventThrottle: rawProps.scrollEventThrottle ?? 16 };
   if (Platform.OS !== "web") return <FlashList<T> ref={ref as never} {...(props as FlashListProps<T>)} />;
 
   const {
@@ -42,6 +58,7 @@ function ListInner<T>(props: ListProps<T>, ref: React.Ref<unknown>) {
     horizontal,
     testID,
     style,
+    scrollEventThrottle,
   } = props as ListProps<T> & { style?: StyleProp<ViewStyle> };
 
   const items = (data ?? []) as readonly T[];
@@ -57,6 +74,8 @@ function ListInner<T>(props: ListProps<T>, ref: React.Ref<unknown>) {
       refreshControl={refreshControl}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
       keyboardShouldPersistTaps="handled"
+      onScroll={props.onScroll}
+      scrollEventThrottle={scrollEventThrottle}
     >
       {renderSlot(ListHeaderComponent as never)}
       {items.length === 0
