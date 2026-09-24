@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { zActivityLevel, zGender, zWeekday } from "./common";
 
-const perLevel = (beginner: number, intermediate: number, advanced: number, max = 10) =>
+/* Bounds only; the values live in `muscleDefaults()` below. */
+const perLevel = (max: number) =>
   z.object({ beginner: z.number().min(0).max(max), intermediate: z.number().min(0).max(max), advanced: z.number().min(0).max(max) });
-const perSex = (male: number, female: number, min: number, max: number) =>
-  z.object({ male: z.number().min(min).max(max).default(male), female: z.number().min(min).max(max).default(female) });
+const perSex = (min: number, max: number) => z.object({ male: z.number().min(min).max(max), female: z.number().min(min).max(max) });
 
 /**
  * T7 — muscle-gain engine constants (bulk / recomp / FFMI). Every value is a literature average;
@@ -54,9 +54,9 @@ const muscleDefaults = () => ({
 });
 
 export const zMuscleSettings = z.object({
-  leanGainPctBwPerMonth: perLevel(1.25, 0.75, 0.375, 3),
+  leanGainPctBwPerMonth: perLevel(3),
   femaleRateFactor: z.number().min(0.2).max(1),
-  fatPerLeanKg: perLevel(0.75, 1.25, 2, 5),
+  fatPerLeanKg: perLevel(5),
   kcalPerKgLeanGain: z.number().min(1000).max(8000),
   kcalPerKgFatGain: z.number().min(6000).max(10000),
   bulkProfiles: z.object({
@@ -65,8 +65,8 @@ export const zMuscleSettings = z.object({
     aggressive: z.object({ lean: z.number().min(0.3).max(1.5), fat: z.number().min(0.2).max(3) }),
   }),
   bulkProteinGPerKg: z.number().min(1.2).max(3),
-  bulkBfCeiling: perSex(20, 30, 8, 45),
-  ffmiCeiling: perSex(25, 21.5, 15, 30),
+  bulkBfCeiling: perSex(8, 45),
+  ffmiCeiling: perSex(15, 30),
   ffmiTaperWindow: z.number().min(0.5).max(8),
   taperFloor: z.number().min(0).max(1),
   levelFfmi: z.object({
@@ -75,7 +75,7 @@ export const zMuscleSettings = z.object({
   }),
   recompDeficitPct: z.number().min(0).max(0.25),
   recompMaxDeficitKcal: z.number().min(0).max(1000),
-  recompLeanFactor: perLevel(0.5, 0.4, 0.25, 1),
+  recompLeanFactor: perLevel(1),
 });
 export type MuscleSettings = z.infer<typeof zMuscleSettings>;
 export const DEFAULT_MUSCLE_SETTINGS: MuscleSettings = muscleDefaults();

@@ -336,7 +336,10 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
     const o = lower();
     o.labelTr = kcalLabel(before, o);
     const lateLabel = direction === "recomp" ? "Kaloriyi koru, tarihi güncelle" : "Kaloriyi koru, tarihi ötele";
-    options.push(o, replan(lateLabel));
+    // At the calorie floor a lower TDEE cannot lower the target: offer only the later date.
+    const atFloor = Math.abs((o.after?.dailyCalorieTarget ?? before.dailyCalorieTarget) - before.dailyCalorieTarget) < 25;
+    if (atFloor) options.push(replan(lateLabel, true));
+    else options.push(o, replan(lateLabel));
     const measured = lowerStep.measured ? "Ölçülen harcaman plandakinden düşük çıktı. " : "";
     const why =
       direction === "recomp"
@@ -348,7 +351,9 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
       mood: sit.kind === "stalled" ? "worried" : "think",
       trigger: sit.kind === "stalled" ? "goal.adjust.stalled" : "goal.adjust.behind",
       titleTr: sit.kind === "stalled" ? "Trend yerinde sayıyor" : "Biraz geride kaldık",
-      messageTr: `${measured}${why} ${cap(kcalLet(before, o))} ya da ${direction === "recomp" ? "planı bugünden güncelleyelim" : "tarihi öteleyelim"}.`,
+      messageTr: atFloor
+        ? `${why} Kalori zaten güvenli tabanda; ${direction === "recomp" ? "planı bugünden güncelleyelim" : "tarihi öteleyelim"}.`
+        : `${measured}${why} ${cap(kcalLet(before, o))} ya da ${direction === "recomp" ? "planı bugünden güncelleyelim" : "tarihi öteleyelim"}.`,
     };
   }
 

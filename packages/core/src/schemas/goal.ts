@@ -295,6 +295,10 @@ export function goalDirectionOf(input: { direction?: GoalDirection | null; targe
 }
 
 function checkGoalTargets(v: { direction?: GoalDirection; targetBodyFatPct?: number; targetLeanGainKg?: number }, ctx: z.RefinementCtx) {
+  if (!v.direction && v.targetBodyFatPct != null && v.targetLeanGainKg != null) {
+    ctx.addIssue({ code: "custom", path: ["direction"], message: "İki hedef birden verildiğinde yön (direction) gerekli" });
+    return;
+  }
   const direction = goalDirectionOf(v);
   if (direction === "bulk" && v.targetLeanGainKg == null) {
     ctx.addIssue({ code: "custom", path: ["targetLeanGainKg"], message: "Kas kazanma hedefi için kazanılacak yağsız kütle (kg) gerekli" });
