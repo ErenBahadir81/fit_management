@@ -19,6 +19,7 @@ export type { WeightPoint, WeightTrendPoint, EwmaSettings } from "./ewma";
 
 export {
   bodyFatTrend,
+  smoothedBodyFat,
   computeGoalProgress,
   expectedAtDay,
   roadmapWeekAt,
