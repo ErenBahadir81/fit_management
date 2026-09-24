@@ -17,7 +17,9 @@ async function main() {
   if (config.SEED_ON_BOOT) {
     try {
       const seed = await import("./seed/index");
-      await seed.runSeed();
+      const report = await seed.runSeed(seed.seedOptionsFromConfig(config));
+      if (report.skippedUsers.length) app.log.warn({ users: report.skippedUsers }, "seed accounts not created: set SEED_ADMIN_PASSWORD / SEED_USER_PASSWORD");
+      for (const w of report.warnings) app.log.warn(`seed: ${w}`);
     } catch (e) {
       app.log.warn({ err: e }, "seed skipped");
     }

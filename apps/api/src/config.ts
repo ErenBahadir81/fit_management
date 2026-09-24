@@ -11,6 +11,14 @@ const zBool = z
     return ["1", "true", "yes", "on"].includes(v.trim().toLowerCase());
   });
 
+/** Unset and "" (e.g. `${VAR:-}` in compose) both mean "not provided". */
+const zOptionalString = z
+  .string()
+  .optional()
+  .transform((v) => (v ? v : undefined));
+
+const MIN_PROD_SEED_PASSWORD = 12;
+
 const zEnv = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().default(4000),
@@ -25,13 +33,21 @@ const zEnv = z.object({
   VISION_MOCK: zBool.default(false),
   UPLOAD_DIR: z.string().default("./uploads"),
   LOG_LEVEL: z.string().default("info"),
-  SEED_ON_BOOT: zBool.default(true),
+  /** Defaults to on outside production and off in production — see loadConfig; an explicit value always wins. */
+  SEED_ON_BOOT: zBool,
+  /**
+   * Passwords for the two seed accounts (`eren` admin, `inci` user). Outside production they fall back to a
+   * dev-only default; in production an account whose password is unset is simply not created.
+   */
+  SEED_ADMIN_PASSWORD: zOptionalString,
+  SEED_USER_PASSWORD: zOptionalString,
   /** Defaults to on in production — see loadConfig; an explicit value always wins. */
   COOKIE_SECURE: zBool,
 });
 
-export type AppConfig = Omit<z.infer<typeof zEnv>, "COOKIE_SECURE"> & {
+export type AppConfig = Omit<z.infer<typeof zEnv>, "COOKIE_SECURE" | "SEED_ON_BOOT"> & {
   COOKIE_SECURE: boolean;
+  SEED_ON_BOOT: boolean;
   corsOrigins: string[];
   isTest: boolean;
   isProd: boolean;
@@ -39,11 +55,21 @@ export type AppConfig = Omit<z.infer<typeof zEnv>, "COOKIE_SECURE"> & {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = zEnv.parse({ ...env, JWT_SECRET: env.JWT_SECRET ?? (env.NODE_ENV === "test" ? "test-secret-test-secret" : undefined) });
+  const isProd = parsed.NODE_ENV === "production";
+  if (isProd) {
+    for (const key of ["SEED_ADMIN_PASSWORD", "SEED_USER_PASSWORD"] as const) {
+      const pw = parsed[key];
+      if (pw !== undefined && pw.length < MIN_PROD_SEED_PASSWORD) {
+        throw new Error(`${key} must be at least ${MIN_PROD_SEED_PASSWORD} characters in production`);
+      }
+    }
+  }
   return {
     ...parsed,
-    COOKIE_SECURE: parsed.COOKIE_SECURE ?? parsed.NODE_ENV === "production",
+    SEED_ON_BOOT: parsed.SEED_ON_BOOT ?? !isProd,
+    COOKIE_SECURE: parsed.COOKIE_SECURE ?? isProd,
     corsOrigins: parsed.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean),
     isTest: parsed.NODE_ENV === "test",
-    isProd: parsed.NODE_ENV === "production",
+    isProd,
   };
 }
