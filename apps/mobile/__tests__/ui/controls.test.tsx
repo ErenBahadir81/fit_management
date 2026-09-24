@@ -81,6 +81,6 @@ describe("TextField", () => {
   });
   test("idle edge is controlBorder (3:1), not the card hairline", async () => {
     await renderUI(<TextField label="E-posta" value="" onChangeText={() => {}} testID="tf2" />);
-    expect(JSON.stringify(screen.toJSON())).toContain(`"borderColor":"rgba(133, 148, 165, 1)"`); // light.controlBorder #8594A5
+    expect(JSON.stringify(screen.toJSON())).toContain(`"borderColor":"rgba(122, 138, 156, 1)"`); // light.controlBorder #7A8A9C
   });
 });

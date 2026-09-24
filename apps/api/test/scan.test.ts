@@ -5,10 +5,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import sharp from "sharp";
 import { zScanResult } from "@fitfloow/core";
 import { MOCK_LABELS } from "../src/modules/vision/client";
-import { Scan } from "../src/models/nutrition";
 import { Settings } from "../src/models/settings";
 import { seedFoods } from "../src/modules/nutrition/seed/index";
-import { filterDetections, prepareImage, runScan } from "../src/modules/nutrition/scan.service";
+import { Food, Scan, type FoodDoc } from "../src/models/nutrition";
+import { alternativesFor, filterDetections, prepareImage, resolveFoodsForLabels, runScan } from "../src/modules/nutrition/scan.service";
 import type { AppContext } from "../src/context";
 import { asAdmin, asUser, createTestApp, seedBasics, type TestApp } from "./harness";
 
@@ -112,6 +112,44 @@ describe("filterDetections", () => {
   });
 });
 
+describe("alternativesFor (T6 — “Bunu mu demek istedin?”)", () => {
+  const d = (label: string, confidence: number) => ({ label, confidence, bbox: null });
+
+  it("offers the other mapped candidates, most likely first, never the item itself", async () => {
+    const candidates = [d("pide", 0.31), d("lahmacun", 0.42), d("pizza", 0.2), d("not_a_food_class", 0.15)];
+    const foods = await resolveFoodsForLabels(candidates.map((c) => c.label));
+    const alts = alternativesFor(candidates[1], candidates, foods);
+    expect(alts.map((a) => a.label)).toEqual(["pide", "pizza"]); // unmapped class dropped
+    expect(alts[0]).toMatchObject({ labelTr: "Pide", confidence: 0.31 });
+    expect(alts[0].food.name).toBe("Kıymalı pide");
+    expect(alts[0].suggestedGrams).toBe(alts[0].food.defaultServingG);
+  });
+
+  it("caps at three and lists each food once", async () => {
+    const candidates = [d("pizza", 0.5), d("hamburger", 0.2), d("sushi", 0.1), d("steak", 0.08), d("omelette", 0.05)];
+    const foods = await resolveFoodsForLabels(candidates.map((c) => c.label));
+    // Two labels that resolve to the same catalogue food must not both appear.
+    const pizza = foods.get("pizza")!;
+    foods.set("hamburger", pizza);
+    const alts = alternativesFor(d("lahmacun", 0.6), candidates, foods);
+    expect(alts).toHaveLength(3);
+    expect(alts.map((a) => a.label)).toEqual(["pizza", "sushi", "steak"]);
+  });
+
+  it("skips candidates that map to the item's own food", async () => {
+    const candidates = [d("pizza", 0.6), d("margherita", 0.3), d("sushi", 0.1)];
+    const foods = await resolveFoodsForLabels(candidates.map((c) => c.label));
+    foods.set("margherita", foods.get("pizza") as FoodDoc);
+    expect(alternativesFor(candidates[0], candidates, foods).map((a) => a.label)).toEqual(["sushi"]);
+  });
+
+  it("is empty when the model had nothing else to say", async () => {
+    const only = [d("pizza", 0.97)];
+    expect(alternativesFor(only[0], only, await resolveFoodsForLabels(["pizza"]))).toEqual([]);
+    expect(await Food.countDocuments()).toBeGreaterThan(0);
+  });
+});
+
 describe("POST /nutrition/scan", () => {
   it("requires auth", async () => {
     const res = await postScan({}, await makeImage());
@@ -145,6 +183,12 @@ describe("POST /nutrition/scan", () => {
     expect([...confs].sort((a: number, b: number) => b - a)).toEqual(confs);
     const parsed = zScanResult.safeParse(body);
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
+    // T6: each item lists the other candidates of the same photo as alternatives.
+    const labels = body.detections.map((d: { label: string }) => d.label);
+    for (const det of body.detections) {
+      expect(det.alternatives.map((a: { label: string }) => a.label)).toEqual(labels.filter((l: string) => l !== det.label));
+      for (const a of det.alternatives) expect(a.food).not.toBeNull();
+    }
   });
 
   it("is deterministic for the same image in mock mode", async () => {
@@ -292,5 +336,33 @@ describe("vision service integration (VISION_MOCK=0)", () => {
     // An unknown class still comes back, just without a food to log.
     expect(result.detections[2]).toMatchObject({ food: null, labelTr: "Not a food class", suggestedGrams: 100 });
     expect(result.latencyMs).toBe(121);
+    // T6: alternatives come from every candidate, mapped ones only.
+    expect(result.detections[0].alternatives?.map((a) => a.label)).toEqual(["pide"]);
+    expect(result.detections[1].alternatives?.map((a) => a.label)).toEqual(["lahmacun"]);
+    expect(result.detections[2].alternatives?.map((a) => a.label)).toEqual(["lahmacun", "pide"]);
+  });
+
+  it("offers candidates below the confidence floor as alternatives, not as items", async () => {
+    visionReply = {
+      body: {
+        detections: [
+          { label: "lahmacun", confidence: 0.41, bbox: null },
+          { label: "pide", confidence: 0.12, bbox: null },
+          { label: "pizza", confidence: 0.06, bbox: null },
+          { label: "hamburger", confidence: 0.03, bbox: null },
+          { label: "sushi", confidence: 0.02, bbox: null },
+        ],
+        modelVersion: "swin-food101-q",
+        mock: false,
+        latencyMs: 90,
+        imageSize: [1024, 768],
+        gate: "food",
+      },
+    };
+    const { user } = await asUser(t);
+    const result = await runScan(liveCtx(), String(user._id), { bytes: await makeImage(), mimetype: "image/jpeg" });
+    expect(result.detections.map((d) => d.label)).toEqual(["lahmacun"]);
+    expect(result.detections[0].alternatives?.map((a) => a.label)).toEqual(["pide", "pizza", "hamburger"]);
+    expect(zScanResult.safeParse(result).success).toBe(true);
   });
 });

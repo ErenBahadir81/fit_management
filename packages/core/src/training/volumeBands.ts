@@ -146,7 +146,7 @@ export interface VolumeDayLike {
 
 export interface ProgramVolumeOptions {
   mode?: ProgramMode;
-  /** Current catalog: its activation values win over the snapshot stored on the program. */
+  /** Current catalog: its activation values (even an empty list) win over the program's snapshot. */
   catalog?: readonly CatalogExerciseLike[];
 }
 
@@ -174,8 +174,10 @@ export function programVolume(
       if (ex?.metric === "stretch") continue;
       const sets = typeof ex?.targetSets === "number" && Number.isFinite(ex.targetSets) ? Math.max(0, ex.targetSets) : 0;
       if (sets <= 0) continue;
+      // An exercise the (active) catalog knows counts with the catalog's values — even none, so an
+      // admin who takes every muscle off an exercise is obeyed; unknown exercises use the snapshot.
       const fromCatalog = catalog?.get(exerciseNameKey(ex.name))?.muscles;
-      const loads = normalizeMuscleLoads(fromCatalog && fromCatalog.length > 0 ? fromCatalog : ex.muscles);
+      const loads = normalizeMuscleLoads(fromCatalog ?? ex.muscles);
       for (const { key, load } of loads) {
         if (load <= 0) continue;
         perCycle.set(key, (perCycle.get(key) ?? 0) + sets * load);

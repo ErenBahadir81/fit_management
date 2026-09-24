@@ -16,6 +16,8 @@ import {
   round,
   type BodyEntryDTO,
   type GoalDTO,
+  type GoalInput,
+  type OnboardingTraining,
   type MascotKey,
   type MascotMessage,
   type MealEntryDTO,
@@ -31,6 +33,9 @@ import {
   jumpTransition,
   logDayTransition,
   normalizeProgramInput,
+  exerciseNameKey,
+  starterProgram,
+  trainingLevelForExperience,
   pointerOf,
   programMode,
   reconcilePointer,
@@ -75,6 +80,8 @@ export interface FakeState {
   sessions: Set<string>;
   /** Per-log pointer history (`pointerBeforeId`…), which the API stores on the log but never sends. */
   pointerMeta: Record<string, LogPointerLike>;
+  /** T8 — registered in this session and not yet onboarded: the one account a starter program may replace. */
+  freshAccount?: boolean;
 }
 
 export function createFakeState(today = trDateKey()): FakeState {
@@ -320,6 +327,7 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
       state.weighIns = [];
       state.mealEntries = [];
       state.goal = null;
+      state.freshAccount = true;
       return ok({ ...issueTokens(), user: state.user });
     },
     false
@@ -365,11 +373,23 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
     state.bodyEntries = [...state.bodyEntries.filter((e) => e.dateKey !== entry.dateKey), entry].sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1));
     upsertWeighIn(entry.weightKg, entry.dateKey, "bodyEntry");
 
-    const wanted = body.goal as { targetBodyFatPct?: number; profile?: GoalDTO["profile"] } | null | undefined;
+    const wanted = body.goal as GoalInput | null | undefined;
     if (wanted && state.goal?.status !== "active") {
-      state.goal = domain.goalCreate(today(), state.user, entry, Number(wanted.targetBodyFatPct), wanted.profile ?? "optimal");
+      state.goal = domain.goalFromInput(today(), state.user, entry, wanted);
     }
-    return ok({ user: state.user, bodyEntry: entry, goal: wanted ? state.goal : null });
+    // T8 — a freshly registered demo account gets the starter program, like the API.
+    const training = body.training as OnboardingTraining | null | undefined;
+    if (training && state.freshAccount) {
+      const starter = starterProgram({ daysPerWeek: training.daysPerWeek, level: trainingLevelForExperience(training.experience) });
+      const known = new Set(fx.EXERCISES.map((e) => exerciseNameKey(e.name)));
+      // The demo catalog is small: an exercise it lacks keeps its name with no muscle load.
+      const input = starter.days.map((d) => ({ ...d, exercises: d.exercises.map((e) => (known.has(exerciseNameKey(e.name)) ? e : { ...e, muscles: [] })) }));
+      const { days } = normalizeProgramInput(input, fx.EXERCISES, { mode: "cycle" });
+      const now = nowIso();
+      state.program = { ...state.program, id: fx.nextId("p"), name: starter.name, mode: "cycle", days, currentDayId: days[0].id, currentIndex: 0, cycleNumber: 1, weekNumber: 1, startedAt: now, lastActionAt: now, sourceTemplateId: null };
+      state.freshAccount = false;
+    }
+    return ok({ user: state.user, bodyEntry: entry, goal: wanted ? state.goal : null, program: state.program });
   });
 
   // catalog
@@ -510,7 +530,21 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   on("GET", "/body/summary", () => ok(fx.makeSummary(state.bodyEntries, state.weighIns, state.user)));
 
   // goals
-  on("GET", "/goals/current", () => ok({ goal: state.goal, progress: progress() }));
+  const evaluation = () => (state.goal && state.goal.status === "active" ? domain.evaluateFor(today(), state.user, state.goal, state.weighIns, state.bodyEntries, state.mealEntries) : null);
+  on("GET", "/goals/current", () => {
+    const e = evaluation();
+    return ok({ goal: state.goal, progress: e?.progress ?? null, feedback: e?.feedback ?? null, adjustment: e?.adjustment ?? null });
+  });
+  const answerAdjustment = (body: Record<string, unknown>, dismiss: boolean) => {
+    const e = evaluation();
+    if (!state.goal || !e) return err(404, "NOT_FOUND", "Aktif hedef yok");
+    const res = domain.answerAdjustment(today(), state.goal, e, { id: String(body.id ?? ""), action: body.action as never, dismiss });
+    if ("error" in res) return res.error === "stale" ? err(409, "ADJUSTMENT_STALE", "Bu öneri artık geçerli değil, güncel durumu yeniden yükle") : err(400, "VALIDATION", "Bu öneride böyle bir seçenek yok");
+    state.goal = res.goal;
+    return ok(res);
+  };
+  on("POST", "/goals/current/adjustment/accept", ({ body }) => answerAdjustment(body, false));
+  on("POST", "/goals/current/adjustment/dismiss", ({ body }) => answerAdjustment(body, true));
   on("POST", "/goals/preview", ({ body }) => {
     const start = state.bodyEntries[state.bodyEntries.length - 1];
     if (!start) return err(409, "NO_BODY_ENTRY", "Önce bir vücut ölçümü gir");
@@ -648,10 +682,17 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   });
   on("POST", "/nutrition/scan", () => {
     const pick = (id: string, conf: number, grams: number) => {
-      const f = state.foods.find((x) => x.id === id)!;
-      return { label: f.nameEn ?? f.name, labelTr: f.name, confidence: conf, food: f, suggestedGrams: grams };
+      const f = state.foods.find((x) => x.id === id);
+      return f ? { label: f.nameEn ?? f.name, labelTr: f.name, confidence: conf, food: f, suggestedGrams: grams } : null;
     };
-    return ok({ scanId: fx.nextId("scan"), imageUrl: null, detections: [pick("f_tavuk", 0.84, 150), pick("f_bulgur", 0.61, 150), pick("f_salata", 0.42, 120)], mock: true, latencyMs: 420, modelVersion: "fake-1" });
+    /** Other readings of the same photo ("Bunu mu demek istedin?"); foods the demo lacks are skipped. */
+    const alts = (...picks: [string, number][]) => picks.map(([id, conf]) => pick(id, conf, state.foods.find((x) => x.id === id)?.defaultServingG ?? 100)).filter((a) => a !== null);
+    const detections = [
+      { ...pick("f_tavuk", 0.84, 150)!, alternatives: alts(["f_kofte", 0.09]) },
+      { ...pick("f_bulgur", 0.61, 150)!, alternatives: alts(["f_pilav", 0.21]) },
+      { ...pick("f_salata", 0.42, 120)!, alternatives: alts(["f_cacik", 0.31], ["f_mercimek", 0.12], ["f_yogurt", 0.05]) },
+    ];
+    return ok({ scanId: fx.nextId("scan"), imageUrl: null, detections, mock: true, latencyMs: 420, modelVersion: "fake-1" });
   });
   on("GET", "/nutrition/week", ({ query }) => ok(fx.makeWeekNutrition(query.week ? weekKeyFor(query.week, md()) : weekKeyFor(today(), md()), state.mealEntries, state.target)));
   on("GET", "/nutrition/target", () => ok(state.target));

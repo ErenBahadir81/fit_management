@@ -118,12 +118,33 @@ export const zWeekNutrition = z.object({
 });
 export type WeekNutrition = z.infer<typeof zWeekNutrition>;
 
+/**
+ * T6 — another dish the model considered for the same photo ("Bunu mu demek istedin?"). Always
+ * mapped to a catalogue food, so picking it can be logged as is.
+ */
+export const zDetectionAlternative = z.object({
+  label: z.string(),
+  labelTr: z.string(),
+  confidence: z.number().min(0).max(1),
+  food: zFood,
+  suggestedGrams: z.number().positive(),
+});
+export type DetectionAlternative = z.infer<typeof zDetectionAlternative>;
+
+/** Most alternatives a detection carries. */
+export const MAX_DETECTION_ALTERNATIVES = 3;
+
 export const zDetection = z.object({
   label: z.string(),
   labelTr: z.string(),
   confidence: z.number().min(0).max(1),
   food: zFood.nullable(),
   suggestedGrams: z.number().positive(),
+  /**
+   * T6 — up to three other candidates for this item, most likely first. Optional: scans stored
+   * before T6 (and older API builds) have none, and clients must treat a missing list as empty.
+   */
+  alternatives: z.array(zDetectionAlternative).max(MAX_DETECTION_ALTERNATIVES).optional(),
 });
 export type Detection = z.infer<typeof zDetection>;
 export const zScanResult = z.object({

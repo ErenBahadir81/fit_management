@@ -10,9 +10,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { asUser, createTestApp, createUser, seedBasics, type TestApp } from "./harness";
 import { BodyEntry } from "../src/models/body";
 import { Goal } from "../src/models/goal";
+import { Program } from "../src/models/program";
 import { User } from "../src/models/user";
+import { SEED_EXERCISES } from "../src/seed/data/index";
 import { REGISTER_RATE_LIMIT } from "../src/modules/platform/auth.routes";
-import { zEnergy, zOnboardingResponse, zUser } from "@fitfloow/core";
+import { STARTER_EXERCISE_NAMES, zEnergy, zOnboardingResponse, zUser } from "@fitfloow/core";
 
 let t: TestApp;
 beforeAll(async () => {
@@ -142,6 +144,74 @@ describe("POST /onboarding", () => {
     const res = await post("/onboarding", { ...ONBOARDING, profile: { ...ONBOARDING.profile, gender: "female" } }, headers);
     expect(res.statusCode).toBe(400);
     expect(res.json().error.message).toBe("Kadınlar için kalça ölçüsü gerekli");
+  });
+
+  it("T8: gives an account without a program a starter program sized to its answers", async () => {
+    const { user, headers } = await asUser(t);
+    const res = await post("/onboarding", { ...ONBOARDING, training: { daysPerWeek: 3, experience: "under1" } }, headers);
+    expect(res.statusCode).toBe(200);
+    expect(() => zOnboardingResponse.parse(res.json())).not.toThrow();
+    const program = res.json().program;
+    expect(program.mode).toBe("cycle");
+    expect(program.days).toHaveLength(7);
+    expect(program.days.filter((d: { kind: string }) => d.kind === "strength")).toHaveLength(3);
+    expect(program.currentDayId).toBe(program.days[0].id);
+    // Muscles come from the catalog, not from the client.
+    const squat = program.days[0].exercises.find((e: { name: string }) => e.name === "Squat");
+    expect(squat.muscles.length).toBeGreaterThan(0);
+    expect(await Program.countDocuments({ userId: user._id })).toBe(1);
+    // GET /program serves it straight away.
+    const view = await t.app.inject({ method: "GET", url: "/api/v1/program", headers });
+    expect(view.statusCode).toBe(200);
+  });
+
+  it("T8: never replaces a program the account already has, and a repeat call adds nothing", async () => {
+    const { user, headers } = await asUser(t);
+    const first = await post("/onboarding", { ...ONBOARDING, training: { daysPerWeek: 4, experience: "overThree" } }, headers);
+    const again = await post("/onboarding", { ...ONBOARDING, training: { daysPerWeek: 2, experience: "none" } }, headers);
+    expect(again.statusCode).toBe(200);
+    expect(again.json().program.id).toBe(first.json().program.id);
+    expect(again.json().program.days.filter((d: { kind: string }) => d.kind === "strength")).toHaveLength(4);
+    expect(await Program.countDocuments({ userId: user._id })).toBe(1);
+  });
+
+  it("T8: without training answers no program is invented", async () => {
+    const { user, headers } = await asUser(t);
+    const res = await post("/onboarding", ONBOARDING, headers);
+    expect(res.json().program ?? null).toBeNull();
+    expect(await Program.countDocuments({ userId: user._id })).toBe(0);
+  });
+
+  it("T8: every starter exercise exists in the seed catalog", () => {
+    const names = new Set(SEED_EXERCISES.map((e) => e.name));
+    expect(STARTER_EXERCISE_NAMES.filter((n) => !names.has(n))).toEqual([]);
+  });
+
+  it("T8: a bulk goal with a training level goes through the same goal engine", async () => {
+    const { headers } = await asUser(t);
+    const res = await post(
+      "/onboarding",
+      { ...ONBOARDING, measurement: { weightKg: 72, neckCm: 38, waistCm: 78 }, goal: { direction: "bulk", targetLeanGainKg: 3, trainingLevel: "beginner", profile: "optimal" } },
+      headers
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json().goal).toMatchObject({ direction: "bulk", targetLeanGainKg: 3, trainingLevel: "beginner" });
+  });
+
+  it("T8: a recomp goal carries its body-fat target", async () => {
+    const { headers } = await asUser(t, { gender: "female" });
+    const res = await post(
+      "/onboarding",
+      {
+        ...ONBOARDING,
+        profile: { ...ONBOARDING.profile, gender: "female", heightCm: 165 },
+        measurement: { weightKg: 64, neckCm: 32, waistCm: 76, hipCm: 100 },
+        goal: { direction: "recomp", targetBodyFatPct: 26, trainingLevel: "beginner", profile: "optimal" },
+      },
+      headers
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json().goal).toMatchObject({ direction: "recomp", targetBodyFatPct: 26 });
   });
 
   it("rejects a body that is missing the measurement block", async () => {

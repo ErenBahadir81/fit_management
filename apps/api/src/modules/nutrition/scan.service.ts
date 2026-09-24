@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 import sharp from "sharp";
-import { labelToTitle, labelTr, searchKey, type Detection, type ScanResultDTO } from "@fitfloow/core";
+import { MAX_DETECTION_ALTERNATIVES, labelToTitle, labelTr, searchKey, type Detection, type DetectionAlternative, type ScanResultDTO } from "@fitfloow/core";
 import { Food, Scan, toFoodDTO, type FoodDoc, type ScanDoc } from "../../models/nutrition";
 import { getSettings } from "../../models/settings";
 import { AppError } from "../../lib/errors";
@@ -91,6 +91,40 @@ export function filterDetections(
   return kept.length > 0 ? kept : [sorted[0]];
 }
 
+/**
+ * T6 — "Bunu mu demek istedin?": for one detection, the other dishes the model considered for the
+ * same photo, most likely first. The vision service classifies the whole plate (no boxes), so
+ * every candidate it returned is a plausible reading of any item — whether or not it passed the
+ * confidence floor. Only catalogue-mapped candidates are offered (an alternative must be loggable
+ * with one tap), never the detection's own food, each food once, at most three.
+ */
+export function alternativesFor(
+  detection: VisionDetection,
+  candidates: VisionDetection[],
+  foods: Map<string, FoodDoc>,
+  max = MAX_DETECTION_ALTERNATIVES
+): DetectionAlternative[] {
+  const key = (label: string) => label.toLowerCase().trim();
+  const own = foods.get(key(detection.label));
+  const seen = new Set<string>(own ? [String(own._id)] : []);
+  const out: DetectionAlternative[] = [];
+  for (const c of [...candidates].sort((a, b) => b.confidence - a.confidence)) {
+    if (out.length >= max) break;
+    if (key(c.label) === key(detection.label)) continue;
+    const food = foods.get(key(c.label));
+    if (!food || seen.has(String(food._id))) continue;
+    seen.add(String(food._id));
+    out.push({
+      label: c.label,
+      labelTr: labelTr(c.label) ?? food.name ?? labelToTitle(c.label),
+      confidence: Math.round(Math.min(1, Math.max(0, c.confidence)) * 1000) / 1000,
+      food: toFoodDTO(food),
+      suggestedGrams: food.defaultServingG ?? 100,
+    });
+  }
+  return out;
+}
+
 export interface ScanOutcome extends ScanResultDTO {
   scanDoc: ScanDoc;
 }
@@ -112,8 +146,10 @@ export async function runScan(ctx: AppContext, userId: string, input: ScanImageI
   }
 
   // The open-set gate said "this is not food" — return an empty, honest result rather than a guess.
-  const raw = analysis.gate === "notFood" ? [] : filterDetections(analysis.detections, settings.vision);
-  const foods = await resolveFoodsForLabels(raw.map((d) => d.label));
+  const candidates = analysis.gate === "notFood" ? [] : analysis.detections;
+  const raw = filterDetections(candidates, settings.vision);
+  // Every candidate is resolved (not only the kept ones): the rest become alternatives.
+  const foods = await resolveFoodsForLabels(candidates.map((d) => d.label));
 
   const scanId = new Types.ObjectId();
   const detections: Detection[] = raw.map((d) => {
@@ -124,6 +160,7 @@ export async function runScan(ctx: AppContext, userId: string, input: ScanImageI
       confidence: Math.round(d.confidence * 1000) / 1000,
       food: food ? toFoodDTO(food) : null,
       suggestedGrams: food?.defaultServingG ?? 100,
+      alternatives: alternativesFor(d, candidates, foods),
     };
   });
 

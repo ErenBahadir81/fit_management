@@ -37,7 +37,7 @@ export function CalorieCard({ today, onPress }: { today: HomeDTO["today"]; onPre
       </View>
       <View style={styles.row}>
         <Ring value={Math.min(1, ratio)} size={128} stroke={11} tone={over ? "warning" : "primary"} gradient={!over} testID="home-calorie-ring">
-          <CountUp value={left} format={fmtInt} variant="number" align="center" numberOfLines={1} adjustsFontSizeToFit tone={over ? "warning" : undefined} />
+          <CountUp value={left} from={left} format={fmtInt} variant="number" align="center" numberOfLines={1} adjustsFontSizeToFit tone={over ? "warning" : undefined} />
           <Text variant="caption" color="inkMuted" align="center">
             {over ? "kcal fazla" : "kcal kalan"}
           </Text>

@@ -25,6 +25,18 @@ import {
 /** How far outside the shoulder the front copy of an arm starts, so its root never paints over the body. */
 const SHOULDER_DISC_R = 10.5;
 
+/** Stand-ins for limbs a level of detail does not draw, so their geometry is never computed. */
+const NO_PATH = "M0 0";
+const HIDDEN_ARM: ArmGeo = {
+  tube: NO_PATH,
+  rim: NO_PATH,
+  hand: { palm: NO_PATH, fingers: NO_PATH, creases: NO_PATH, thumb: NO_PATH, tip: { x: 0, y: 0 } },
+  wrist: { x: 0, y: 0 },
+  elbow: { x: 0, y: 0 },
+  front: 0,
+};
+const HIDDEN_LEG: LegGeo = { tube: NO_PATH, rim: NO_PATH, boot: NO_PATH, gloss: { x: 0, y: 0 } };
+
 function ellipsePath(cx: number, cy: number, rx: number, ry: number): string {
   "worklet";
   return `M${cx - rx} ${cy}a${rx} ${ry} 0 1 0 ${rx * 2} 0a${rx} ${ry} 0 1 0 ${-rx * 2} 0Z`;
@@ -55,15 +67,15 @@ export function FlooLimbs({ rig, body: bodyX, hydroScale, lod, children }: FlooL
     "worklet";
     const base = ARM_BASE[side];
     const s = side === "L" ? -1 : 1;
-    const bb = { ...b, k: hk };
-    const root = bodyToWorld(SHOULDER[side], bb);
+    const root = bodyToWorld(SHOULDER[side], b, hk);
     const target = v[base + A.ik] > 0.001 ? bodyToWorld({ x: v[base + A.ikX], y: v[base + A.ikY] }, b) : null;
     return armGeometry(v, base, s, root, b.lean, target);
   };
+  // The badge draws one hand and the mid LOD no legs: what is not drawn is not computed either.
   const armL = useDerivedValue(() => {
     "worklet";
-    return armGeo("L", rig.get(), bodyX.get(), hydroScale.get());
-  });
+    return lod === "badge" ? HIDDEN_ARM : armGeo("L", rig.get(), bodyX.get(), hydroScale.get());
+  }, [lod]);
   const armR = useDerivedValue(() => {
     "worklet";
     return armGeo("R", rig.get(), bodyX.get(), hydroScale.get());
@@ -71,17 +83,19 @@ export function FlooLimbs({ rig, body: bodyX, hydroScale, lod, children }: FlooL
   const legGeo = (side: "L" | "R", v: number[], b: BodyXform, hk: number): LegGeo => {
     "worklet";
     const s = side === "L" ? -1 : 1;
-    const hip = bodyToWorld(HIP[side], { ...b, k: hk });
-    return legGeometry(v, LEG_BASE[side], s, hip, ANKLE[side], b.tx * 0.5);
+    const hip = bodyToWorld(HIP[side], b, hk);
+    // The ankles stay where they are planted: a sideways body shift bends the legs, it never
+    // drags the feet along the ground.
+    return legGeometry(v, LEG_BASE[side], s, hip, ANKLE[side], 0);
   };
   const legL = useDerivedValue(() => {
     "worklet";
-    return legGeo("L", rig.get(), bodyX.get(), hydroScale.get());
-  });
+    return lod === "full" ? legGeo("L", rig.get(), bodyX.get(), hydroScale.get()) : HIDDEN_LEG;
+  }, [lod]);
   const legR = useDerivedValue(() => {
     "worklet";
-    return legGeo("R", rig.get(), bodyX.get(), hydroScale.get());
-  });
+    return lod === "full" ? legGeo("R", rig.get(), bodyX.get(), hydroScale.get()) : HIDDEN_LEG;
+  }, [lod]);
   const armLTube = useDerivedValue(() => armL.get().tube);
   const armLRim = useDerivedValue(() => armL.get().rim);
   const armLPalm = useDerivedValue(() => armL.get().hand.palm);
@@ -99,12 +113,13 @@ export function FlooLimbs({ rig, body: bodyX, hydroScale, lod, children }: FlooL
   /** The disc around each shoulder the FRONT copy of an arm leaves out, so its root stays hidden. */
   const shoulderDiscL = useDerivedValue(() => {
     "worklet";
-    const p = bodyToWorld(SHOULDER.L, { ...bodyX.get(), k: hydroScale.get() });
+    if (lod === "badge") return NO_PATH;
+    const p = bodyToWorld(SHOULDER.L, bodyX.get(), hydroScale.get());
     return ellipsePath(p.x, p.y, SHOULDER_DISC_R, SHOULDER_DISC_R);
-  });
+  }, [lod]);
   const shoulderDiscR = useDerivedValue(() => {
     "worklet";
-    const p = bodyToWorld(SHOULDER.R, { ...bodyX.get(), k: hydroScale.get() });
+    const p = bodyToWorld(SHOULDER.R, bodyX.get(), hydroScale.get());
     return ellipsePath(p.x, p.y, SHOULDER_DISC_R, SHOULDER_DISC_R);
   });
   const legLTube = useDerivedValue(() => legL.get().tube);

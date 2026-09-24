@@ -2,6 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Types } from "mongoose";
 import { asAdmin, asUser, createTestApp, seedBasics, type TestApp } from "./harness";
 import { ProgramTemplate } from "../src/models/program";
+import { EREN_DAYS, INCI_DAYS } from "../src/seed/data/index";
+import { templateVolume } from "@fitfloow/core";
 
 let t: TestApp;
 beforeAll(async () => {
@@ -52,9 +54,13 @@ describe("admin program templates", () => {
     const templates = res.json().templates as Array<{ name: string; cycleLength: number; weeklyVolume: Record<string, number> }>;
     expect(templates).toHaveLength(2);
     const eren = templates.find((x) => x.cycleLength === 7)!;
-    expect(eren.weeklyVolume).toEqual({ chest: 17, frontDelt: 9, traps: 9, sideDelt: 6, lats: 10, abs: 6, legs: 14 });
+    // Fractional sets from the activation catalog (v1 counted every set in full: chest 17, legs 14).
+    expect(eren.weeklyVolume).toEqual(templateVolume(EREN_DAYS));
+    expect(eren.weeklyVolume).toMatchObject({ chest: 13.6, quads: 15.05 });
+    expect(eren.weeklyVolume.legs).toBeUndefined();
     const inci = templates.find((x) => x.cycleLength === 4)!;
-    expect(inci.weeklyVolume).toEqual({ legs: 5, frontDelt: 5, sideDelt: 5, traps: 5, abs: 5 });
+    expect(inci.weeklyVolume).toEqual(templateVolume(INCI_DAYS));
+    expect(inci.weeklyVolume.legs).toBeUndefined();
   });
 
   it("creates a template, normalizes day orders to 1..N and fills exercise defaults", async () => {

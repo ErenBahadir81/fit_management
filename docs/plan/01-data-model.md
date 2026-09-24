@@ -70,8 +70,17 @@ Seed = v1's 7 muscles + extras (biceps, triceps, glutes, hamstrings, calves, low
 | equipment | string[] |
 | instructions | string (TR) |
 | active | boolean |
+| slug | string \| null — the seed catalog row it came from (activation data v1); set by the seed only, never by the admin API |
 
 v1 had `muscles: string[]` (implicit load 1). Migration maps each string to `{key, load: 1}`.
+
+Seed catalog (3.0): the 143 exercises of `seed/data/exerciseActivation.v1.ts` (literature-average loads,
+generated from `exerciseActivation.v1.evidence.json`). An existing database gets it once through
+`syncExerciseCatalogV1` (marker `catalog-activation-v1` in `migrations`): missing exercises are added by
+slug/`nameKey`; `muscles` is replaced only on untouched legacy rows (all loads 1, v1 keys, exactly the v1
+set for that name); untouched legacy snapshots in templates and programs get the catalog's resulting values.
+Admin edits, deletions and renames made afterwards are never undone. The admin panel shows each pair's
+literature value, confidence and sources (by `slug`) next to the editable load.
 
 ## programTemplates (admin)
 Same `days[]` shape as programs (below) + `name`, `description`, `cycleLength = days.length`,

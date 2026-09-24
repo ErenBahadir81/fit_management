@@ -7,6 +7,7 @@ import { mockRouter } from "../../mocks/expo-router";
 import { GoalSetupScreen } from "../../../src/features/goals/GoalSetupScreen";
 import { RoadmapScreen } from "../../../src/features/goals/RoadmapScreen";
 import { defaultTarget, instantPlan } from "../../../src/features/goals/goalMath";
+import { ON_TRACK_TR } from "../../../src/features/goals/goalIntent";
 import { useSession } from "../../../src/features/auth/session";
 import { setApi } from "../../../src/lib/api";
 import { todayKey } from "../../../src/lib/dates";
@@ -96,7 +97,8 @@ describe("GoalSetupScreen", () => {
   test("edit mode preloads the active target/pace and PATCHes the goal", async () => {
     await renderUI(<GoalSetupScreen mode="edit" />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("goal-target").props.children).toBe(fmtPct(15, 1)));
-    expect(screen.getByTestId("goal-pace-conservative").props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByTestId("goal-pace-optimal").props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByTestId("goal-pace-conservative").props.accessibilityState).toMatchObject({ selected: false });
     await a11y(screen.getByTestId("goal-slider"), "decrement");
     await fireEvent.press(screen.getByText("Hedefi güncelle"));
     await waitFor(() => expect(api.fake.goal?.targetBodyFatPct).toBe(14.5));
@@ -127,7 +129,8 @@ describe("RoadmapScreen", () => {
     const { goal, progress } = await api.goals.current();
     expect(screen.getByTestId("roadmap-ring").props.accessibilityValue).toMatchObject({ now: Math.round(progress!.percentComplete) });
     expect(screen.getByTestId("roadmap-pct").props.accessibilityLabel).toBe(String(Math.round(progress!.percentComplete)));
-    expect(screen.getByText("Rotada")).toBeTruthy();
+    expect(screen.getByText(ON_TRACK_TR[progress!.onTrack].label)).toBeTruthy();
+    expect(screen.getByText("Geride")).toBeTruthy(); // the demo trend runs behind the plan
     expect(screen.getByTestId("plan-chart")).toBeTruthy();
     await waitFor(() => expect(screen.getAllByTestId(/^week-row-/).length).toBe(goal!.plan.roadmap.length));
     expect(screen.getByText("Bu hafta")).toBeTruthy();

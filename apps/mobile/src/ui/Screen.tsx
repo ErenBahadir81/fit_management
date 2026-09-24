@@ -1,7 +1,7 @@
-import React from "react";
-import { RefreshControl, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { RefreshControl, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import Animated, { interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import Animated, { interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeProvider";
 import { spacing } from "../theme/tokens";
@@ -26,12 +26,48 @@ export interface ScreenProps extends Omit<ScrollViewProps, "style"> {
 /** Height of the top bar that fades in behind the corner Floo once a tab screen scrolls. */
 export const SCREEN_TOP_BAR = 60;
 
+type ScrollHandler = (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+/** Reports a list's scroll offset to the top bar of the list screen around it. */
+const ScreenOffsetContext = createContext<((y: number) => void) | null>(null);
+/** Lets a Header that stays put above the list switch the bar off (see `useStaticHead`). */
+const ScreenHeadContext = createContext<(() => () => void) | null>(null);
+/** `true` inside a `List`: a Header there scrolls with the list, it is not a static head. */
+export const InListContext = createContext(false);
+
+/**
+ * Inside `<Screen scroll={false}>` on a tab screen: the handler that feeds a vertical scroller's
+ * offset to the screen's top bar. `List` attaches it by itself; call it from any other scroller's
+ * `onScroll` (and wrap that scroller's content in `<InListContext.Provider value>` if it holds a
+ * large `Header`). The scroller's offset is dropped when it unmounts, so the bar is never left up
+ * over content at rest. `null` elsewhere, and on screens whose header stays put above the list.
+ */
+export function useScreenScroll(enabled = true): ScrollHandler | null {
+  const context = useContext(ScreenOffsetContext);
+  const report = enabled ? context : null;
+  useEffect(() => (report ? () => report(0) : undefined), [report]);
+  return useMemo(() => (report ? (e: NativeSyntheticEvent<NativeScrollEvent>) => report(e.nativeEvent.contentOffset.y) : null), [report]);
+}
+
+/**
+ * Called by `Header`. A large header rendered in a list screen but outside its list holds the top
+ * of the screen still: rows start below it and can never reach Floo, so the bar would only hide
+ * the title. While such a header is mounted the bar is off. (Layout effect: decided before the
+ * first frame is painted, so the bar and the list's handler are never wired up for nothing.)
+ */
+export function useStaticHead(active: boolean): void {
+  const register = useContext(ScreenHeadContext);
+  const inList = useContext(InListContext);
+  useLayoutEffect(() => (register && active && !inList ? register() : undefined), [register, active, inList]);
+}
+
 /**
  * Themed screen container: safe areas, gutters, pull-to-refresh, tab-bar clearance.
  *
- * On scrolling tab screens a flat top bar (the page colour plus a hairline) fades in as soon as
- * content moves, so rows never slide visibly underneath the corner Floo. At rest it is invisible:
- * the large title owns the top of the page.
+ * On tab screens a flat top bar (the page colour plus a hairline) fades in as soon as content
+ * moves, so rows never slide visibly underneath the corner Floo. At rest it is invisible: the large
+ * title owns the top of the page. List screens (`scroll={false}`) get the same bar: `List` reports
+ * its scroll through `useScreenScroll`. The bar is drawn inside the screen, under the corner Floo,
+ * which lives one layer up (the tabs layout), so nothing a screen draws can cover Floo.
  */
 export function Screen({ children, scroll = true, keyboard, refreshing, onRefresh, tabBar = true, edges = ["top"], style, contentStyle, testID, ...rest }: ScreenProps) {
   const { colors } = useTheme();
@@ -43,9 +79,9 @@ export function Screen({ children, scroll = true, keyboard, refreshing, onRefres
 
   if (!scroll) {
     return (
-      <View testID={testID} style={[styles.flex, bg, { paddingTop: padTop }, style]}>
+      <StaticBody testID={testID} style={[styles.flex, bg, { paddingTop: padTop }, style]} topBar={tabBar}>
         {children}
-      </View>
+      </StaticBody>
     );
   }
   if (keyboard) {
@@ -81,15 +117,50 @@ interface ScrollBodyProps extends Omit<ScreenProps, "scroll" | "keyboard" | "tab
   topBar: boolean;
 }
 
-function ScrollBody({ children, refreshing, onRefresh, padTop, padBottom, contentStyle, topBar, testID, ...rest }: ScrollBodyProps) {
+/**
+ * A screen whose scroller is its child (a `List`): the list drives the top bar, unless a header
+ * stays put above the list (then nothing ever slides under Floo and the bar stays off).
+ */
+function StaticBody({ children, topBar, testID, style }: { children: React.ReactNode; topBar: boolean; testID?: string; style: StyleProp<ViewStyle> }) {
+  const y = useSharedValue(0);
+  const [staticHeads, setStaticHeads] = useState(0);
+  const report = useCallback((offset: number) => y.set(offset), [y]);
+  const registerHead = useCallback(() => {
+    setStaticHeads((n) => n + 1);
+    return () => setStaticHeads((n) => n - 1);
+  }, []);
+  const bar = topBar && staticHeads === 0;
+  return (
+    <View testID={testID} style={style}>
+      <ScreenHeadContext.Provider value={topBar ? registerHead : null}>
+        <ScreenOffsetContext.Provider value={bar ? report : null}>{children}</ScreenOffsetContext.Provider>
+      </ScreenHeadContext.Provider>
+      {bar ? <TopBar y={y} /> : null}
+    </View>
+  );
+}
+
+function TopBar({ y }: { y: SharedValue<number> }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  // 0 → 1 over the first 16 pt of scroll: quick enough that nothing is ever seen under Floo, and
+  // tied to the scroll position (no clock, no overshoot).
+  const bar = useAnimatedStyle(() => ({ opacity: interpolate(y.get(), [0, 16], [0, 1], "clamp") }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      testID="screen-top-bar"
+      style={[styles.topBar, { height: insets.top + SCREEN_TOP_BAR, backgroundColor: colors.bg, borderBottomColor: colors.border }, bar]}
+    />
+  );
+}
+
+function ScrollBody({ children, refreshing, onRefresh, padTop, padBottom, contentStyle, topBar, testID, ...rest }: ScrollBodyProps) {
+  const { colors } = useTheme();
   const y = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((e) => {
     y.set(e.contentOffset.y);
   });
-  // 0 → 1 over the first 16 pt of scroll: quick enough that nothing is ever seen under Floo.
-  const bar = useAnimatedStyle(() => ({ opacity: interpolate(y.get(), [0, 16], [0, 1], "clamp") }));
   return (
     <>
       <Animated.ScrollView
@@ -106,15 +177,12 @@ function ScrollBody({ children, refreshing, onRefresh, padTop, padBottom, conten
           onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} progressViewOffset={padTop} /> : undefined
         }
       >
-        {children}
+        {/* A scrolling screen owns its bar: nothing inside it reports to a list screen around it. */}
+        <ScreenHeadContext.Provider value={null}>
+          <ScreenOffsetContext.Provider value={null}>{children}</ScreenOffsetContext.Provider>
+        </ScreenHeadContext.Provider>
       </Animated.ScrollView>
-      {topBar ? (
-        <Animated.View
-          pointerEvents="none"
-          testID="screen-top-bar"
-          style={[styles.topBar, { height: insets.top + SCREEN_TOP_BAR, backgroundColor: colors.bg, borderBottomColor: colors.border }, bar]}
-        />
-      ) : null}
+      {topBar ? <TopBar y={y} /> : null}
     </>
   );
 }
