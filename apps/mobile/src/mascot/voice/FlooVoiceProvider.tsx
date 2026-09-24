@@ -117,16 +117,37 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
     [stopTimer]
   );
 
-  // A new message on screen: tell its sender, fire its beat, buzz for warnings, start its clock.
+  /** Id of the line whose arrival has played (sender told, beat, buzz, clock started). */
+  const arrived = useRef<string | null>(null);
+
+  // A line arrives: tell its sender, fire its beat, buzz for warnings, start its clock.
+  const arrive = useCallback(
+    (m: QueuedMessage) => {
+      arrived.current = m.id;
+      try {
+        m.onShow?.();
+      } catch (e) {
+        // The sender's bookkeeping must never leave a bubble without its clock.
+        if (__DEV__) console.warn("[floo] onShow threw", e);
+      }
+      if (m.trigger) setReaction({ name: m.trigger, key: ++reactKey.current });
+      if (m.tone === "warning") void haptic.warning();
+      else if (m.tone === "success") void haptic.success();
+      if (m.ttlMs != null && !held.current) startTimer(m.ttlMs);
+      else remaining.current = m.ttlMs;
+    },
+    [startTimer]
+  );
+
+  // A new message on screen. If the app is not in the foreground (backgrounded, or covered by the
+  // app switcher / Control Center) nobody sees it arrive, so the whole arrival waits for the
+  // foreground (below) instead of playing, and timing out, unseen.
   useEffect(() => {
     stopTimer();
+    arrived.current = null;
     if (!current) return;
-    current.onShow?.();
-    if (current.trigger) setReaction({ name: current.trigger, key: ++reactKey.current });
-    if (current.tone === "warning") void haptic.warning();
-    else if (current.tone === "success") void haptic.success();
-    if (current.ttlMs != null && !held.current) startTimer(current.ttlMs);
-    else remaining.current = current.ttlMs;
+    const away = AppState.currentState === "background" || AppState.currentState === "inactive";
+    if (!away) arrive(current);
     return stopTimer;
     // Keyed on the id only: an in-place dedupe refresh must not restart the beat or the clock.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,7 +156,12 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
   // Backgrounded: freeze the clock so a line is not "read" while the phone is in a pocket.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (s) => {
-      if (!current || current.ttlMs == null) return;
+      if (!current) return;
+      if (s === "active" && arrived.current !== current.id) {
+        arrive(current);
+        return;
+      }
+      if (current.ttlMs == null) return;
       if (s !== "active") {
         if (timer.current) {
           remaining.current = Math.max(800, (remaining.current ?? 0) - (Date.now() - startedAt.current));
@@ -146,7 +172,7 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
       }
     });
     return () => sub.remove();
-  }, [current, startTimer, stopTimer]);
+  }, [current, arrive, startTimer, stopTimer]);
 
   // Mascot switched off mid-bubble: drop the queue rather than dumping it into toasts at once.
   useEffect(() => {

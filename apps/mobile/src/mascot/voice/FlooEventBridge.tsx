@@ -1,6 +1,7 @@
 import { describeFlooEvent, useFlooEvents, type FlooEvent } from "../events";
 import { useFloo } from "./FlooVoiceProvider";
-import { claimOnce, wasSaid } from "./useFlooOnce";
+import { onceMessage } from "./useFlooOnce";
+import type { FlooMessage } from "./queue";
 
 /**
  * Events already turned into a line. Module-wide on purpose: however many bridges end up mounted
@@ -25,27 +26,17 @@ const delivered = new WeakSet<FlooEvent>();
  *   screen does not repeat what the meal that crossed the line already said, and vice versa.
  */
 export function FlooEventBridge(): null {
-  const { say, enabled, presence } = useFloo();
+  const { say, presence } = useFloo();
   useFlooEvents((event) => {
-    // No Floo on screen (onboarding draws its own): a reaction is about the moment, so it is not
-    // saved up to pop out of context minutes later.
-    if (!enabled || presence === "hidden" || delivered.has(event)) return;
+    // No Floo on screen (mascot switched off, or onboarding, which draws its own): a reaction is
+    // about the moment, so it is neither saved up to pop out of context later nor made a toast.
+    if (presence === "hidden" || delivered.has(event)) return;
     delivered.add(event);
-    const line = describeFlooEvent(event);
-    // A fact about the day that was already told is not news. It is only marked as told once it is
-    // actually on screen: a waiting line can still be dropped unseen, and then the day stays open.
-    if (line.once && wasSaid(line.key)) return;
-    const key = line.key;
-    say({
-      text: line.text,
-      mood: line.mood,
-      trigger: line.trigger,
-      priority: line.priority,
-      tone: line.tone,
-      dedupeKey: key,
-      ttlMs: line.ttlMs,
-      onShow: line.once ? () => void claimOnce(key) : undefined,
-    });
+    const { key, once, ...line } = describeFlooEvent(event);
+    const msg: FlooMessage = { ...line, dedupeKey: key };
+    // A fact about the day that was already told is not news (see `onceMessage`).
+    const out = once ? onceMessage(key, msg) : msg;
+    if (out) say(out);
   });
   return null;
 }

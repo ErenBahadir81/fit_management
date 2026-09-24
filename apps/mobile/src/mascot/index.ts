@@ -6,7 +6,9 @@ export { toFlooMood } from "./moodMap";
 export { Floo as FlooLegacy, FLOO_SIZES, type FlooProps, type FlooSize } from "./Floo";
 export { SpeechBubble, type SpeechBubbleProps } from "./SpeechBubble";
 export { useMascot, MASCOT_FALLBACK, type MascotContext, type MascotLine } from "./useMascot";
-export { MOOD_POSE, MOOD_LABEL_TR, FLOO_COLORS, type Mood, type Pose } from "./moods";
+// Two mood vocabularies: `ApiMood` (the API and the v1 SVG Floo, ten faces) and `FlooMood` (Floo 3,
+// what `say()` and the corner take). `toFlooMood` maps the first onto the second.
+export { MOOD_POSE, MOOD_LABEL_TR, FLOO_COLORS, type Mood as ApiMood, type Pose } from "./moods";
 export { flooBus, useFlooEvents, describeFlooEvent, overTargetKey, FLOO_EVENTS, type FlooEvent, type FlooEventName, type FlooLine } from "./events";
 export {
   FlooModel,
@@ -18,6 +20,6 @@ export {
   type Gesture as FlooGesture,
   type FlooLod,
   type Trigger as FlooTrigger,
-  type Mood as FlooModelMood,
+  type Mood as FlooMood,
 } from "./model";
 export * from "./voice";
