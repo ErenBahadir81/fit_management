@@ -9,6 +9,7 @@ import { trainingState, withCardioDay, withRestDay } from "../../../lib/fake/tra
 import { getJSON, storage } from "../../../lib/storage";
 import { createLoggerState, loggerReducer, type LoggerState } from "../lib/logger";
 import { WORKOUT_DRAFT_KEY } from "./useWorkoutSession";
+import { flooBus } from "../../../mascot/events";
 import { WorkoutScreen } from "./WorkoutScreen";
 
 jest.mock("expo-router", () => jest.requireActual("../../../../__tests__/mocks/expo-router"));
@@ -223,9 +224,11 @@ describe("WorkoutScreen", () => {
     expect(screen.queryByText("Eski gün")).toBeNull();
   });
 
-  test("finishing sends the completed sets with their load and reports the session back", async () => {
+  test("finishing logs the day through logDay({ dayId }) with the completed sets and their load", async () => {
     const api = await mount();
-    const spy = jest.spyOn(api.training, "complete");
+    const spy = jest.spyOn(api.training, "logDay");
+    const events: string[] = [];
+    const off = flooBus.subscribe((e) => events.push(e.name));
     await waitFor(() => expect(screen.getByTestId("weight-0-input")).toBeTruthy());
     await fireEvent.changeText(screen.getByTestId("weight-0-input"), "60");
     await fireEvent.press(screen.getByTestId("complete-set"));
@@ -241,6 +244,8 @@ describe("WorkoutScreen", () => {
 
     await waitFor(() => expect(spy).toHaveBeenCalled());
     const input = spy.mock.calls[0][0];
+    expect(input.dayId).toBe("d1");
+    expect(input.resumePlanned).toBe(false);
     expect(input.rpe).toBe(8);
     expect(input.strength?.[0].sets).toHaveLength(2);
     expect(input.strength?.[0].sets[0].weightKg).toBe(60);
@@ -249,6 +254,54 @@ describe("WorkoutScreen", () => {
     await waitFor(() => expect(screen.getByTestId("workout-saved")).toBeTruthy());
     expect(screen.getByTestId("workout-saved-compare")).toBeTruthy();
     expect(getJSON(WORKOUT_DRAFT_KEY)).toBeNull();
+    // Two sets → two quiet nods, then the one workout event Floo celebrates.
+    expect(events.filter((n) => n === "setCompleted")).toHaveLength(2);
+    expect(events.at(-1)).toBe("workoutDone");
+    const server = await api.training.program();
+    expect(server.todayLog?.dayId).toBe("d1");
+    expect(server.program.currentDayId).toBe("d2");
+    off();
+  });
+
+  test("every completed set tells Floo what was lifted", async () => {
+    await mount();
+    const seen: Record<string, unknown>[] = [];
+    const off = flooBus.subscribe((e) => e.name === "setCompleted" && seen.push(e.payload ?? {}));
+    await waitFor(() => expect(screen.getByTestId("weight-0-input")).toBeTruthy());
+    await fireEvent.changeText(screen.getByTestId("weight-0-input"), "62,5");
+    await fireEvent.press(screen.getByTestId("complete-set"));
+    await waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]).toMatchObject({ exercise: "Bench Press", kg: 62.5, setIndex: 0 });
+    expect(typeof seen[0].reps).toBe("number");
+    off();
+  });
+
+  test("started from 'başka bir şey yaptım', it logs the chosen day and can keep the planned one next", async () => {
+    const api = createFakeApi({ latencyMs: 0, signedIn: true });
+    setApi(api);
+    useSession.setState({ status: "signedIn", user: (await api.auth.me()).user });
+    const spy = jest.spyOn(api.training, "logDay");
+    await renderUI(<WorkoutScreen dayId="d5" resumePlanned />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("pane-0")).toBeTruthy());
+    expect(within(screen.getByTestId("pane-0")).getByText("Pull-up")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("complete-set"));
+    await fireEvent.press(screen.getByTestId("workout-finish"));
+    await waitFor(() => expect(screen.getByTestId("finish-sheet")).toBeTruthy());
+    await fireEvent.press(screen.getByTestId("finish-confirm"));
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    expect(spy.mock.calls[0][0]).toMatchObject({ dayId: "d5", resumePlanned: true });
+    const server = await api.training.program();
+    expect(server.todayLog?.dayId).toBe("d5");
+    expect(server.program.currentDayId).toBe("d1"); // the missed day stays next
+  });
+
+  test("an unknown day id falls back to today's planned day", async () => {
+    const api = createFakeApi({ latencyMs: 0, signedIn: true });
+    setApi(api);
+    useSession.setState({ status: "signedIn", user: (await api.auth.me()).user });
+    await renderUI(<WorkoutScreen dayId="nope" />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("pane-0")).toBeTruthy());
+    expect(within(screen.getByTestId("pane-0")).getByText("Bench Press")).toBeTruthy();
   });
 
   test("closing with logged sets asks before leaving", async () => {

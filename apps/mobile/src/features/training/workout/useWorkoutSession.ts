@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
-import type { ProgramView } from "@fitfloow/core";
+import type { DayDTO, ProgramView } from "@fitfloow/core";
 import { todayKey } from "../../../lib/dates";
 import { STORAGE_KEYS, getJSON, removeKey, setJSON } from "../../../lib/storage";
 import { createLoggerState, loggerReducer, restoreDraft, type LoggerAction, type LoggerState } from "../lib/logger";
@@ -33,26 +33,39 @@ export interface WorkoutSession {
 
 type Session = { state: LoggerState; restored: boolean } | null;
 
+/**
+ * The day this session logs: the one asked for ("Bugün başka bir şey yaptım" → "Setleriyle
+ * kaydet"), else today's planned day.
+ */
+export function sessionDay(view: ProgramView, dayId?: string | null): { day: DayDTO; index: number } | null {
+  if (dayId) {
+    const index = view.program.days.findIndex((d) => d.id === dayId);
+    if (index >= 0) return { day: view.program.days[index], index };
+  }
+  return view.current?.day ? { day: view.current.day, index: view.current.index } : null;
+}
+
 /** Seed the session from the persisted draft (same day, same date) or a fresh logger state. */
-function seedSession(view: ProgramView): Session {
-  const day = view.current?.day;
-  if (!day) return null;
+function seedSession(view: ProgramView, dayId?: string | null): Session {
+  const picked = sessionDay(view, dayId);
+  if (!picked) return null;
+  const { day } = picked;
   const dateKey = todayKey();
   const draft = restoreDraft(readDraft(), { dayOrder: day.order, dayId: day.id, dateKey });
   if (draft) return { state: draft, restored: true };
   return {
-    state: createLoggerState({ day, dayIndex: view.current.index, programId: view.program.id, weekNumber: view.program.cycleNumber ?? view.program.weekNumber, dateKey, startedAt: Date.now() }),
+    state: createLoggerState({ day, dayIndex: picked.index, programId: view.program.id, weekNumber: view.program.cycleNumber ?? view.program.weekNumber, dateKey, startedAt: Date.now() }),
     restored: false,
   };
 }
 
-export function useWorkoutSession(view: ProgramView | null): WorkoutSession {
+export function useWorkoutSession(view: ProgramView | null, dayId?: string | null): WorkoutSession {
   // Seeded lazily once the program is known; a session never re-seeds while the modal is open.
-  const [session, setSession] = useState<Session>(() => (view ? seedSession(view) : null));
-  if (session === null && view && view.current?.day) {
+  const [session, setSession] = useState<Session>(() => (view ? seedSession(view, dayId) : null));
+  if (session === null && view && sessionDay(view, dayId)) {
     // The program arrived after mount (cold cache): adopt it during render, the React-sanctioned
     // way to derive state from a prop change without an extra effect pass.
-    const seeded = seedSession(view);
+    const seeded = seedSession(view, dayId);
     if (seeded) setSession(seeded);
   }
   const state = session?.state ?? null;
