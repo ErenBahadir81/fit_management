@@ -16,7 +16,7 @@ import {
 } from "@fitfloow/core";
 import { asUser, createTestApp, seedBasics, type TestApp, type TestUser } from "./harness";
 import { Goal } from "../src/models/goal";
-import { WeighIn } from "../src/models/body";
+import { BodyEntry, WeighIn } from "../src/models/body";
 
 let t: TestApp;
 beforeAll(async () => {
@@ -300,5 +300,126 @@ describe("adaptive goal", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().goal.status).toBe("completed");
     expect((await view(headers)).goal).toBeNull();
+  });
+});
+
+describe("adaptive goal — recomp is judged on body fat", () => {
+  /** 90 kg at ≈ 25.2 % → 21 %: a slow recomp; weight is meant to stay nearly flat. */
+  async function recompGoal() {
+    const u = await measured(heavy, 180);
+    const res = await t.app.inject({ method: "POST", url: `${api}/goals`, headers: u.headers, payload: { direction: "recomp", targetBodyFatPct: 21 } });
+    expect(res.statusCode).toBe(200);
+    const goal = zGoal.parse(res.json().goal);
+    expect(goal.direction).toBe("recomp");
+    return { ...u, goal };
+  }
+
+  /** Weekly tape readings after the start one (days 7, 14, … `lastDay`), body fat per day index. */
+  async function tapeReadings(user: TestUser, lastDay: number, bodyFatAt: (d: number) => number, weightKg = 90) {
+    const docs = [];
+    for (let d = 7; d <= lastDay; d += 7) {
+      const dateKey = shiftKey(START, d);
+      const bodyFatPct = Math.round(bodyFatAt(d) * 10) / 10;
+      const fatMassKg = Math.round(weightKg * bodyFatPct) / 100;
+      docs.push({
+        userId: user._id,
+        date: new Date(`${dateKey}T09:00:00.000Z`),
+        dateKey,
+        gender: "male",
+        heightCm: heavy.heightCm,
+        neckCm: heavy.neckCm,
+        waistCm: heavy.waistCm,
+        weightKg,
+        bodyFatPct,
+        fatMassKg,
+        leanMassKg: Math.round((weightKg - fatMassKg) * 100) / 100,
+      });
+    }
+    await BodyEntry.insertMany(docs);
+  }
+
+  it("flat weight and no new tape reading: an invitation to measure, never a weight verdict", async () => {
+    const { user, headers } = await recompGoal();
+    // on the old weight rule this read as "behind" the planned drift and proposed fewer calories
+    await weighIns(user, START, 50, () => 90);
+    at(shiftKey(START, 49));
+    const v = await view(headers);
+    expect(v.progress!.onTrack).toBe("onTrack");
+    expect(v.adjustment).toBeNull();
+    expect(v.feedback!.trigger).toBe("goal.feedback.measure");
+    expect(v.feedback!.tone).toBe("neutral");
+    expect(v.feedback!.textTr).toContain("ölçüm");
+    expect(v.feedback!.deviationBfPts).toBeNull();
+  });
+
+  it("stalled body fat: GET proposes fewer calories, one tap re-plans exactly as previewed", async () => {
+    const { user, headers, goal } = await recompGoal();
+    await weighIns(user, START, 71, () => 90);
+    await tapeReadings(user, 70, () => goal.start.bodyFatPct);
+    const today = shiftKey(START, 70);
+    at(today);
+    const v = await view(headers);
+    expect(v.progress!.onTrack).toBe("stalled");
+    expect(v.feedback!.status).toBe("stalled");
+    expect(v.feedback!.deviationBfPts!).toBeGreaterThan(1);
+    expect(v.feedback!.textTr).toContain("yağ oranın");
+    const proposal = v.adjustment!;
+    expect(proposal).not.toBeNull();
+    expect(proposal.kind).toBe("stalled");
+    expect(proposal.direction).toBe("recomp");
+    expect(proposal.deviationBfPts!).toBeGreaterThan(1);
+    const lower = proposal.options.find((o) => o.recommended)!;
+    expect(lower.action).toBe("lowerCalories");
+    expect(lower.after!.dailyCalorieTarget).toBeLessThan(proposal.before.dailyCalorieTarget);
+
+    const res = await t.app.inject({ method: "POST", url: `${api}/goals/current/adjustment/accept`, headers, payload: { id: proposal.id } });
+    expect(res.statusCode).toBe(200);
+    const { goal: after, adjustment } = zGoalAdjustmentResponse.parse(res.json());
+    expect(adjustment).toMatchObject({ status: "accepted", action: "lowerCalories", kind: "stalled" });
+    expect(after.tdeeOverride).toBe(lower.change.tdeeOverride);
+    expect(after.plan.startKey).toBe(today);
+    expect(after.plan.initialDailyCalorieTarget).toBe(lower.after!.dailyCalorieTarget);
+    expect(after.plan.estimatedWeeks).toBe(lower.after!.estimatedWeeks);
+    expect(after.targetBodyFatPct).toBe(21);
+    expect(after.adjustments).toHaveLength(1);
+
+    // The new plan starts today: nothing to judge until fresh readings, and the cool-down restarted.
+    const next = await view(headers);
+    expect(next.adjustment).toBeNull();
+    expect(next.feedback!.trigger).toBe("goal.feedback.measure");
+    const again = await t.app.inject({ method: "POST", url: `${api}/goals/current/adjustment/accept`, headers, payload: { id: proposal.id } });
+    expect(again.statusCode).toBe(409);
+  });
+
+  it("a dismissed recomp proposal changes nothing and is not repeated", async () => {
+    const { user, headers, goal } = await recompGoal();
+    await weighIns(user, START, 71, () => 90);
+    await tapeReadings(user, 70, () => goal.start.bodyFatPct);
+    at(shiftKey(START, 70));
+    const proposal = (await view(headers)).adjustment!;
+    expect(proposal.kind).toBe("stalled");
+    const res = await t.app.inject({ method: "POST", url: `${api}/goals/current/adjustment/dismiss`, headers, payload: { id: proposal.id } });
+    expect(res.statusCode).toBe(200);
+    const { goal: after, adjustment } = zGoalAdjustmentResponse.parse(res.json());
+    expect(adjustment).toMatchObject({ status: "dismissed", action: null });
+    expect(after.plan).toEqual(goal.plan);
+    expect(after.tdeeOverride).toBeNull();
+    const v = await view(headers);
+    expect(v.adjustment).toBeNull();
+    expect(v.feedback!.status).toBe("stalled"); // the verdict stands; only the proposal waits
+  });
+
+  it("flat weight with body fat on plan is a working recomp: no proposal", async () => {
+    const { user, headers, goal } = await recompGoal();
+    await weighIns(user, START, 64, () => 90);
+    const rate = (goal.plan.roadmap[0].startBfPct - goal.plan.roadmap.at(-1)!.endBfPct) / goal.plan.roadmap.length;
+    await tapeReadings(user, 63, (d) => goal.start.bodyFatPct - (rate * d) / 7);
+    at(shiftKey(START, 63));
+    const v = await view(headers);
+    expect(v.progress!.onTrack).toBe("onTrack");
+    expect(v.adjustment).toBeNull();
+    expect(v.feedback!.status).toBe("onTrack");
+    expect(v.feedback!.textTr).toContain("Yağ oranın planda");
+    expect(Math.abs(v.feedback!.deviationBfPts!)).toBeLessThan(0.5);
   });
 });

@@ -143,6 +143,88 @@ Ideal bulk end point: men about 18–20%, women about 26–28% (then cut).
 
 ---
 
+## 8. Judging a recomp from body-fat measurements (added 2026-09-24)
+
+**Why weight cannot be used.** A recomp targets a change of 0 to −0.5 %BW a week (§4). The engine
+plans about −0.2 kg a week, which is inside the weekly scale noise (§7). What a recomp changes is
+composition. The engine's recomp plans move body fat about 0.25–0.3 points a week and lean mass
+about +0.05–0.1 kg a week. Controlled studies report roughly +0.5–1.5 kg lean and −1–3 kg fat over
+8–12 weeks (Barakat 2020, §4). So progress has to come from body fat and the lean mass derived from
+it, and these have to be judged against their own noise.
+
+**How precise the app's body fat is.** The app measures body fat with the Navy tape method.
+- Trained observers reproduce the circumference estimate within **±1 %BF**. Sources: Hodgdon &
+  Friedl 1999, *Development of the DoD Body Composition Estimation Equations*, NHRC; cited by
+  Potter, Tharion, Holden et al. 2022, *Front Physiol* 13:868627, "Circumference-Based Predictions
+  of Body Fat Revisited", https://pmc.ncbi.nlm.nih.gov/articles/PMC9008774/. Confidence: medium-high.
+- Self-measured circumferences are noisier. Barrios, Martin-Biggers, Quick & Byrd-Bredbenner 2016,
+  *BMC Med Res Methodol* 16:49, "Reliability and criterion validity of self-measured waist, hip, and
+  neck circumferences", https://pmc.ncbi.nlm.nih.gov/articles/PMC4855335/, reports the technical error
+  of duplicate self-measurements:
+  - waist 0.76 in (1.9 cm)
+  - hip 0.38 in (1.0 cm)
+  - neck 0.24 in (0.6 cm)
+  - trained technicians: 0.22 / 0.20 / 0.08 in
+
+  In the Navy equation, one cm of (waist − neck) is about 0.75–0.8 body-fat points for a man, and
+  one cm of (waist + hip − neck) is about 0.5 points for a woman. So one self-measured reading
+  carries **≈ 1.5 points (men) / ≈ 1.1 points (women)** of noise (1 SD). Confidence: medium (my own
+  propagation of a peer-reviewed technical error of measurement).
+- Tape tracks *change* poorly. Foulis, Friedl, Spiering et al. 2023, *Front Physiol* 14:1183836,
+  "Body composition changes during 8 weeks of military training are not accurately captured by
+  circumference-based assessments", https://www.frontiersin.org/journals/physiology/articles/10.3389/fphys.2023.1183836/full,
+  followed n = 1,407 recruits over 8 weeks of training:
+  - DXA: −3.3 %BF (men), −4.0 %BF (women)
+  - tape: −2.2 %BF (men), 0.0 %BF (women)
+  - a change of ≥ 1 point was classified correctly for 83 % of men and 56 % of women
+
+  So one or two readings cannot judge a recomp; a trend over several weeks can. Confidence: high.
+- For comparison, the least significant change between two DXA scans is 2.77 × the precision error
+  (95 %) (Slart et al. 2024, *Eur J Nucl Med Mol Imaging*, "Updated practice guideline for DXA",
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC11732917/).
+
+**Rule in code (`bodyFatTrend`, docs/plan/11 §Recomp on body fat).**
+- **Residuals.** Take the readings since the plan (re)started, from the last 56 days, one per day.
+  For each, the residual is the measured value minus the plan's expected body fat (and lean mass)
+  on that day.
+- **Deviation.** A least-squares line through the residuals gives the deviation at the latest
+  reading and its standard error. The noise is max(1.5 points, the person's own scatter). For lean
+  mass the noise is weight/100 × √(1.5² + 0.5²) kg; the 0.5 is scale noise in %BW (Orsama 2014, §7).
+- **When it counts.** A deviation counts beyond max(1 point, 2.25 × SE). The 1-point floor is the
+  tape's reproducibility and the ≥ 1-point criterion used by Foulis. For lean mass the floor is 1 kg.
+- **Minimum data.** At least 3 readings spanning ≥ 21 days, the latest ≤ 14 days old. Three weeks
+  matches §7's "judge after ≥ 3 weeks", and three points are the fewest that leave any scatter to
+  estimate noise from.
+- **Stalled.** "Stalled" means body fat falls < 0.05 points a week. This is the body-fat counterpart
+  of the cut's 0.1 kg / 14 days.
+- **Proposals.** A proposal also needs the same verdict at the previous reading, the counterpart of
+  the cut's "today and 7 days ago" rule. The 21-day cool-down stays.
+- **Reached.** "Reached" needs the latest reading at the target and, once there are 3 readings, the
+  fitted trend at the target too. With 1.5 points of noise, someone 1 point above target reads at or
+  below it on about 25 % of single readings.
+- Confidence: medium-low. The structure is standard statistics; the calibration is mine (below).
+
+**Calibration (simulation, own work, low-medium confidence).** The setup:
+- a man, 85 kg, 20 → 15 %, over an 18-week plan (≈ 0.28 points a week)
+- Gaussian tape noise σ on each reading, 0.4 kg scale noise
+- proposals checked at every reading, from week 3 to the end of the plan
+
+The table shows the share of people who ever got a wrong proposal while on plan, and how many
+full stalls were caught.
+
+| noise floor / z | on plan, σ 1.0, weekly | on plan, σ 1.6, weekly | on plan, σ 1.0, fortnightly | full stall caught, weekly (median week) | full stall caught, fortnightly (median week) |
+|---|---|---|---|---|---|
+| 1.0 / 2.0 | 14 % | 29 % | 3 % | 100 % (7–8) | 99 % (10) |
+| 1.5 / 2.0 | 0.7 % | 14 % | 0 % | 100 % (9) | 100 % (12) |
+| **1.5 / 2.25 (chosen)** | **0 %** | **5 %** | **0 %** | **100 % (9–10)** | **97 % (12)** |
+| 1.5 / 2.5 | 0 % | 2 % | 0 % | 99–100 % (10) | 93 % (14) |
+
+A proposal is never applied silently (§2 of the sprint hand-off), but a wrong proposal still costs
+trust. That is why the chosen row keeps false alarms at or below 5 % even for noisy self-measurers.
+For a recomp, catching a stall a week later costs little.
+
+---
+
 ## Recommended constants
 
 | Constant | Value | Source | Confidence |
@@ -183,3 +265,11 @@ Ideal bulk end point: men about 18–20%, women about 26–28% (then cut).
 | MIN_WEEKS_BEFORE_ADJUST | 3 (evaluable) | Helms Pyramid, MacroFactor, RippedBody (5) | medium |
 | ON_TRACK_TOLERANCE | max(0.1 %BW/wk, 0.1 kg/wk) | heuristic | low |
 | CALORIE_ADJUST_STEP | 5% (≈100–200 kcal/day) | RippedBody | medium |
+| RECOMP_BF_NOISE_PTS (`adaptive.bfNoisePts`) | 1.5 (floor; own scatter wins when larger) | Hodgdon & Friedl 1999 (±1 trained); Barrios 2016 TEM through the Navy equation | medium |
+| RECOMP_BF_TOLERANCE_PTS (`bfTolerancePts`) | 1.0 | tape reproducibility; Foulis 2023 ≥ 1-point criterion | medium |
+| RECOMP_LEAN_TOLERANCE_KG (`leanToleranceKg`) | 1.0 | ≈ 1 point of body fat at 85–100 kg | low-medium |
+| RECOMP_CONFIDENCE_Z (`bfConfidenceZ`) | 2.25 | §8 simulation; LSC = 2.77 × precision (Slart 2024) | low-medium |
+| RECOMP_MIN_READINGS / SPAN / MAX_AGE | 3 readings / 21 days / 14 days | §7 "≥ 3 weeks"; 3 = fewest with scatter left | medium |
+| RECOMP_WINDOW_DAYS (`bfWindowDays`) | 56 | recomp effects read over 8–12 weeks (Barakat 2020) | low-medium |
+| RECOMP_STALL_PTS_PER_WEEK (`bfStallPtsPerWeek`) | 0.05 | counterpart of the cut's 0.1 kg / 14 days | low |
+| WEIGH_IN_NOISE_PCT_BW (`weighInNoisePctBw`) | 0.5 | Orsama 2014 (§7) | medium |
