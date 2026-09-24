@@ -391,6 +391,7 @@ describe("exercise catalog sync (activation v1)", () => {
         { name: "Squat", muscles: [{ key: "legs", load: 1 }], targetSets: 4, targetReps: 12, targetRIR: 2, metric: "reps" },
         { name: "Lunge", muscles: [{ key: "quads", load: 0.7 }], targetSets: 3, targetReps: 12, targetRIR: 2, metric: "reps" },
         { name: "Uydurma", muscles: [{ key: "legs", load: 1 }], targetSets: 3, targetReps: 10, targetRIR: null, metric: "reps" },
+        { name: "pistol squat", muscles: ["legs"], targetSets: 3, targetReps: 8, targetRIR: 2, metric: "reps" }, // v1 strings, other case
       ],
       run: null,
       swim: null,
@@ -415,8 +416,9 @@ describe("exercise catalog sync (activation v1)", () => {
 
     const docs = [await ProgramTemplate.collection.findOne({ name: "Eski Şablon" }), await Program.collection.findOne({ userId })];
     for (const doc of docs) {
-      const [squat, lunge, custom] = doc!.days[0].exercises;
+      const [squat, lunge, custom, pistol] = doc!.days[0].exercises;
       expect(squat.muscles).toEqual(seedMuscles("Squat"));
+      expect(pistol).toMatchObject({ name: "pistol squat", muscles: seedMuscles("Pistol Squat") });
       expect(squat).toMatchObject({ targetSets: 4, targetReps: 12 });
       expect(lunge.muscles).toEqual([{ key: "quads", load: 0.7 }]);
       expect(custom.muscles).toEqual([{ key: "legs", load: 1 }]); // ad-hoc exercise: not ours to change

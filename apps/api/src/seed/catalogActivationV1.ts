@@ -159,7 +159,8 @@ async function refreshSnapshots(): Promise<number> {
   let n = 0;
   for (const model of [ProgramTemplate, Program] as const) {
     const col = model.collection;
-    const cursor = col.find({ "days.exercises.name": { $in: Object.keys(LEGACY_V1_EXERCISE_MUSCLES) } }, { projection: { days: 1 } });
+    // Every doc with an exercise: names are matched with `exerciseNameKey` folding, not exact case.
+    const cursor = col.find({ "days.exercises.0": { $exists: true } }, { projection: { days: 1 } });
     for await (const doc of cursor) {
       const days = refreshDays(doc.days);
       if (!days) continue;
