@@ -11,15 +11,67 @@
  * returned as it stands rather than replaced.
  */
 import type { FastifyInstance } from "fastify";
+import type { Types } from "mongoose";
 import type { z } from "zod";
-import { trDateKey, zOnboardingInput, type OnboardingResponse } from "@fitfloow/core";
+import {
+  exerciseNameKey as exerciseKey,
+  normalizeProgramInput,
+  starterProgram,
+  trDateKey,
+  trainingLevelForExperience,
+  zOnboardingInput,
+  type OnboardingResponse,
+  type OnboardingTraining,
+  type ProgramDTO,
+} from "@fitfloow/core";
 import type { AppContext } from "../../context";
 import { AppError } from "../../lib/errors";
 import { BodyEntry, type BodyEntryDoc } from "../../models/body";
 import { Goal, invalidateAllWeeklyReports, toGoalDTO, type GoalDoc } from "../../models/goal";
+import { Program, toProgramDTO } from "../../models/program";
 import { User, toUserDTO } from "../../models/user";
 import { createBodyEntry, updateBodyEntry } from "../body/body.service";
 import { createGoal } from "../body/goals.service";
+import { fullCatalog } from "../training/service";
+
+/**
+ * T8 — the account's program after onboarding. An account that already has one keeps it untouched
+ * (a coach may have assigned it, and a repeated call must not reset the cycle); otherwise, when
+ * the flow told us how often and how long they train, it gets the starter program for that.
+ * Exercise muscles come from the live catalog by name; a name the catalog has lost is dropped
+ * rather than failing the whole first-run commit over one exercise.
+ */
+async function ensureStarterProgram(userId: Types.ObjectId, training: OnboardingTraining | null | undefined, now: Date): Promise<ProgramDTO | null> {
+  const existing = await Program.findOne({ userId });
+  if (existing) return toProgramDTO(existing);
+  if (!training) return null;
+
+  const starter = starterProgram({ daysPerWeek: training.daysPerWeek, level: trainingLevelForExperience(training.experience) });
+  const catalog = await fullCatalog();
+  const known = new Set(catalog.map((e) => exerciseKey(e.name)));
+  const input = starter.days.map((d) => ({ ...d, exercises: d.exercises.filter((e) => known.has(exerciseKey(e.name))) }));
+  const { days } = normalizeProgramInput(input, catalog, { mode: "cycle" });
+  const created = await Program.findOneAndUpdate(
+    { userId },
+    {
+      $setOnInsert: {
+        userId,
+        name: starter.name,
+        mode: "cycle",
+        days,
+        currentDayId: days[0]?.id ?? null,
+        currentIndex: 0,
+        cycleNumber: 1,
+        weekNumber: 1,
+        startedAt: now,
+        lastActionAt: now,
+        sourceTemplateId: null,
+      },
+    },
+    { upsert: true, returnDocument: "after" }
+  );
+  return created ? toProgramDTO(created) : null;
+}
 
 export async function onboardingRoutes(app: FastifyInstance, ctx: AppContext) {
   app.post("/onboarding", { preHandler: [app.authenticate], schema: { body: zOnboardingInput } }, async (req): Promise<OnboardingResponse> => {
@@ -59,9 +111,11 @@ export async function onboardingRoutes(app: FastifyInstance, ctx: AppContext) {
       goal = active ? toGoalDTO(active) : await createGoal(ctx, userId, input.goal);
     }
 
+    const program = await ensureStarterProgram(user._id, input.training, ctx.now());
+
     // Re-read: creating the measurement writes gender/height back onto the user.
     const fresh = await User.findById(userId);
     if (!fresh) throw new AppError(401, "AUTH_INVALID", "Kullanıcı bulunamadı");
-    return { user: toUserDTO(fresh), bodyEntry, goal };
+    return { user: toUserDTO(fresh), bodyEntry, goal, program };
   });
 }
