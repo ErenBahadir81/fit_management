@@ -212,7 +212,7 @@ export function ProgramEditor({ program, onClose }: { program: ProgramDTO; onClo
               {draft.days.length} gün
             </Text>
           </View>
-          <DayList days={draft.days} mode={draft.mode} canRemove={canRemoveDay(draft) || draft.days.length > 7 && draft.mode === "weekly"} onOpen={openDay} onMove={moveDay} onRemove={removeDay} />
+          <DayList days={draft.days} mode={draft.mode} canRemove={canRemoveDay(draft) || (draft.mode === "weekly" && draft.days.length > 7)} onOpen={openDay} onMove={moveDay} onRemove={removeDay} />
           {canAddDay(draft) ? (
             <View style={styles.addRow}>
               <Button label="Gün ekle" variant="secondary" icon="add" onPress={() => dispatch({ type: "add-day", kind: "strength" })} style={styles.grow} testID="editor-add-day" />

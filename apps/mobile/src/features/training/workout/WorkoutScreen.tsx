@@ -199,10 +199,11 @@ export function WorkoutScreen({ dayId = null, resumePlanned = false }: WorkoutSc
     [addSheet, dispatch]
   );
 
+  const plannedId = view?.current?.day?.id ?? null;
   const finish = useCallback(() => {
     if (!state) return;
     // A draft written before day ids existed only knows its position: today's planned day.
-    const id = state.dayId ?? view?.current?.day?.id;
+    const id = state.dayId ?? plannedId;
     if (!id) return;
     logDay.mutate({ dayId: id, resumePlanned: resumePlanned && Boolean(dayId), ...toCompleteInput(state, Date.now()) }, {
       onSuccess: ({ log }) => {
@@ -213,7 +214,7 @@ export function WorkoutScreen({ dayId = null, resumePlanned = false }: WorkoutSc
         leaveTimer.current = setTimeout(() => router.back(), SAVED_MS);
       },
     });
-  }, [dayId, finishSheet, logDay, resumePlanned, router, state, view?.current?.day?.id]);
+  }, [dayId, finishSheet, logDay, plannedId, resumePlanned, router, state]);
 
   const leave = useCallback(() => {
     if (state && hasAnything(state)) {

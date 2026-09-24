@@ -14,7 +14,6 @@ import {
   WEEKDAY_TITLES_TR,
   WEEKLY_DAY_COUNT,
   type CardioTargetDTO,
-  type DayDTO,
   type DayKind,
   type ExerciseDTO,
   type ExerciseMetric,

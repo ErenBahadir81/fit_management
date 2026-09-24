@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { exerciseNameKey, type ExerciseDTO, type ExerciseMetric, type MuscleDTO, type MuscleLoad } from "@fitfloow/core";
+import { exerciseNameKey, type ExerciseDTO, type ExerciseMetric, type ExerciseTargetDTO, type MuscleDTO, type MuscleLoad } from "@fitfloow/core";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
@@ -12,7 +12,6 @@ import { Text } from "../../../ui/Text";
 import { TextField } from "../../../ui/TextField";
 import { adHocTarget } from "../lib/editorDraft";
 import { useExerciseCatalog } from "../queries";
-import type { ExerciseTargetDTO } from "@fitfloow/core";
 
 export interface ExercisePickerProps {
   muscles: readonly MuscleDTO[];
