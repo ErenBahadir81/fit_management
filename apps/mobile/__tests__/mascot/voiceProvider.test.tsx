@@ -1,5 +1,5 @@
 import React from "react";
-import { Text as RNText } from "react-native";
+import { AppState, Text as RNText } from "react-native";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import * as Haptics from "expo-haptics";
 import { ThemeProvider } from "../../src/theme";
@@ -170,6 +170,41 @@ describe("Floo voice", () => {
     // Next visit: it was never seen, so it is said now.
     await r.rerender(ui(true, true));
     expect(screen.getByTestId("floo-bubble").props.accessibilityLabel).toBe("Floo: Bugün hedefini aştın.");
+  });
+
+  test("a line that arrives while the app is in the background waits for the foreground, beat and clock included", async () => {
+    const before = Object.getOwnPropertyDescriptor(AppState, "currentState");
+    Object.defineProperty(AppState, "currentState", { value: "background", configurable: true });
+    const onShow = jest.fn();
+    try {
+      await render(
+        <Harness>
+          <Sayer msg={{ text: "Hedefi aştın.", priority: "high", trigger: "overTarget", ttlMs: 1000, onShow }} />
+        </Harness>
+      );
+      await fireEvent.press(screen.getByTestId("say"));
+      expect(onShow).not.toHaveBeenCalled();
+      expect(Haptics.notificationAsync).not.toHaveBeenCalled();
+      // Its clock does not run while nobody can read it.
+      await act(async () => {
+        jest.advanceTimersByTime(1500);
+      });
+      expect(screen.getByTestId("floo-bubble")).toBeTruthy();
+
+      Object.defineProperty(AppState, "currentState", { value: "active", configurable: true });
+      const listeners = (AppState.addEventListener as jest.Mock).mock.calls.filter(([type]) => type === "change").map(([, fn]) => fn as (s: string) => void);
+      await act(async () => {
+        for (const fn of listeners) fn("active");
+      });
+      expect(onShow).toHaveBeenCalledTimes(1);
+      expect(Haptics.notificationAsync).toHaveBeenCalledWith("warning");
+      await act(async () => {
+        jest.advanceTimersByTime(1500);
+      });
+      expect(screen.queryByTestId("floo-bubble")).toBeNull();
+    } finally {
+      if (before) Object.defineProperty(AppState, "currentState", before);
+    }
   });
 
   test("tapping an idle Floo brings the last line back", async () => {
