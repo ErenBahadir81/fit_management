@@ -68,9 +68,9 @@ describe("GET /recovery", () => {
     const res = await t.app.inject({ method: "GET", url: "/api/v1/recovery", headers });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.muscles).toHaveLength(7);
-    expect(body.muscles[0]).toMatchObject({ key: "chest", name: "Göğüs", short: "Göğüs", color: "#EF6C6C", readiness: 100, status: "ready", lastTrainedAt: null, weeklySets: 0, weeklyTarget: { min: 15, max: 20 } });
-    expect(body.overall).toMatchObject({ readiness: 100, status: "ready", readyCount: 7, fatiguedCount: 0 });
+    expect(body.muscles).toHaveLength(17);
+    expect(body.muscles[0]).toMatchObject({ key: "chest", name: "Göğüs", short: "Göğüs", color: "#EF6C6C", readiness: 100, status: "ready", lastTrainedAt: null, weeklySets: 0, weeklyTarget: { min: 10, max: 15 } });
+    expect(body.overall).toMatchObject({ readiness: 100, status: "ready", readyCount: 17, fatiguedCount: 0 });
     expect(body.generatedAt).toBe(t.clock.now.toISOString());
     expect(() => zRecoveryView.parse(body)).not.toThrow();
   });
@@ -78,15 +78,15 @@ describe("GET /recovery", () => {
   it("follows the recovery curve from the real logs", async () => {
     const { user, headers } = await asUser(t);
     await givenSession(user._id, 0, [{ key: "chest", sets: 5 }]);
-    await givenSession(user._id, 12, [{ key: "legs", sets: 4 }]); // 24 h muscle at half time
+    await givenSession(user._id, 12, [{ key: "quads", sets: 4 }]); // 24 h muscle at half time
     await givenSession(user._id, 30, [{ key: "lats", sets: 5 }]); // fully recovered
 
     const body = (await t.app.inject({ method: "GET", url: "/api/v1/recovery", headers })).json();
     const by = Object.fromEntries(body.muscles.map((m: { key: string }) => [m.key, m]));
     expect(by.chest).toMatchObject({ readiness: 0, status: "fatigued", hoursSince: 0 });
-    expect(by.legs).toMatchObject({ readiness: 70, status: "recovering", hoursToFull: 12 });
+    expect(by.quads).toMatchObject({ readiness: 70, status: "recovering", hoursToFull: 12 });
     expect(by.lats).toMatchObject({ readiness: 100, status: "ready", weeklySets: 5 });
-    expect(body.overall).toMatchObject({ readyCount: 5, fatiguedCount: 1 }); // chest fatigued, legs recovering
+    expect(body.overall).toMatchObject({ readyCount: 15, fatiguedCount: 1 }); // chest fatigued, quads recovering
   });
 
   it("weighs the load of the exercise→muscle mapping", async () => {
@@ -132,14 +132,14 @@ describe("GET /training/stats", () => {
   it("buckets sessions into the user's weeks (Sunday start by default)", async () => {
     const { user, headers } = await asUser(t);
     await givenSession(user._id, 0, [{ key: "chest", sets: 5 }]);
-    await givenSession(user._id, 24, [{ key: "legs", sets: 4, load: 0.5 }]);
+    await givenSession(user._id, 24, [{ key: "quads", sets: 4, load: 0.5 }]);
     await givenSession(user._id, 8 * 24, [{ key: "chest", sets: 3 }]);
 
     const res = await t.app.inject({ method: "GET", url: "/api/v1/training/stats?weeks=3", headers });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.weeks.map((w: { weekKey: string }) => w.weekKey)).toEqual(["2026-08-23", "2026-08-30", "2026-09-06"]);
-    expect(body.weeks[2]).toMatchObject({ sessions: 2, sets: 9, volumeByMuscle: { chest: 5, legs: 2 } });
+    expect(body.weeks[2]).toMatchObject({ sessions: 2, sets: 9, volumeByMuscle: { chest: 5, quads: 2 } });
     expect(body.weeks[1]).toMatchObject({ sessions: 1, sets: 3 });
     expect(body.totalSessions).toBe(3);
     expect(body.streakDays).toBe(2);

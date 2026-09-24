@@ -5,6 +5,7 @@ import { Program, type ProgramDoc } from "../src/models/program";
 import { WorkoutLog } from "../src/models/workoutLog";
 import { WeeklyReportCache } from "../src/models/goal";
 import { EREN_DAYS, INCI_DAYS } from "../src/seed/data/index";
+import { MUSCLE_KEYS_V3 } from "../src/seed/data/muscles";
 import { zProgramView, zWorkoutLog, type DayDTO } from "@fitfloow/core";
 
 let t: TestApp;
@@ -66,7 +67,7 @@ describe("GET /program", () => {
     expect(body.schedule).toHaveLength(7);
     expect(body.schedule[0]).toMatchObject({ dateKey: TODAY, isToday: true, status: "today" });
     expect(body.schedule.map((s: { day: DayDTO }) => s.day.order)).toEqual([3, 4, 5, 6, 7, 1, 2]);
-    expect(body.weeklyVolume.map((v: { key: string }) => v.key)).toEqual(["chest", "frontDelt", "sideDelt", "traps", "lats", "legs", "abs"]);
+    expect(body.weeklyVolume.map((v: { key: string }) => v.key)).toEqual(MUSCLE_KEYS_V3);
     expect(body.weeklyVolume[0]).toMatchObject({ key: "chest", done: 0, status: "none", zone: "none", target: { min: 10, max: 15 } });
     expect(body.plannedVolume.cycleLength).toBe(7);
     expect(body.plannedVolume.muscles.find((m: { key: string }) => m.key === "chest")).toMatchObject({ weekly: 17, zone: "optimal" });

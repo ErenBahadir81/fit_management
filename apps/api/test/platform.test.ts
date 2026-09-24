@@ -35,7 +35,7 @@ describe("catalog (user facing)", () => {
     const res = await t.app.inject({ method: "GET", url: `${API}/muscles`, headers });
     expect(res.statusCode).toBe(200);
     const muscles = res.json().muscles as Array<{ key: string; order: number; active: boolean }>;
-    expect(muscles).toHaveLength(7);
+    expect(muscles).toHaveLength(17);
     expect(muscles.every((m) => m.active)).toBe(true);
     expect(muscles.map((m) => m.order)).toEqual([...muscles.map((m) => m.order)].sort((a, b) => a - b));
     expect(muscles[0].key).toBe("chest");

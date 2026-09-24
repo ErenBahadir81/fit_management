@@ -4,6 +4,7 @@ import { User } from "../models/user";
 import { Muscle } from "../models/muscle";
 import { Exercise } from "../models/exercise";
 import { Program, ProgramTemplate, plainDays } from "../models/program";
+import { upgradeMusclesToV3 } from "./catalogV3";
 import { WorkoutLog } from "../models/workoutLog";
 import { BodyEntry } from "../models/body";
 import { DietTarget } from "../models/nutrition";
@@ -128,6 +129,7 @@ async function ensureCatalogs(report: SeedReport): Promise<void> {
     await Muscle.insertMany(SEED_MUSCLES);
     report.created.muscles += SEED_MUSCLES.length;
   }
+  report.created.muscles += await upgradeMusclesToV3();
   if ((await Exercise.countDocuments()) === 0) {
     await Exercise.insertMany(SEED_EXERCISES.map((e) => ({ ...e, nameKey: exerciseNameKey(e.name) })));
     report.created.exercises += SEED_EXERCISES.length;
