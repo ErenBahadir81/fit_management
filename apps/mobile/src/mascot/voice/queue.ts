@@ -2,8 +2,7 @@
  * Floo's message queue: pure data, no React. One bubble shows at a time; the rest wait in priority
  * order. Everything here is deterministic given `now`, so the rules can be tested without timers.
  */
-import type { FlooMood as Mood } from "../moods";
-import type { Trigger } from "../model/params";
+import type { Mood as FlooMood, Trigger as FlooTrigger } from "../model";
 
 export type FlooPriority = "low" | "normal" | "high" | "urgent";
 
@@ -14,13 +13,19 @@ export interface FlooAction {
   onPress: () => void;
 }
 
-/** What a caller hands to `say()`. Only `text` is required. */
+/**
+ * What a caller hands to `say()`. Only `text` is required.
+ *
+ * Moods and triggers are the Floo 3 model's own (`model/params.ts`), because that is what the
+ * corner draws. A mood from the API (`@fitfloow/core`'s ten, e.g. `cheer`, `flex`) goes through
+ * `toFlooMood` first.
+ */
 export interface FlooMessage {
   text: string;
   /** Face while the bubble is up. Defaults by priority (warnings look worried, the rest happy). */
-  mood?: Mood;
+  mood?: FlooMood;
   /** One-shot animation fired when the bubble appears. Any name the model knows. */
-  trigger?: Trigger;
+  trigger?: FlooTrigger;
   priority?: FlooPriority;
   /** One button in the bubble. Pressing it runs `onPress` and dismisses the bubble. */
   action?: FlooAction;
@@ -33,16 +38,22 @@ export interface FlooMessage {
   ttlMs?: number | null;
   /** Tone of the bubble's accent: `warning` for anything the user should act on. */
   tone?: "neutral" | "warning" | "success";
+  /**
+   * Called each time the line actually comes on screen (not when it is queued: a waiting line can
+   * still be dropped unseen). Must be idempotent.
+   */
+  onShow?: () => void;
 }
 
 export interface QueuedMessage extends Required<Pick<FlooMessage, "text" | "priority">> {
   id: string;
-  mood: Mood;
-  trigger?: Trigger;
+  mood: FlooMood;
+  trigger?: FlooTrigger;
   action?: FlooAction;
   dedupeKey?: string;
   ttlMs: number | null;
   tone: "neutral" | "warning" | "success";
+  onShow?: () => void;
   /** Insertion order, the tie-break inside one priority (FIFO). */
   seq: number;
   createdAt: number;
@@ -74,10 +85,10 @@ export function readingTime(text: string, hasAction: boolean): number {
   return hasAction ? base + 2500 : base;
 }
 
-function defaultMood(m: FlooMessage): Mood {
+function defaultMood(m: FlooMessage): FlooMood {
   if (m.mood) return m.mood;
   if (m.tone === "warning" || m.priority === "high" || m.priority === "urgent") return "worried";
-  if (m.tone === "success") return "cheer";
+  if (m.tone === "success") return "celebrate";
   return "happy";
 }
 
@@ -99,6 +110,7 @@ export function normalize(m: FlooMessage, id: string, seq: number, now: number):
     dedupeKey: m.dedupeKey,
     ttlMs: m.ttlMs === undefined ? readingTime(m.text, Boolean(m.action)) : m.ttlMs,
     tone: defaultTone(withPriority),
+    onShow: m.onShow,
     seq,
     createdAt: now,
   };
@@ -127,6 +139,14 @@ export function enqueue(state: QueueState, msg: FlooMessage, id: string, now: nu
   // Same key already on screen: refresh its words in place rather than repeating the beat.
   if (q.dedupeKey && state.current?.dedupeKey === q.dedupeKey) {
     return { ...state, seq, current: { ...state.current, text: q.text, mood: q.mood, tone: q.tone, action: q.action } };
+  }
+  // Same key still waiting: the newcomer takes its place in line and keeps its age, so a screen
+  // that says its line again on every visit neither loses its turn nor escapes going stale. One
+  // that already went stale is simply replaced by the fresh line.
+  const waiting = q.dedupeKey ? state.pending.find((p) => p.dedupeKey === q.dedupeKey) : undefined;
+  if (waiting && now - waiting.createdAt <= STALE_MS) {
+    q.seq = waiting.seq;
+    q.createdAt = waiting.createdAt;
   }
   const pending = q.dedupeKey ? state.pending.filter((p) => p.dedupeKey !== q.dedupeKey) : [...state.pending];
 

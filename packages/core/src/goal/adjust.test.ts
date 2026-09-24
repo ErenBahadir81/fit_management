@@ -341,29 +341,33 @@ describe("proposeGoalAdjustment — bulk", () => {
 });
 
 describe("proposeGoalAdjustment — recomp", () => {
-  it("losing weight much faster than planned → raiseCalories (protect muscle)", () => {
+  // A recomp is judged on body-fat measurements (recomp.test.ts); the scale alone never proposes.
+  it("losing weight much faster than planned proposes nothing without body-fat data", () => {
     const pts = weighIns(recompGoal, 35, (d) => -0.05 * d);
-    const p = propose(recompGoal, pts, 35)!;
-    expect(p.kind).toBe("ahead");
-    expect(p.options[0].action).toBe("raiseCalories");
-    expect(p.options[0].after!.dailyCalorieTarget).toBeGreaterThan(p.before.dailyCalorieTarget);
-    expect(p.options[1].action).toBe("replan");
+    expect(computeGoalProgress(recompGoal, pts, [], [], day(35), S).onTrack).toBe("onTrack");
+    expect(propose(recompGoal, pts, 35)).toBeNull();
   });
 
-  it("flat weight is not a stall on a recomp: it reads as 'behind' the slow planned drift", () => {
-    const p = propose(recompGoal, flat(85, 35), 35)!;
-    expect(p.kind).toBe("behind");
-    expect(p.options[0].action).toBe("lowerCalories");
-    expect(p.options[1].labelTr).toContain("güncelle");
-    expect(p.messageTr).toContain("üstünde");
+  it("flat weight is neither a stall nor 'behind' on a recomp", () => {
+    expect(computeGoalProgress(recompGoal, flat(85, 35), [], [], day(35), S).onTrack).toBe("onTrack");
+    expect(propose(recompGoal, flat(85, 35), 35)).toBeNull();
   });
 
-  it("reached on body fat, not weight", () => {
-    const pts = flat(85, 10);
-    const progress = { ...computeGoalProgress(recompGoal, pts, [{ dateKey: day(10), weightKg: 85, bodyFatPct: 14.8 }], [], day(10), S) };
-    const p = proposeGoalAdjustment({ goal: recompGoal, progress, weighIns: pts, todayKey: day(10), replanBase: baseFrom(recompGoal, pts), settings: S })!;
+  it("reached on body fat, not weight (three weeks of readings at the target)", () => {
+    const pts = flat(85, 14);
+    const body = [
+      { dateKey: day(0), weightKg: 85, bodyFatPct: 20 },
+      { dateKey: day(7), weightKg: 85, bodyFatPct: 15.1 },
+      { dateKey: day(14), weightKg: 85, bodyFatPct: 14.8 },
+    ];
+    const progress = computeGoalProgress(recompGoal, pts, body, [], day(14), S);
+    const p = proposeGoalAdjustment({ goal: recompGoal, progress, weighIns: pts, bodyEntries: body, todayKey: day(14), replanBase: baseFrom(recompGoal, pts), settings: S })!;
     expect(p.kind).toBe("reached");
     expect(p.options.map((o) => o.action)).toEqual(["complete"]);
+    // one low reading alone is not enough
+    const single = [body[0], body[2]];
+    const one = computeGoalProgress(recompGoal, pts, single, [], day(14), S);
+    expect(proposeGoalAdjustment({ goal: recompGoal, progress: one, weighIns: pts, bodyEntries: single, todayKey: day(14), replanBase: baseFrom(recompGoal, pts), settings: S })).toBeNull();
   });
 });
 

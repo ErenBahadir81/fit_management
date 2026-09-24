@@ -18,6 +18,8 @@ export { ewmaTrend, ewmaAt, ewmaChange, ewmaSlopePerWeek, latestTrendWeight, wei
 export type { WeightPoint, WeightTrendPoint, EwmaSettings } from "./ewma";
 
 export {
+  bodyFatTrend,
+  smoothedBodyFat,
   computeGoalProgress,
   expectedAtDay,
   roadmapWeekAt,
@@ -28,7 +30,7 @@ export {
   ON_TRACK_TOLERANCE_KG,
   STALL_THRESHOLD_KG,
 } from "./progress";
-export type { GoalLike, BodyPoint } from "./progress";
+export type { GoalLike, BodyPoint, BodyFatTrend, ExpectedBody } from "./progress";
 
 export { recalibrateTdee, isLogged } from "./recalibrate";
 export type { RecalibrationInput, DayIntake } from "./recalibrate";

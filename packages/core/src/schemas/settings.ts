@@ -96,6 +96,44 @@ export const DEFAULT_ADAPTIVE_SETTINGS = {
   /** Bulk: observed gain above this × plan → too fast (extra is fat); below `bulkSlowRatio` × plan → too slow. */
   bulkFastRatio: 1.5,
   bulkSlowRatio: 0.5,
+  /*
+   * Recomp: judged on tape measurements (body fat and the lean mass derived from it), never on
+   * weight. Sources and the calibration simulation: docs/research/muscle-gain-science.md §8.
+   */
+  /**
+   * Noise floor of one body-fat reading, points (1 SD). Navy tape: trained observers agree within
+   * ±1 point (Hodgdon & Friedl, via Potter 2022 / Foulis 2023); self-measured tape errors (Barrios
+   * 2016: waist 1.9 cm, neck 0.6 cm) carry through the Navy equation as ≈ 1.5 points for a man and
+   * ≈ 1.1 for a woman. The person's own scatter is used instead when it is larger.
+   */
+  bfNoisePts: 1.5,
+  /** The body-fat level must also be at least this far off the plan, the same way (tape reproducibility). */
+  bfTolerancePts: 1,
+  /** The lean-mass level must also be at least this far below the plan (≈ 1 point of body fat at 85–100 kg). */
+  leanToleranceKg: 1,
+  /**
+   * The pace gap (observed minus planned change a week, which the plan's noisy start reading cannot
+   * bias) must exceed this many standard errors. Simulated over a whole 18-week recomp with weekly
+   * readings and a noisy start reading: no proposal for people on plan at 1-point tape noise, ≈ 5 %
+   * at 1.6 points; a full stall caught in ≈ 99 % of cases, typically around week 13 (a two-scan LSC
+   * uses 2.77 × the precision error, Slart 2024).
+   */
+  bfConfidenceZ: 2.25,
+  /** A verdict needs readings in this many weeks (a week counts once, as the mean of its readings) … */
+  bfMinMeasurements: 3,
+  /** … spanning at least this many days (Helms / MacroFactor: judge after ≥ 3 weeks) … */
+  bfMinSpanDays: 21,
+  /** … the latest no older than this (a weekly or fortnightly tape habit keeps it fresh). */
+  bfMaxAgeDays: 14,
+  /**
+   * Readings older than this before today are left out. Long, because at ±1.5 points a pace gap of
+   * 0.3 points a week needs 10+ readings to stand out; the plan (re)start bounds it anyway.
+   */
+  bfWindowDays: 112,
+  /** Body fat falling slower than this (points a week) is "stalled" rather than just "behind". */
+  bfStallPtsPerWeek: 0.05,
+  /** Day-to-day scale noise, % of bodyweight (Orsama 2014), added to the lean-mass noise. */
+  weighInNoisePctBw: 0.5,
 } as const;
 
 export const zAdaptiveSettings = z.object({
@@ -105,7 +143,25 @@ export const zAdaptiveSettings = z.object({
   kcalStep: z.number().min(25).max(500),
   bulkFastRatio: z.number().min(1).max(4),
   bulkSlowRatio: z.number().min(0).max(1),
-});
+  /* Recomp body-fat judgement — defaulted one by one so adaptive blocks stored before them still parse. */
+  bfNoisePts: z.number().min(0.2).max(5).default(DEFAULT_ADAPTIVE_SETTINGS.bfNoisePts),
+  bfTolerancePts: z.number().min(0).max(5).default(DEFAULT_ADAPTIVE_SETTINGS.bfTolerancePts),
+  leanToleranceKg: z.number().min(0).max(5).default(DEFAULT_ADAPTIVE_SETTINGS.leanToleranceKg),
+  bfConfidenceZ: z.number().min(1).max(4).default(DEFAULT_ADAPTIVE_SETTINGS.bfConfidenceZ),
+  /** A line through fewer than three weekly readings has no scatter left to judge the noise by. */
+  bfMinMeasurements: z.number().int().min(3).max(20).default(DEFAULT_ADAPTIVE_SETTINGS.bfMinMeasurements),
+  bfMinSpanDays: z.number().int().min(7).max(112).default(DEFAULT_ADAPTIVE_SETTINGS.bfMinSpanDays),
+  bfMaxAgeDays: z.number().int().min(1).max(56).default(DEFAULT_ADAPTIVE_SETTINGS.bfMaxAgeDays),
+  /** At most 140 days: the home and weekly reports load ≥ 150 days of history, the goal view 200. */
+  bfWindowDays: z.number().int().min(21).max(140).default(DEFAULT_ADAPTIVE_SETTINGS.bfWindowDays),
+  bfStallPtsPerWeek: z.number().min(0).max(1).default(DEFAULT_ADAPTIVE_SETTINGS.bfStallPtsPerWeek),
+  weighInNoisePctBw: z.number().min(0).max(3).default(DEFAULT_ADAPTIVE_SETTINGS.weighInNoisePctBw),
+})
+  // Readings are only kept inside the window, so a longer span or age could never be satisfied.
+  .refine((s) => s.bfMinSpanDays <= s.bfWindowDays && s.bfMaxAgeDays <= s.bfWindowDays && (s.bfMinMeasurements - 1) * 7 <= s.bfWindowDays, {
+    message: "bfMinSpanDays, bfMaxAgeDays and bfMinMeasurements weeks must fit inside bfWindowDays",
+    path: ["bfWindowDays"],
+  });
 export type AdaptiveSettings = z.infer<typeof zAdaptiveSettings>;
 
 export const zRateBand = z.object({
