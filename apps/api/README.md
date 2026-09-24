@@ -28,7 +28,8 @@ database. Swagger UI is mounted at `/docs` in development only.
 | `CORS_ORIGINS` | admin + expo dev hosts | comma separated, `*` allowed |
 | `VISION_URL` / `VISION_MOCK` | `http://127.0.0.1:8100` / 0 | `VISION_MOCK=1` → deterministic fake detections |
 | `UPLOAD_DIR` | `./uploads` | scan images |
-| `SEED_ON_BOOT` | 1 | runs `runSeed()` after connecting |
+| `SEED_ON_BOOT` | 1 (0 in production) | runs `runSeed()` after connecting |
+| `SEED_ADMIN_PASSWORD` / `SEED_USER_PASSWORD` | dev default (unset in production) | passwords for the `eren` / `inci` seed accounts; in production an unset one skips that account, and a set one must be ≥ 12 chars |
 | `COOKIE_SECURE` | 0 | set to 1 behind HTTPS |
 
 ## Layout
@@ -82,8 +83,11 @@ Admin routes use `preHandler: [app.requireAdmin]` (403 `FORBIDDEN` for users), u
 destructive** — every step is skipped when its data already exists, and it returns a `SeedReport` of what it
 created/migrated.
 
-1. users: `eren` (admin, male, 178 cm) and `inci` (user, female) with the v1 default password `Asd*123`;
-   drops the legacy `passwordPlain` field and backfills `activityLevel` / `measurementDay` / `mascotEnabled`.
+1. users: `eren` (admin, male, 178 cm) and `inci` (user, female), created only for the passwords passed in
+   `SeedOptions` (`seedOptionsFromConfig(config)`: `SEED_ADMIN_PASSWORD` / `SEED_USER_PASSWORD`, falling back to a
+   dev-only default outside production; `runSeed()` with no options creates no accounts). In production it also
+   reports existing seed accounts that still accept the dev default password. Drops the legacy `passwordPlain`
+   field and backfills `activityLevel` / `measurementDay` / `mascotEnabled`.
 2. catalogs (insert only when the collection is empty): muscles, exercises, program templates, mascot
    messages, plus the settings singleton (`_id: "global"`).
 3. programs: creates one from the matching template for eren/inci when they have none; an existing program is

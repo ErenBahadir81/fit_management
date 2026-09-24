@@ -34,9 +34,18 @@ pnpm dev:vision                 # http://localhost:8100 (model yoksa VISION_MOCK
 pnpm dev:admin                  # http://localhost:3000
 pnpm dev:mobile                 # Expo (EXPO_PUBLIC_API_URL=http://<ip>:4000/api/v1)
 bash scripts/dev-all.sh         # hepsi birden
-docker compose up               # mongo + api + vision + admin
+cp .env.example .env && docker compose up   # mongo (auth açık) + api + vision + admin; önce .env'deki sırları doldur
 ```
-Seed kullanıcıları: **eren** (admin) ve **inci** — şifre `Asd*123`. Seed/migration her açılışta idempotent çalışır (`SEED_ON_BOOT`), v1 verileri korunur.
+Seed kullanıcıları **eren** (admin) ve **inci**. Geliştirmede (`NODE_ENV` production değilken) şifreleri `SEED_ADMIN_PASSWORD` /
+`SEED_USER_PASSWORD` verilmezse koddaki geliştirme varsayılanıdır (`apps/api/src/seed/index.ts`). **Production'da** varsayılan şifre
+hiç kullanılmaz: şifresi verilmeyen hesap oluşturulmaz, verilen şifre en az 12 karakter olmalı ve `SEED_ON_BOOT` varsayılan olarak
+kapalıdır. Seed/migration idempotent çalışır, v1 verileri korunur.
+
+**Production notu:** MongoDB yalnızca `127.0.0.1:27017`'de yayınlanır ve kimlik doğrulama zorunludur; API, `deploy/mongo-init`
+ile oluşturulan ve yalnızca `fitfloow` veritabanında `readWrite` yetkisi olan kullanıcıyla bağlanır. Bu kullanıcılar yalnızca
+`mongo-data` volume'u ilk oluşturulurken yaratılır: auth'suz eski bir volume varsa kullanıcıları elle oluştur (ya da veriyi
+taşıyıp volume'u yenile). Mevcut bir veritabanında eren/inci hâlâ eski varsayılan şifreyi kullanıyorsa API açılışta uyarı loglar;
+şifreyi uygulamadan değiştir.
 
 ## Test
 ```bash
