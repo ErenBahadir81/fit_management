@@ -351,6 +351,17 @@ describe("exercise catalog sync (activation v1)", () => {
     expect((await Exercise.findOne({ name: "Kendi Hareketim" }).lean())!.slug ?? null).toBeNull();
   });
 
+  it("does not bring back a v1 exercise an admin deleted or renamed before the sync", async () => {
+    await givenLegacyCatalog();
+    await Exercise.deleteOne({ name: "HSPU" });
+    await Exercise.updateOne({ name: "Row" }, { $set: { name: "Tek Kol Row", nameKey: "tek kol row" } });
+    const report = await runSeed(DEV_SEED);
+    expect(await Exercise.exists({ name: "HSPU" })).toBeNull();
+    expect(await Exercise.exists({ name: "Row" })).toBeNull();
+    expect(report.created.exercises).toBe(143 - 20);
+    expect(await Exercise.countDocuments()).toBe(143 - 1);
+  });
+
   it("upgrades a legacy row whose muscles are still v1 strings", async () => {
     await givenLegacyCatalog();
     await Exercise.collection.updateOne({ name: "Squat" }, { $set: { muscles: ["legs"] } });

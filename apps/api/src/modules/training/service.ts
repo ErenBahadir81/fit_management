@@ -4,6 +4,7 @@ import {
   buildCardioEntry,
   ensureDayIds,
   exerciseNameKey,
+  normalizeMuscleLoads,
   pointerOf,
   trDateKey,
   weekKeyFor,
@@ -101,16 +102,11 @@ export async function invalidateWeeks(userId: string | Types.ObjectId, dateKeys:
 
 type StrengthInput = CompleteWorkoutInput["strength"][number];
 
-/** Plain `{key, load}` pairs (also from Mongoose subdocuments), a missing load counting in full. */
-function plainLoads(list: ReadonlyArray<{ key: string; load?: number }> | undefined): Array<{ key: string; load: number }> {
-  return (list ?? []).map((m) => ({ key: m.key, load: m.load ?? 1 }));
-}
-
 /**
  * Resolves a logged exercise into a self-contained entry. Muscles come from:
- * the entry being edited (`previous`) — a past log keeps the loads it was logged with, so an admin
- * revision never rewrites history — → the catalog, when it knows the exercise (even with no
- * muscles) → the payload → the planned day. Clients send the program's snapshot for planned
+ * the entry being edited (`previous`) for catalog exercises — a past log keeps the loads it was
+ * logged with, so an admin revision never rewrites history — → the catalog, when it knows the
+ * exercise (even with no muscles) → the payload → the planned day. Clients send the program's snapshot for planned
  * exercises, so the catalog has to win for an admin's activation edit to reach the next log; it is
  * the same rule `programVolume` uses for planned volume. Ad-hoc exercises keep what the client sent.
  * Planned targets come from the payload → the entry being edited (`previous`, B6) → the
@@ -140,8 +136,11 @@ export function buildStrengthEntries(
           ? { targetSets: planEx.targetSets, targetReps: planEx.targetReps, targetRIR: planEx.targetRIR, muscles: planEx.muscles, metric: planEx.metric }
           : null;
     const cat = catalog.get(key) ?? null;
-    const fromCatalog = cat ? plainLoads(cat.muscles) : null;
-    const muscles = prev ? plainLoads(prev.muscles) : (fromCatalog ?? (raw.muscles !== undefined ? raw.muscles : (plan?.muscles ?? [])));
+    const fromCatalog = cat ? normalizeMuscleLoads(cat.muscles) : null;
+    const fromClient = raw.muscles !== undefined ? raw.muscles : null;
+    // A catalog exercise already in the log keeps its logged loads; an ad-hoc one takes the client's fix.
+    const kept = prev ? (cat ? normalizeMuscleLoads(prev.muscles) : (fromClient ?? normalizeMuscleLoads(prev.muscles))) : null;
+    const muscles = kept ?? fromCatalog ?? fromClient ?? plan?.muscles ?? [];
     const skipped = raw.skipped ?? false;
     const sets: SetEntryDTO[] = skipped ? [] : (raw.sets ?? []).slice(0, 40);
     return {

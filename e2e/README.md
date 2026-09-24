@@ -48,5 +48,5 @@ history list and the program editor button by button. Extra regressions it guard
 `legs`, fractional loads) reaches the admin panel, that a pair's literature value, confidence and
 sources are readable next to its editable load, that an edited load (typed off the 0.05 grid, then
 snapped) survives a reload, and that "Literatür değerlerine dön" restores every value. It edits and
-then restores `Barbell Bench Press`, so it leaves the database as it found it.
+then puts `Barbell Bench Press` back exactly as it found it (also when a step fails).
 `E2E_COLOR_SCHEME=dark` runs it in dark mode; `E2E_SHOTS=<dir>` writes a screenshot per step.

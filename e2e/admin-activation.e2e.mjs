@@ -40,12 +40,11 @@ const api = (path, method = "GET", body) =>
     { url: `/api/v1${path}`, method, body }
   );
 
-/** Puts the exercise back on its literature values, so a failed run never poisons the next one. */
-async function restoreLiterature(id) {
-  const { reference } = await api(`/admin/exercises/${id}`);
-  await api(`/admin/exercises/${id}`, "PATCH", { muscles: reference.muscles.map(({ key, load }) => ({ key, load })) });
+/** Puts the exercise back exactly as the run found it (e.g. gym-revised loads), even after a failure. */
+let original = null;
+async function restoreOriginal() {
+  if (original) await api(`/admin/exercises/${original.id}`, "PATCH", { muscles: original.muscles });
 }
-let editedId = null;
 
 async function openDialog() {
   await p.getByRole("button", { name: `${NAME} düzenle`, exact: true }).click();
@@ -83,7 +82,7 @@ try {
   await shot("exercise-dialog-literature", dialog);
 
   // Edit: type a value off the grid, commit, save.
-  editedId = bench.id;
+  original = { id: bench.id, muscles: bench.muscles };
   await chest.fill("0,83");
   await chest.press("Tab");
   check("exercises/dialog", "a typed load snaps to the 0.05 grid", (await chest.inputValue()) === "0,85");
@@ -113,11 +112,10 @@ try {
   const reference = (await api(`/admin/exercises/${bench.id}`)).reference.muscles.map(({ key, load }) => ({ key, load }));
   const byKey = (list) => JSON.stringify([...list].sort((a, b) => a.key.localeCompare(b.key)));
   check("exercises/restore", "one click restores every literature value", byKey(restored) === byKey(reference));
-  editedId = null;
 } catch (e) {
   rec.fail("exception", e instanceof Error ? e.message : String(e));
 } finally {
-  if (editedId) await restoreLiterature(editedId).catch((e) => rec.fail("cleanup", `could not restore ${NAME}: ${e}`));
+  await restoreOriginal().catch((e) => rec.fail("cleanup", `could not restore ${NAME}: ${e}`));
   await h.close();
 }
 

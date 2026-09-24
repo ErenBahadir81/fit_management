@@ -104,7 +104,9 @@ async function addAndUpgradeExercises(): Promise<Pick<CatalogSyncResult, "added"
   for (const row of SEED_EXERCISES) {
     const doc = bySlug.get(row.slug) ?? byName.get(exerciseNameKey(row.name));
     if (!doc) {
-      missing.push(row);
+      // A v1 exercise missing from a database that already has a catalog was deleted or renamed
+      // by an admin before this sync: bringing it back would undo that edit.
+      if (docs.length === 0 || !LEGACY_BY_KEY.has(exerciseNameKey(row.name))) missing.push(row);
       continue;
     }
     const set: Record<string, unknown> = {};
@@ -196,7 +198,8 @@ async function refreshSnapshots(): Promise<number> {
  * insert-only-when-empty, so a database that has the 20 legacy exercises would never see the other
  * 123, and its legacy rows would keep counting every set in full (`legs` included).
  *
- * - adds every catalog exercise that no row matches by slug or name (`nameKey` folding),
+ * - adds every catalog exercise that no row matches by slug or name (`nameKey` folding) — except
+ *   the v1 names on a database that already has a catalog (missing there = deleted/renamed by an admin),
  * - replaces `muscles` only on untouched legacy rows (see `isUntouchedLegacy`), never admin edits,
  * - links matched rows to their catalog slug (the admin panel shows the literature next to them),
  * - refreshes untouched legacy exercise snapshots in program templates and user programs with the

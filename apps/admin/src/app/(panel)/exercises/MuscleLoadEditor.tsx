@@ -21,7 +21,7 @@ interface Row {
   key: string;
   name: string;
   color: string;
-  /** Not one of the active muscles (e.g. the retired `legs`): shown only so it can be removed. */
+  /** Not one of the active muscles (e.g. the retired `legs`): shown only so it can be removed (read-only otherwise). */
   retired: boolean;
 }
 
@@ -166,6 +166,7 @@ function LoadRow({
         <button
           type="button"
           onClick={() => change(on ? null : (literature?.load ?? 1))}
+          disabled={row.retired && !on}
           aria-pressed={on}
           className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
@@ -176,6 +177,7 @@ function LoadRow({
 
         <input
           type="range"
+          disabled={row.retired}
           min={0}
           max={1}
           step={LOAD_STEP}
@@ -196,6 +198,7 @@ function LoadRow({
         <input
           type="text"
           inputMode="decimal"
+          disabled={row.retired}
           autoComplete="off"
           aria-label={`${row.name} yükü (sayı)`}
           aria-invalid={invalid || undefined}
@@ -203,7 +206,7 @@ function LoadRow({
           value={draft ?? (on ? formatLoad(value) : "")}
           placeholder="—"
           onChange={(e) => setDraft(e.target.value)}
-          onBlur={(e) => commit(e.target.value)}
+          onBlur={(e) => draft !== null && commit(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
