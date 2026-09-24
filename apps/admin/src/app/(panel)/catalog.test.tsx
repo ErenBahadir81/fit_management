@@ -67,6 +67,124 @@ describe("Exercises page", () => {
   });
 });
 
+describe("Exercise activation editing", () => {
+  async function openEditor(name: string) {
+    const user = userEvent.setup();
+    const harness = installFakeApi();
+    renderWithProviders(<ExercisesPage />);
+    await screen.findByText(name);
+    await user.click(screen.getByRole("button", { name: `${name} düzenle` }));
+    const dialog = await screen.findByRole("dialog", { name: /hareketi düzenle/i });
+    return { user, dialog, ...harness };
+  }
+  const saveButton = (dialog: HTMLElement) => within(dialog).getByRole("button", { name: /^kaydet$/i });
+  const musclesOf = (state: { exercises: Array<{ name: string; muscles: unknown }> }, name: string) =>
+    state.exercises.find((e) => e.name === name)?.muscles;
+
+  it("edits a load on the 0.05 grid and saves it", async () => {
+    const { user, dialog, state } = await openEditor("Bench Press");
+    const chest = within(dialog).getByRole("textbox", { name: "Göğüs yükü (sayı)" });
+    expect(chest).toHaveValue("1");
+    await user.clear(chest);
+    await user.type(chest, "0,83");
+    await user.tab(); // commit snaps to the grid
+    expect(chest).toHaveValue("0,85");
+    expect(within(dialog).getByRole("slider", { name: "Göğüs yükü" })).toHaveValue("0.85");
+
+    await user.click(saveButton(dialog));
+    await waitFor(() =>
+      expect(musclesOf(state, "Bench Press")).toEqual([
+        { key: "chest", load: 0.85 },
+        { key: "frontDelt", load: 0.5 },
+        { key: "triceps", load: 0.6 },
+      ])
+    );
+  });
+
+  it("steps with the arrow keys and keeps the previous value when the input is not a load", async () => {
+    const { user, dialog } = await openEditor("Bench Press");
+    const triceps = within(dialog).getByRole("textbox", { name: "Triceps yükü (sayı)" });
+    await user.click(triceps);
+    await user.keyboard("{ArrowUp}");
+    expect(triceps).toHaveValue("0,65");
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect(triceps).toHaveValue("0,55");
+
+    await user.clear(triceps);
+    await user.type(triceps, "1,5");
+    await user.tab();
+    expect(triceps).toHaveValue("0,55");
+  });
+
+  it("adds and removes muscle pairs across all 17 keys", async () => {
+    const { user, dialog, state } = await openEditor("Bench Press");
+    // Every active muscle has a row; the inactive v1 catch-all does not.
+    expect(within(dialog).getAllByRole("slider")).toHaveLength(state.muscles.filter((m) => m.active).length);
+
+    await user.click(within(dialog).getByRole("button", { name: "Karın", pressed: false }));
+    await user.click(within(dialog).getByRole("button", { name: "Triceps yükünü kaldır" }));
+    const abs = within(dialog).getByRole("textbox", { name: "Karın yükü (sayı)" });
+    await user.clear(abs);
+    await user.type(abs, "0,2");
+    await user.tab();
+
+    await user.click(saveButton(dialog));
+    await waitFor(() =>
+      expect(musclesOf(state, "Bench Press")).toEqual([
+        { key: "chest", load: 1 },
+        { key: "frontDelt", load: 0.5 },
+        { key: "abs", load: 0.2 },
+      ])
+    );
+  });
+
+  it("shows the literature value, confidence and sources read-only next to each muscle", async () => {
+    const { user, dialog } = await openEditor("Bench Press");
+    const chip = await within(dialog).findByRole("button", { name: /literatür değeri.*0,95.*yüksek güven/i });
+    expect(chip).toHaveAttribute("aria-expanded", "false");
+    await user.click(chip);
+    expect(chip).toHaveAttribute("aria-expanded", "true");
+
+    const sources = within(dialog).getByRole("list", { name: "Göğüs kaynakları" });
+    const links = within(sources).getAllByRole("link");
+    expect(links.map((a) => a.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("ExRx.net: Barbell Bench Press"), expect.stringContaining("StrengthLog: Bench Press")])
+    );
+    expect(links[0]).toHaveAttribute("target", "_blank");
+    expect(within(dialog).getByText(/8 tahmin/)).toBeInTheDocument();
+    // Read-only: the literature is text and links, never an input.
+    expect(within(sources).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("applies one literature value, or restores them all", async () => {
+    const { user, dialog, state } = await openEditor("Bench Press");
+    await user.click(await within(dialog).findByRole("button", { name: /literatür değeri.*0,6/i }));
+    await user.click(within(dialog).getByRole("button", { name: "Bu değeri uygula" }));
+    expect(within(dialog).getByRole("textbox", { name: "Ön Omuz yükü (sayı)" })).toHaveValue("0,6");
+
+    // Chest is 1 in the catalog but 0,95 in the literature: marked as revised.
+    expect(within(dialog).getByRole("button", { name: /literatür değeri.*0,95.*literatürden farklı/i })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: /literatür değerlerine dön/i }));
+    expect(within(dialog).getByRole("button", { name: /literatür değerlerine dön/i })).toBeDisabled();
+    expect(within(dialog).queryByRole("button", { name: /literatürden farklı/i })).not.toBeInTheDocument();
+    await user.click(saveButton(dialog));
+    await waitFor(() =>
+      expect(musclesOf(state, "Bench Press")).toEqual([
+        { key: "chest", load: 0.95 },
+        { key: "frontDelt", load: 0.6 },
+        { key: "biceps", load: 0.3 },
+        { key: "triceps", load: 0.5 },
+      ])
+    );
+  });
+
+  it("says so when an exercise has no literature reference", async () => {
+    const { dialog } = await openEditor("DB Fly");
+    expect(await within(dialog).findByText(/literatür değeri yok/i)).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /literatür değeri/i })).not.toBeInTheDocument();
+  });
+});
+
 describe("Mascot page", () => {
   async function renderPage() {
     const harness = installFakeApi();

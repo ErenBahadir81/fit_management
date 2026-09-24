@@ -40,3 +40,12 @@ history list and the program editor button by button. Extra regressions it guard
 - Note for anyone writing more of these: the query cache is persisted to localStorage and hydrated
   synchronously with a 30 s `staleTime`, so a plain reload repaints the old data without hitting the
   network. Drop `fitfloow\query.cache.v1` first when a test needs a real request (see `coldBoot`).
+
+## Exercise activation (`e2e/admin-activation.e2e.mjs`)
+
+`node e2e/admin-activation.e2e.mjs` checks that the seeded activation catalog (143 exercises, no
+`legs`, fractional loads) reaches the admin panel, that a pair's literature value, confidence and
+sources are readable next to its editable load, that an edited load (typed off the 0.05 grid, then
+snapped) survives a reload, and that "Literatür değerlerine dön" restores every value. It edits and
+then restores `Barbell Bench Press`, so it leaves the database as it found it.
+`E2E_COLOR_SCHEME=dark` runs it in dark mode; `E2E_SHOTS=<dir>` writes a screenshot per step.

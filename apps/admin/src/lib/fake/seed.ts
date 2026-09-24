@@ -13,6 +13,7 @@ import {
   trDateKey,
   type AdminUserDTO,
   type DayDTO,
+  type ExerciseActivationReference,
   type ExerciseDTO,
   type FoodDTO,
   type MascotTemplateDTO,
@@ -91,6 +92,47 @@ export const EXERCISES: ExerciseDTO[] = EX_SEED.map((e, i) => ({
   instructions: e.instructions ?? "",
   active: true,
 }));
+
+/**
+ * Literature references (activation data v1) for two demo exercises. The real API serves one for
+ * every seeded exercise; the fake keeps a sample so the dialog's read-only panel can be judged.
+ */
+const SRC = {
+  EXRX_BB_BENCH: { id: "EXRX_BB_BENCH", title: "ExRx.net: Barbell Bench Press", url: "https://exrx.net/WeightExercises/PectoralSternal/BBBenchPress", kind: "exrx", year: 2026 },
+  EXRX_BW_PUSHUP: { id: "EXRX_BW_PUSHUP", title: "ExRx.net: Push-up", url: "https://exrx.net/WeightExercises/PectoralSternal/BWPushup", kind: "exrx" },
+  ACE_CHEST_2012: { id: "ACE_CHEST_2012", title: "Schanke W, Porcari JP et al. ACE-sponsored research: Top 3 most effective chest exercises", url: "https://contentcdn.eacefitness.com/certifiednews/images/article/pdfs/ACE_BestChestExercises.pdf", kind: "emg", year: 2012 },
+  SAETERBAKKEN_2017: { id: "SAETERBAKKEN_2017", title: "Saeterbakken AH et al. The Effects of Bench Press Variations in Competitive Athletes on Muscle Activity and Performance. J Hum Kinet 2017", url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC5504579/", kind: "emg", year: 2017 },
+  SL_BENCH_PRESS: { id: "SL_BENCH_PRESS", title: "StrengthLog: Bench Press (primary/secondary muscles worked)", url: "https://www.strengthlog.com/bench-press/", kind: "volume-method", year: 2025 },
+  SL_PUSH_UP: { id: "SL_PUSH_UP", title: "StrengthLog: Push-Up (primary/secondary muscles worked)", url: "https://www.strengthlog.com/push-up/", kind: "volume-method", year: 2025 },
+  RP_FRONTDELT: { id: "RP_FRONTDELT", title: "RP Strength (Israetel). Front Delt Hypertrophy Training Tips", url: "https://rpstrength.com/blogs/articles/front-delt-hypertrophy-training-tips", kind: "volume-method", year: 2024 },
+} satisfies Record<string, ExerciseActivationReference["sources"][number]>;
+
+export const ACTIVATION_REFERENCES: Record<string, ExerciseActivationReference> = {
+  "Bench Press": {
+    version: "v1",
+    slug: "barbell-bench-press",
+    name: "Barbell Bench Press",
+    muscles: [
+      { key: "chest", load: 0.95, confidence: { level: "high", n: 8, spread: 0.24 }, sources: ["EXRX_BB_BENCH", "ACE_CHEST_2012", "SAETERBAKKEN_2017", "SL_BENCH_PRESS"] },
+      { key: "frontDelt", load: 0.6, confidence: { level: "low", n: 6, spread: 0.64 }, sources: ["EXRX_BB_BENCH", "RP_FRONTDELT", "SL_BENCH_PRESS"] },
+      { key: "triceps", load: 0.5, confidence: { level: "high", n: 4, spread: 0.04 }, sources: ["EXRX_BB_BENCH", "SL_BENCH_PRESS"] },
+      { key: "biceps", load: 0.3, confidence: { level: "low", n: 1, spread: 0 }, sources: ["EXRX_BB_BENCH"] },
+    ],
+    sources: [SRC.EXRX_BB_BENCH, SRC.ACE_CHEST_2012, SRC.SAETERBAKKEN_2017, SRC.SL_BENCH_PRESS, SRC.RP_FRONTDELT],
+  },
+  "Push-up": {
+    version: "v1",
+    slug: "push-up",
+    name: "Push-up",
+    muscles: [
+      { key: "chest", load: 0.8, confidence: { level: "medium", n: 4, spread: 0.39 }, sources: ["EXRX_BW_PUSHUP", "ACE_CHEST_2012", "SL_PUSH_UP"] },
+      { key: "frontDelt", load: 0.6, confidence: { level: "low", n: 4, spread: 0.68 }, sources: ["EXRX_BW_PUSHUP", "SL_PUSH_UP", "RP_FRONTDELT"] },
+      { key: "triceps", load: 0.4, confidence: { level: "medium", n: 3, spread: 0.32 }, sources: ["EXRX_BW_PUSHUP", "SL_PUSH_UP"] },
+      { key: "abs", load: 0.35, confidence: { level: "medium", n: 2, spread: 0.35 }, sources: ["EXRX_BW_PUSHUP", "SL_PUSH_UP"] },
+    ],
+    sources: [SRC.EXRX_BW_PUSHUP, SRC.ACE_CHEST_2012, SRC.SL_PUSH_UP, SRC.RP_FRONTDELT],
+  },
+};
 
 function ex(name: string, sets: number, reps: number, rir: number | null = 2) {
   const found = EXERCISES.find((e) => e.name === name);

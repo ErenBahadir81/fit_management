@@ -5,6 +5,7 @@ import { Pencil, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
 import type { ExerciseDTO } from "@fitfloow/core";
 import { useDebounced } from "@/hooks/useDebounced";
 import { num } from "@/lib/format";
+import { formatLoad } from "@/lib/muscleLoad";
 import { errorMessage, useDeleteExercise, useExercises, useMuscles } from "@/lib/queries";
 import { PageHeader } from "@/components/layout/PanelShell";
 import { Badge } from "@/components/ui/Badge";
@@ -53,7 +54,7 @@ export default function ExercisesPage() {
       <PageHeader
         eyebrow="Katalog"
         title="Hareketler"
-        description="Her hareketin kas yükleri haftalık hacim ve yenilenme hesabını besler. Yük 1 = tam, 0,5 = yarım."
+        description="Her hareketin kas yükleri haftalık hacim ve yenilenme hesabını besler. Yük 1 = tam set, 0,5 = yarım set; değerler literatür ortalamasıdır, salonda revize edilebilir."
         actions={
           <>
             <SearchInput value={query} onChange={setQuery} placeholder="Hareket veya ekipman…" className="w-56" />
@@ -118,7 +119,7 @@ export default function ExercisesPage() {
                               >
                                 <span aria-hidden className="size-1.5 rounded-full" style={{ background: muscle?.color ?? "var(--ff-text-subtle)" }} />
                                 <span className={muscle ? "text-muted" : "text-danger"}>{muscle?.short ?? m.key}</span>
-                                <span className="tnum text-subtle">{num(m.load, 1)}</span>
+                                <span className="tnum text-subtle">{formatLoad(m.load)}</span>
                               </span>
                             );
                           })}

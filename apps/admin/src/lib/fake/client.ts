@@ -36,7 +36,7 @@ import {
 } from "@fitfloow/core";
 import { computeGoalPlan } from "../goal-sim";
 import { templateVolume } from "../volume";
-import { CREDENTIALS, EXERCISES, FOODS, MASCOT_MESSAGES, MUSCLES, SCANS, SETTINGS, TEMPLATES, USERS, dashboardSeries, type FakeScan } from "./seed";
+import { ACTIVATION_REFERENCES, CREDENTIALS, EXERCISES, FOODS, MASCOT_MESSAGES, MUSCLES, SCANS, SETTINGS, TEMPLATES, USERS, dashboardSeries, type FakeScan } from "./seed";
 
 export interface FakeState {
   session: UserDTO | null;
@@ -636,6 +636,13 @@ export function createFakeApiClient(options: FakeOptions = {}): ApiClient {
             (!q?.muscle || e.muscles.some((m) => m.key === q.muscle))
         );
         return wait({ exercises });
+      },
+      exercise: async (id: string) => {
+        requireAdmin();
+        const exercise = state.exercises.find((e) => e.id === id);
+        if (!exercise) return notFound("Hareket");
+        const reference = ACTIVATION_REFERENCES[exercise.name] ?? null;
+        return wait({ exercise, reference: reference ? clone(reference) : null });
       },
       createExercise: async (input: ExerciseInput) => {
         requireAdmin();

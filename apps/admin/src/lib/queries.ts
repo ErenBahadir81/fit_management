@@ -24,6 +24,7 @@ export const qk = {
   userOverview: (id: string) => ["admin", "user", id, "overview"] as const,
   muscles: ["admin", "muscles"] as const,
   exercises: (q?: { q?: string; muscle?: string }) => ["admin", "exercises", q?.q ?? "", q?.muscle ?? ""] as const,
+  exercise: (id: string) => ["admin", "exercise", id] as const,
   templates: ["admin", "templates"] as const,
   template: (id: string) => ["admin", "template", id] as const,
   settings: ["admin", "settings"] as const,
@@ -53,6 +54,10 @@ export const useUserOverview = (id: string) => useQuery({ queryKey: qk.userOverv
 export const useMuscles = () => useQuery({ queryKey: qk.muscles, queryFn: () => api.admin.muscles() });
 
 export const useExercises = (q?: { q?: string; muscle?: string }) => useQuery({ queryKey: qk.exercises(q), queryFn: () => api.admin.exercises(q) });
+
+/** One exercise with the literature values it was seeded with (`reference`, read-only). */
+export const useExercise = (id: string | null) =>
+  useQuery({ queryKey: qk.exercise(id ?? ""), queryFn: () => api.admin.exercise(id as string), enabled: Boolean(id) });
 
 export const useTemplates = () => useQuery({ queryKey: qk.templates, queryFn: () => api.admin.templates() });
 
@@ -218,6 +223,7 @@ export function useSaveExercise(fb: MutationFeedback = {}) {
       id ? api.admin.updateExercise(id, input) : api.admin.createExercise(input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["admin", "exercises"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "exercise"] });
       fb.onDone?.();
     },
     onError: fb.onFail,
