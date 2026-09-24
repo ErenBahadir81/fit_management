@@ -38,6 +38,11 @@ export interface FlooMessage {
   ttlMs?: number | null;
   /** Tone of the bubble's accent: `warning` for anything the user should act on. */
   tone?: "neutral" | "warning" | "success";
+  /**
+   * Called each time the line actually comes on screen (not when it is queued: a waiting line can
+   * still be dropped unseen). Must be idempotent.
+   */
+  onShow?: () => void;
 }
 
 export interface QueuedMessage extends Required<Pick<FlooMessage, "text" | "priority">> {
@@ -48,6 +53,7 @@ export interface QueuedMessage extends Required<Pick<FlooMessage, "text" | "prio
   dedupeKey?: string;
   ttlMs: number | null;
   tone: "neutral" | "warning" | "success";
+  onShow?: () => void;
   /** Insertion order, the tie-break inside one priority (FIFO). */
   seq: number;
   createdAt: number;
@@ -104,6 +110,7 @@ export function normalize(m: FlooMessage, id: string, seq: number, now: number):
     dedupeKey: m.dedupeKey,
     ttlMs: m.ttlMs === undefined ? readingTime(m.text, Boolean(m.action)) : m.ttlMs,
     tone: defaultTone(withPriority),
+    onShow: m.onShow,
     seq,
     createdAt: now,
   };

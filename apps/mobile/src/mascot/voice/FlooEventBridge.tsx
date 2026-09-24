@@ -1,6 +1,6 @@
 import { describeFlooEvent, useFlooEvents, type FlooEvent } from "../events";
 import { useFloo } from "./FlooVoiceProvider";
-import { claimOnce } from "./useFlooOnce";
+import { claimOnce, wasSaid } from "./useFlooOnce";
 
 /**
  * Events already turned into a line. Module-wide on purpose: however many bridges end up mounted
@@ -21,27 +21,28 @@ const delivered = new WeakSet<FlooEvent>();
  *   history, so a remount can never say an old line again.
  * - With the mascot switched off, events stay silent: Floo's asides are not worth a toast, and the
  *   mutations behind them already confirm themselves.
- * - "Once" lines (a day that went over its target) share their memory with `useFlooOnce`, so the
- *   home screen does not repeat what the meal that crossed the line already said.
+ * - "Once" lines (today went over its target) share their memory with `useFlooOnce`, so the home
+ *   screen does not repeat what the meal that crossed the line already said, and vice versa.
  */
 export function FlooEventBridge(): null {
-  const { say, enabled, presence } = useFloo();
+  const { say, enabled } = useFloo();
   useFlooEvents((event) => {
     if (!enabled || delivered.has(event)) return;
     delivered.add(event);
     const line = describeFlooEvent(event);
-    if (line.once) {
-      // A fact about the day: leave it to the screen that shows the day when Floo cannot be seen.
-      if (presence === "hidden" || !claimOnce(line.key)) return;
-    }
+    // A fact about the day that was already told is not news. It is only marked as told once it is
+    // actually on screen: a waiting line can still be dropped unseen, and then the day stays open.
+    if (line.once && wasSaid(line.key)) return;
+    const key = line.key;
     say({
       text: line.text,
       mood: line.mood,
       trigger: line.trigger,
       priority: line.priority,
       tone: line.tone,
-      dedupeKey: line.key,
+      dedupeKey: key,
       ttlMs: line.ttlMs,
+      onShow: line.once ? () => void claimOnce(key) : undefined,
     });
   });
   return null;

@@ -99,8 +99,12 @@ export interface FlooLine {
   ttlMs: number;
 }
 
-/** The one key for "the day went over its calorie target", shared by the bus line and the home screen. */
-export const overTargetKey = (dateKey: string) => `overTarget:${dateKey}`;
+/**
+ * The one key for "the day went over its calorie target", shared by the bus line and the home
+ * screen. It keeps the home screen's original `home:over:<day>` spelling, so a warning already
+ * shown before this key was shared still counts as shown.
+ */
+export const overTargetKey = (dateKey: string) => `home:over:${dateKey}`;
 
 export const FLOO_LINE_MAX_CHARS = 60;
 

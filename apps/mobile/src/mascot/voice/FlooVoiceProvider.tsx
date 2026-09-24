@@ -117,10 +117,11 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
     [stopTimer]
   );
 
-  // A new message on screen: fire its beat, buzz for warnings, start its clock.
+  // A new message on screen: tell its sender, fire its beat, buzz for warnings, start its clock.
   useEffect(() => {
     stopTimer();
     if (!current) return;
+    current.onShow?.();
     if (current.trigger) setReaction({ name: current.trigger, key: ++reactKey.current });
     if (current.tone === "warning") void haptic.warning();
     else if (current.tone === "success") void haptic.success();

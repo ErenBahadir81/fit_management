@@ -157,6 +157,8 @@ describe("describeFlooEvent", () => {
   test("going over target is a fact about a day: keyed by that day and said once", () => {
     const line = describeFlooEvent(ev("overTarget", { overKcal: 150, dateKey: "2026-09-24" }));
     expect(line.key).toBe(overTargetKey("2026-09-24"));
+    // The home screen's original spelling: a warning shown before the key was shared still counts.
+    expect(overTargetKey("2026-09-24")).toBe("home:over:2026-09-24");
     expect(line.once).toBe(true);
     // Without a day there is nothing to remember it by: an ordinary line.
     expect(describeFlooEvent(ev("overTarget", { overKcal: 150 })).once).toBeFalsy();
@@ -214,6 +216,20 @@ describe("data layer emits", () => {
     });
     await waitFor(() => expect(emit).toHaveBeenCalledWith("overTarget", { overKcal: 150, dateKey }));
     expect(emit).toHaveBeenCalledWith("mealLogged", { kcal: 250, name: "Lahmacun" });
+  });
+
+  test("a meal logged on another day never says 'over target': Floo's copy and the home warning are about today", async () => {
+    const qc = makeQueryClient();
+    const yesterday = todayKey(new Date(Date.now() - 86_400_000));
+    const hook = await renderHookUI(() => useAddEntry(yesterday), { queryClient: qc });
+    const day = await getApi().nutrition.day(yesterday);
+    qc.setQueryData(nutritionDayKey(yesterday), { ...day, target: { ...day.target, calories: day.totals.kcal + 100 } } satisfies NutritionDayView);
+    await act(async () => {
+      hook.result.current.mutate({ meal: "dinner", grams: 100, custom });
+    });
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+    expect(emit).toHaveBeenCalledWith("mealLogged", { kcal: 250, name: "Lahmacun" });
+    expect(emit).not.toHaveBeenCalledWith("overTarget", expect.anything());
   });
 
   test("weigh-in and full measurement emit measurementLogged", async () => {

@@ -7,7 +7,7 @@ import { ToastProvider } from "../../src/ui/Toast";
 import { Pressable } from "../../src/ui/Pressable";
 import * as events from "../../src/mascot/events";
 import { flooBus, overTargetKey } from "../../src/mascot/events";
-import { FlooCornerHost, FlooEventBridge, FlooVoiceProvider, claimOnce, useFloo, useFlooOnce } from "../../src/mascot/voice";
+import { FlooCornerHost, FlooEventBridge, FlooVoiceProvider, claimOnce, useFloo, useFlooOnce, wasSaid } from "../../src/mascot/voice";
 import { storage } from "../../src/lib/storage";
 
 function Harness({ enabled = true, bridges = 1, children }: { enabled?: boolean; bridges?: number; children?: React.ReactNode }) {
@@ -131,6 +131,59 @@ describe("FlooEventBridge", () => {
     await fireEvent.press(screen.getByTestId("open-home"));
     expect(bubble()).toBeUndefined();
     expect(pending()).toBe(0);
+  });
+
+  test("a day's line that never reached the screen does not use up the day", async () => {
+    function HomeWarning() {
+      useFlooOnce(overTargetKey("2026-09-24"), { text: "Bugün hedefini 150 kcal aştın.", priority: "high" });
+      return null;
+    }
+    const ui = (enabled: boolean, home = false) => (
+      <Harness enabled={enabled}>
+        <Peek />
+        {home ? <HomeWarning /> : null}
+      </Harness>
+    );
+    const r = await render(ui(true));
+    await emit("mealLogged", { kcal: 650, name: "Lahmacun" });
+    await emit("overTarget", { overKcal: 150, dateKey: "2026-09-24" });
+    expect(pending()).toBe(1);
+    // The mascot is switched off while the warning still waits: the queue is dropped unseen.
+    await r.rerender(ui(false));
+    await r.rerender(ui(true));
+    expect(bubble()).toBeUndefined();
+    // So the home screen still gets to say it.
+    await r.rerender(ui(true, true));
+    expect(bubble()).toBe("Floo: Bugün hedefini 150 kcal aştın.");
+  });
+
+  test("a day's line that waits while Floo is hidden is said, and remembered, once Floo is back", async () => {
+    function Host() {
+      const [shown, setShown] = useState(false);
+      return (
+        <>
+          <Pressable testID="show-host" onPress={() => setShown(true)}>
+            <RNText>host</RNText>
+          </Pressable>
+          {shown ? <FlooCornerHost presence="idle" /> : null}
+        </>
+      );
+    }
+    await render(
+      <ThemeProvider>
+        <ToastProvider>
+          <FlooVoiceProvider>
+            <FlooEventBridge />
+            <Host />
+          </FlooVoiceProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    );
+    await emit("overTarget", { overKcal: 150, dateKey: "2026-09-24" });
+    expect(wasSaid(overTargetKey("2026-09-24"))).toBe(false);
+    await fireEvent.press(screen.getByTestId("show-host"));
+    expect(bubble()).toBe("Floo: Hedefi 150 kcal aştık, dert değil.");
+    expect(wasSaid(overTargetKey("2026-09-24"))).toBe(true);
   });
 
   test("and the other way round: once the home screen said it, a later crossing that day is silent", async () => {

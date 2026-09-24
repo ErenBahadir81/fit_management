@@ -2,8 +2,7 @@ import React from "react";
 import type { HomeDTO } from "@fitfloow/core";
 import { greetingFor, trHour } from "../../../lib/dates";
 import { fmtDate } from "../../../lib/format";
-import { toFlooMood } from "../../../mascot/moodMap";
-import { useFlooOnce } from "../../../mascot/voice";
+import { toFlooMood, useFlooOnce } from "../../../mascot";
 import { Header } from "../../../ui/Header";
 
 /**
