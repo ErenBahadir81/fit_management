@@ -134,17 +134,22 @@ export const MOOD_LABEL_TR: Record<FlooMood, string> = {
 export { GAZE_RADIUS };
 
 /**
- * Floo's palette. Violet body (the brand primary), amber knit for the scarf and boots — the warm
- * accent stops the character reading as a plain UI blob and ties back to the `warning` token family.
+ * The v1 SVG Floo's palette (today the web fallback when CanvasKit does not load). Floo blue body,
+ * the same `floo` colour as the theme tokens and Floo 3, with amber knit for the scarf and boots.
+ *
+ * The body family was violet when the app's brand was; it moved to blue with one HSL transform
+ * (hue −49°, saturation ×0.89, lightness −2.5%, chosen so the old `bodyMid` lands exactly on
+ * `floo` #69C8F1). The body render `assets/mascot/floo-body.png` went through the same transform,
+ * so the lids below, sampled off that render, still vanish into it on a blink.
  */
 export const FLOO_COLORS = {
   /** Body gradient, light rim → core → shaded base. */
-  bodyLight: "#A79AFF",
-  bodyMid: "#7E6DFA",
-  bodyDeep: "#5A46D8",
-  /** Warm bounce light on the shaded side, so the base does not read as dead purple. */
-  bounce: "#8E7BFF",
-  rim: "#D8D2FF",
+  bodyLight: "#93D9F9",
+  bodyMid: "#69C8F1",
+  bodyDeep: "#44A1CD",
+  /** Bounce light on the shaded side, so the base does not read as a dead shadow. */
+  bounce: "#76CDF7",
+  rim: "#C8ECFC",
   highlight: "#FFFFFF",
   eye: "#141A26",
   /** Reflected light in the lower half of the iris. */
@@ -152,16 +157,16 @@ export const FLOO_COLORS = {
   mouth: "#2A1030",
   tongue: "#F2708C",
   cheeks: "#FF9DB4",
-  mitten: "#6455E8",
+  mitten: "#52B6DE",
   /**
    * Eyelid fill, sampled from floo-body.png across the eye band (SVG y 103…141). The rendered body
    * is much lighter there than `bodyMid` because of the key light, so lids need their own pair.
    */
-  lidLight: "#D6CCFF",
-  lidDeep: "#C0B6F7",
+  lidLight: "#C3E6FB",
+  lidDeep: "#AFDBF1",
   scarf: "#F5A524",
   scarfAlt: "#FFF0D6",
   boot: "#D98A12",
   bootDark: "#A6650A",
-  shadow: "#3B2E7A",
+  shadow: "#2E576D",
 } as const;
