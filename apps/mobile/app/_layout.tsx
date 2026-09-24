@@ -13,7 +13,7 @@ import { needsOnboarding } from "../src/features/onboarding/api";
 import { AppQueryProvider } from "../src/lib/queryClient";
 import { ThemeProvider, useTheme } from "../src/theme";
 import { ToastProvider } from "../src/ui/Toast";
-import { FlooVoiceProvider } from "../src/mascot/voice";
+import { FlooEventBridge, FlooVoiceProvider } from "../src/mascot/voice";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -40,10 +40,19 @@ export default function RootLayout() {
   );
 }
 
-/** Floo's queue lives above every navigator; the user's "show Floo" switch turns it into toasts. */
+/**
+ * Floo's queue lives above every navigator; the user's "show Floo" switch turns it into toasts.
+ * The event bridge sits right inside it, once: the data layer's events (meal, workout, body,
+ * goal) become Floo's lines and gestures in whichever corner host is showing.
+ */
 function FlooVoice({ children }: { children: React.ReactNode }) {
   const mascotEnabled = useSession((s) => s.user?.mascotEnabled ?? true);
-  return <FlooVoiceProvider enabled={mascotEnabled}>{children}</FlooVoiceProvider>;
+  return (
+    <FlooVoiceProvider enabled={mascotEnabled}>
+      <FlooEventBridge />
+      {children}
+    </FlooVoiceProvider>
+  );
 }
 
 function RootNavigator() {

@@ -188,7 +188,7 @@ function emitMealLogged(qc: QueryClient, dateKey: string, prev: NutritionDayView
   const day = qc.getQueryData<NutritionDayView>(nutritionDayKey(dateKey));
   const target = day?.target.calories ?? 0;
   if (!prev || !day || target <= 0) return;
-  if (prev.totals.kcal <= target && day.totals.kcal > target) flooBus.emit("overTarget", { overKcal: Math.round(day.totals.kcal - target) });
+  if (prev.totals.kcal <= target && day.totals.kcal > target) flooBus.emit("overTarget", { overKcal: Math.round(day.totals.kcal - target), dateKey });
 }
 
 function useAfterWrite(dateKey: string) {

@@ -21,6 +21,18 @@ export function wasSaid(key: string): boolean {
 }
 
 /**
+ * Record `key` as said, unless it already was. Returns whether the caller may say it now. The one
+ * gate for "once" lines, whether they come from a screen's state (`useFlooOnce`) or from an event
+ * (`FlooEventBridge`), so the two never tell the user the same thing twice.
+ */
+export function claimOnce(key: string, now = Date.now()): boolean {
+  const said = getJSON<Said>(STORAGE_KEYS.flooSaid) ?? {};
+  if (said[key]) return false;
+  setJSON(STORAGE_KEYS.flooSaid, markSaid(said, key, now));
+  return true;
+}
+
+/**
  * Say `message` once per `key`, ever (well, for three days). For lines that come from state rather
  * than an event: "you're over target today", the day's greeting, a weekly nudge. Put the date in
  * the key when the line is daily (`over:2026-09-24`). Pass `null` while there is nothing to say.
@@ -32,9 +44,7 @@ export function useFlooOnce(key: string | null, message: FlooMessage | null): vo
   const text = message?.text;
   useEffect(() => {
     if (!ready || !key || !message || !text) return;
-    const said = getJSON<Said>(STORAGE_KEYS.flooSaid) ?? {};
-    if (said[key]) return;
-    setJSON(STORAGE_KEYS.flooSaid, markSaid(said, key, Date.now()));
+    if (!claimOnce(key)) return;
     say({ dedupeKey: key, ...message });
     // `message` is a fresh object each render; the key and text are what identify the line.
     // eslint-disable-next-line react-hooks/exhaustive-deps

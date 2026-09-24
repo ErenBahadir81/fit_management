@@ -1,7 +1,7 @@
 import { act, waitFor } from "@testing-library/react-native";
 import type { NutritionDayView } from "@fitfloow/core";
 import { makeQueryClient, renderHookUI } from "../helpers";
-import { FLOO_EVENTS, FLOO_LINE_MAX_CHARS, describeFlooEvent, flooBus, useFlooEvents, type FlooEvent, type FlooEventName } from "../../src/mascot/events";
+import { FLOO_EVENTS, FLOO_LINE_MAX_CHARS, describeFlooEvent, flooBus, overTargetKey, useFlooEvents, type FlooEvent, type FlooEventName } from "../../src/mascot/events";
 import { MOODS, TRIGGERS } from "../../src/mascot/model/params";
 import { useSession } from "../../src/features/auth/session";
 import { nutritionDayKey, useAddEntry } from "../../src/features/nutrition/useNutrition";
@@ -144,6 +144,25 @@ describe("describeFlooEvent", () => {
     expect(d("missedDay").text).toBe("Dün kaçtı, bugün yeniden başlıyoruz.");
   });
 
+  test("warnings wear the warning tone; everything else stays neutral (its mutation already buzzed)", () => {
+    const d = (name: FlooEventName, payload?: Record<string, unknown>) => describeFlooEvent(ev(name, payload), { rand: () => 0 });
+    expect(d("overTarget", PAYLOADS.overTarget).tone).toBe("warning");
+    expect(d("volumeWarning", { muscle: "Göğüs", band: "high" }).tone).toBe("warning");
+    expect(d("volumeWarning", { muscle: "Göğüs", band: "injury" }).tone).toBe("warning");
+    expect(d("volumeWarning", { muscle: "Göğüs", band: "low" }).tone).toBe("neutral");
+    const neutral = FLOO_EVENTS.filter((n) => n !== "overTarget" && n !== "volumeWarning");
+    for (const name of neutral) expect([name, d(name, PAYLOADS[name]).tone]).toEqual([name, "neutral"]);
+  });
+
+  test("going over target is a fact about a day: keyed by that day and said once", () => {
+    const line = describeFlooEvent(ev("overTarget", { overKcal: 150, dateKey: "2026-09-24" }));
+    expect(line.key).toBe(overTargetKey("2026-09-24"));
+    expect(line.once).toBe(true);
+    // Without a day there is nothing to remember it by: an ordinary line.
+    expect(describeFlooEvent(ev("overTarget", { overKcal: 150 })).once).toBeFalsy();
+    expect(describeFlooEvent(ev("mealLogged")).once).toBeFalsy();
+  });
+
   test("volumeWarning keys per muscle so two muscles do not dedupe", () => {
     const a = describeFlooEvent(ev("volumeWarning", { muscle: "Göğüs", band: "high" }));
     const b = describeFlooEvent(ev("volumeWarning", { muscle: "Sırt", band: "high" }));
@@ -193,7 +212,7 @@ describe("data layer emits", () => {
     await act(async () => {
       hook.result.current.mutate({ meal: "dinner", grams: 100, custom });
     });
-    await waitFor(() => expect(emit).toHaveBeenCalledWith("overTarget", { overKcal: 150 }));
+    await waitFor(() => expect(emit).toHaveBeenCalledWith("overTarget", { overKcal: 150, dateKey }));
     expect(emit).toHaveBeenCalledWith("mealLogged", { kcal: 250, name: "Lahmacun" });
   });
 

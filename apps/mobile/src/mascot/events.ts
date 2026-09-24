@@ -78,13 +78,29 @@ export function useFlooEvents(handler: FlooListener): void {
 /* ------------------------------ copy + mood ------------------------------ */
 
 export interface FlooLine {
+  /** Dedupe key: a second line with the same key replaces the first instead of piling up. */
   key: string;
   text: string;
   mood: Mood;
   trigger: Trigger;
   priority: "low" | "normal" | "high";
+  /**
+   * `warning` only for what the user should act on (over target, too much or too little volume).
+   * Celebrations stay `neutral`: the mutation behind them already gave its own success haptic, and
+   * the bubble's tone is what decides whether it buzzes again.
+   */
+  tone: "neutral" | "warning";
+  /**
+   * A fact about a day rather than a moment (set with `key` naming the day). Said at most once per
+   * key, in the same memory `useFlooOnce` keeps, so a screen that notices the same state later does
+   * not repeat it.
+   */
+  once?: true;
   ttlMs: number;
 }
+
+/** The one key for "the day went over its calorie target", shared by the bus line and the home screen. */
+export const overTargetKey = (dateKey: string) => `overTarget:${dateKey}`;
 
 export const FLOO_LINE_MAX_CHARS = 60;
 
@@ -280,13 +296,23 @@ export function describeFlooEvent(event: FlooEvent, opts: { now?: Date; rand?: (
   }
 
   let key: string = event.name;
+  let once = false;
   if (event.name === "volumeWarning") {
     const muscle = str(p.muscle);
     if (muscle) key = `${event.name}:${muscle}`;
   } else if (event.name === "goalHit") {
     const what = str(p.what);
     if (what) key = `${event.name}:${what}`;
+  } else if (event.name === "overTarget") {
+    const day = str(p.dateKey);
+    if (day) {
+      key = overTargetKey(day);
+      once = true;
+    }
   }
 
-  return { key, text, mood, trigger: event.name, priority: PRIORITY[event.name], ttlMs: ttlFor(text) };
+  const warning = event.name === "overTarget" || (event.name === "volumeWarning" && p.band !== "low");
+  const line: FlooLine = { key, text, mood, trigger: event.name, priority: PRIORITY[event.name], tone: warning ? "warning" : "neutral", ttlMs: ttlFor(text) };
+  if (once) line.once = true;
+  return line;
 }
