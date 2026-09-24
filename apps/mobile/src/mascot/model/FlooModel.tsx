@@ -64,6 +64,7 @@ import {
   applyGesture,
   applyWalk,
   stepSprings,
+  trackIkTargets,
   type BodyXform,
 } from "./rig";
 import { LOD_VIEW, TRIGGER_GESTURE, flooBox, flooTriggerPlan, type FlooLod } from "./behaviour";
@@ -153,8 +154,14 @@ const MaybeLimbs: typeof FlooLimbs = FRAME_LOOP ? FlooLimbs : ({ children }) => 
 const useRigLoop: typeof useFrameCallback = FRAME_LOOP ? useFrameCallback : ((() => ({ setActive: () => {}, isActive: false, callbackId: -1 })) as unknown as typeof useFrameCallback);
 
 function leanDelay() {
-  return 6000 + Math.random() * 4000;
+  return 9000 + Math.random() * 6000;
 }
+/** Idle fidgets are rare: the first one after 12–20 s on screen, then one every 25–45 s. */
+function fidgetDelay(first: boolean) {
+  return first ? 12000 + Math.random() * 8000 : 25000 + Math.random() * 20000;
+}
+/** Idle fidgets play at this fraction of the gesture: a hint of the move, never a performance. */
+const FIDGET_WEIGHT = 0.55;
 
 /**
  * Floo 3 — the droplet, now with a skeleton.
@@ -270,6 +277,8 @@ export function FlooModel({
     walkAmt: 0,
     walkPhase: 0,
     primed: false,
+    /** The frame's target pose, rebuilt in place every frame (no per-frame allocation). */
+    tgt: REST.slice(),
   });
   /** The posed channels, published once per frame for the geometry below. */
   const rig = useSharedValue<number[]>(REST.slice());
@@ -413,7 +422,7 @@ export function FlooModel({
     let t: ReturnType<typeof setTimeout> | null = null;
     const run = () => {
       t = setTimeout(() => {
-        const to = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 1.4);
+        const to = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.7);
         microLean.set(withSequence(withSpring(to, { damping: 14, stiffness: 60 }), withSpring(0, { damping: 16, stiffness: 50 })));
         run();
       }, leanDelay());
@@ -424,9 +433,9 @@ export function FlooModel({
     };
   }, [loops, microLean]);
 
-  // An idle fidget every 8–15 s — scratching the head, a foot tap, looking at a hand, folding
-  // the arms, a stretch — picked at random and sometimes mirrored, never on a beat. The frame loop
-  // plays it at partial weight and drops it the moment a real gesture starts.
+  // Now and then an idle fidget (see `fidgetDelay`) — scratching the head, a foot tap, looking at
+  // a hand, folding the arms, a stretch — picked at random and sometimes mirrored, never on a beat.
+  // The frame loop plays it at partial weight and drops it the moment a real gesture starts.
   useEffect(() => {
     if (!loops) return;
     let t: ReturnType<typeof setTimeout> | null = null;
@@ -439,7 +448,7 @@ export function FlooModel({
           idleReq.set({ id: GESTURE_INDEX[name], key: prev.key + 1, mirror: Math.random() < 0.5 });
           run();
         },
-        first ? 3500 + Math.random() * 2500 : 8000 + Math.random() * 7000
+        fidgetDelay(first)
       );
       first = false;
     };
@@ -531,7 +540,7 @@ export function FlooModel({
         // Two little drops spin off the crown and vanish. The single clearest "this is water" cue.
         flick.set(withSequence(withTiming(1, { duration: 500, easing: Easing.out(Easing.quad) }), withTiming(0, { duration: 0 })));
         run();
-      }, 5000 + Math.random() * 4000);
+      }, 11000 + Math.random() * 8000);
     };
     run();
     return () => {
@@ -660,7 +669,9 @@ export function FlooModel({
     const st = sim.value;
     const now = frame.timestamp;
     const dt = Math.min(0.05, Math.max(0.001, (frame.timeSincePreviousFrame ?? 16) / 1000));
-    const tgt = moodRig.value.slice();
+    const tgt = st.tgt;
+    const mr = moodRig.value;
+    for (let i = 0; i < tgt.length; i++) tgt[i] = mr[i];
     const reduced = reduceSV.value > 0.5;
 
     if (loopsSV.value > 0.5 && !reduced) {
@@ -709,7 +720,7 @@ export function FlooModel({
       }
     } else if (!reduced && st.iIdx >= 0) {
       const g = st.iMirror ? COMPILED_MIRROR[st.iIdx] : COMPILED[st.iIdx];
-      if (!applyGesture(g, now - st.iStart, tgt, 0.85)) st.iIdx = -1;
+      if (!applyGesture(g, now - st.iStart, tgt, FIDGET_WEIGHT)) st.iIdx = -1;
     }
 
     // Walk: fade the cycle in and out so starting and stopping never pops; 1.7 steps a second.
@@ -735,6 +746,8 @@ export function FlooModel({
       tgt[b + A.front] = 0;
     }
 
+    trackIkTargets(st.x, st.v, tgt);
+
     if (!st.primed) {
       // First frame: start ON the pose. A mascot that flails in from the rest pose every time a
       // screen mounts is the mascot everyone learns to hate.
@@ -746,12 +759,17 @@ export function FlooModel({
     } else if (reduced) {
       stepSprings(st.x, st.v, tgt, dt, SPRING_REDUCED.k, SPRING_REDUCED.z);
     } else {
-      stepSprings(st.x, st.v, tgt, dt, SPRING.k, SPRING.z);
+      stepSprings(st.x, st.v, tgt, dt, SPRING.k, SPRING.z, SPRING.vmax);
     }
     // Front/behind is a layer switch, not a motion: never spring it.
     st.x[ARM_BASE.L + A.front] = tgt[ARM_BASE.L + A.front];
     st.x[ARM_BASE.R + A.front] = tgt[ARM_BASE.R + A.front];
-    rig.value = st.x.slice();
+    // Published in place: `modify` with forceUpdate notifies the geometry without a fresh array.
+    rig.modify((out) => {
+      "worklet";
+      for (let i = 0; i < out.length; i++) out[i] = st.x[i];
+      return out;
+    }, true);
   });
 
   // ── derived: the numbers the renderer actually eats ─────────────────────
