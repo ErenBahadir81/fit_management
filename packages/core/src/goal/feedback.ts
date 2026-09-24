@@ -132,6 +132,10 @@ export function goalFeedback(input: FeedbackInput): GoalFeedback {
           : say("ahead", "positive", "cheer", "goal.feedback.ahead", `Yağ oranında plandan ${p} puan öndesin!${faster}${pending}`);
       case "behind":
       case "stalled": {
+        if (!bodyFat.paceSlow) {
+          // Past the plan's end at the planned pace: more time, not fewer calories.
+          return say(progress.onTrack, "attention", "think", `goal.feedback.${progress.onTrack}`, `Planın süresi doldu, hedefe ${pts(progress.bfToGo)} puan kaldı; tempon plana uygun, biraz daha zaman lazım.${pending}`);
+        }
         const stalled = progress.onTrack === "stalled";
         const what = stalled ? "Son haftalarda yağ oranın yerinde sayıyor" : `Yağ oranında planın ${p} puan gerisindesin`;
         // Losing lean mass as well: fewer calories would cost more muscle (the proposal keeps them).
@@ -143,8 +147,12 @@ export function goalFeedback(input: FeedbackInput): GoalFeedback {
         return say(progress.onTrack, "attention", stalled ? "worried" : "think", `goal.feedback.${progress.onTrack}`, `${what}${next}${pending}`);
       }
       default:
-        return bodyFat.leanLoss
-          ? say("onTrack", "attention", "think", "goal.feedback.onTrack", `Yağ oranın planda ama yağsız kütlen planın ${l} kg altında; proteini ve antrenmanı aksatma.${pending}`)
+        if (bodyFat.leanLoss) {
+          return say("onTrack", "attention", "think", "goal.feedback.onTrack", `Yağ oranın planda ama yağsız kütlen planın ${l} kg altında; proteini ve antrenmanı aksatma.${pending}`);
+        }
+        // Past the plan's end the plan sits at the target, so "on plan" would read wrong while body fat is still above it.
+        return bodyFat.planEnded && progress.bfToGo > 0
+          ? say("onTrack", "neutral", "curious", "goal.feedback.onTrack", `Planın süresi doldu, hedefe ${pts(progress.bfToGo)} puan kaldı; ölçmeye devam, gidişatı birlikte izleyelim.${pending}`)
           : say("onTrack", "positive", "happy", "goal.feedback.onTrack", `Yağ oranın planda, ${pct} tamamlandı.${pending}`);
     }
   }

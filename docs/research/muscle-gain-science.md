@@ -184,9 +184,12 @@ it, and these have to be judged against their own noise.
   https://pmc.ncbi.nlm.nih.gov/articles/PMC11732917/).
 
 **Rule in code (`bodyFatTrend`, docs/plan/11 §Recomp on body fat).**
-- **Residuals.** Take the readings since the plan (re)started, from the last 112 days, one per
-  day. For each, the residual is the measured value minus the plan's expected body fat (and lean
-  mass) on that day. A least-squares line goes through the residuals.
+- **Readings.** Take the readings since the plan (re)started, from the last 112 days: one per day,
+  then one per week (the week's mean). Several tapings in one week share technique and bloating,
+  so they are not independent; treating them as independent would inflate the evidence about
+  twofold for someone who tapes daily.
+- **Residuals.** For each weekly reading, the residual is the measured value minus the plan's
+  expected body fat (and lean mass) on that day. A least-squares line goes through the residuals.
 - **Pace and level.** The line's slope is the *pace gap* (observed minus planned change a week).
   Its value at the latest reading is the *level gap*. The plan is drawn from one start reading,
   which is itself off by up to ±σ. That error shifts every residual equally, so it moves the level
@@ -198,20 +201,25 @@ it, and these have to be judged against their own noise.
   the person's own scatter); for lean mass it is weight/100 × √(1.5² + 0.5²) kg, where 0.5 is
   scale noise in %BW (Orsama 2014, §7). The level gap must also be at least 1 point the same way:
   the tape's reproducibility and Foulis's ≥ 1-point criterion. For lean mass that floor is 1 kg.
-- **Minimum data.** At least 3 readings spanning ≥ 21 days (§7's "≥ 3 weeks"), the latest ≤ 14
-  days old. In practice the pace test needs about 10 or more weekly readings: at ±1.5 points, a
-  pace gap of 0.28 points a week only clears 2.25 SE once Σ(t − t̄)² ≳ 150 week².
+- **Past the plan's end.** The plan now expects the target itself, and the target is absolute, so
+  no start reading can bias the comparison. The level still above the target counts with the same
+  z and tolerance: the mean of the readings since the end (SE σ/√n), or the smoothed line until
+  there are 3 of them. Only a pace shown to be slow recommends fewer calories. Otherwise the
+  recommendation is more time (a re-plan): the plan ran out of time, or started from a low reading.
+- **Minimum data.** At least 3 weeks with readings spanning ≥ 21 days (§7's "≥ 3 weeks"), the
+  latest ≤ 14 days old. In practice the pace test needs about 10 or more weekly readings: at ±1.5
+  points, a pace gap of 0.28 points a week only clears 2.25 SE once Σ(t − t̄)² ≳ 150 week².
 - **Stalled.** "Stalled" means body fat falls < 0.05 points a week, the body-fat counterpart of
-  the cut's 0.1 kg / 14 days.
-- **Proposals.** A proposal needs the same verdict at the previous reading, the counterpart of
-  the cut's "today and 7 days ago" rule. It also needs a reading newer than the last answer, and
+  the cut's 0.1 kg / 14 days. Tape noise can flip a verdict between "stalled" and "behind", so
+  they share one proposal id.
+- **Proposals.** A proposal needs the same verdict at the previous weekly reading, the counterpart
+  of the cut's "today and 7 days ago" rule. It also needs a reading newer than the last answer, and
   the 21-day cool-down still applies.
-- **Reached.** "Reached" needs the latest reading at the target and, once there are 3 readings,
-  the smoothed body fat at the target too. The smoothed value is the line through the window's
-  readings, read at the latest one. With 1.5 points of noise, someone 1 point above target reads
-  at or below it on about 25 % of single readings.
-- **Projection.** The projected end uses the smoothed body fat, at the plan's pace until a verdict
-  shows the pace differs.
+- **Reached.** "Reached" needs the latest reading at the target and the smoothed body fat at the
+  target too: the line through the window's weekly readings, read at the latest one, from at least
+  3 weeks of readings. With 1.5 points of noise, someone 1 point above target reads at or below it
+  on about 25 % of single readings. The smoothed value also drives the goal bar and the projection,
+  as the weight trend does on a cut.
 - Confidence: medium-low. The structure is standard regression; the calibration is mine (below).
 
 **Calibration (simulation, own work, low-medium confidence).** The setup:
@@ -229,6 +237,13 @@ stalls (body fat flat) and of lean loss (−0.35 kg a week, body fat on plan) th
 | **1.5 / 2.25 / 112 d (chosen)** | **0 %** | **4.7 %** | **0 %** | **99 % (13)** | **85 %** | **64 %** | **99 % (10)** |
 | 1.5 / 2.25 / 56 d | 0 % | 4 % | 0 % | 31 % (13) | 50 % | 3 % | 91 % (12) |
 | 1.0 / 2.25 / 112 d | 4.7 % | 9.7 % | 1.3 % | 100 % (11) | 90 % | 87 % | 100 % (9) |
+
+The simulation was run again for 12 weeks past the plan's end. There, people whose pace was on plan
+but whose plan started from a low reading sit above the target, and 19 % (σ 1) to 33 % (σ 1.6) of
+them get a proposal. Almost all of these recommend a re-plan (more time), not a calorie change.
+Over the whole period, calorie changes recommended to people on pace stay at 0 % (σ 1) and ≈ 5 %
+(σ 1.6). Full stalls get a calorie cut in 97–100 % of cases. A stall that starts at week 12 of 18
+is caught about 4 weeks after the end.
 
 A proposal is never applied silently (§2 of the sprint hand-off), but a wrong calorie proposal still
 costs trust. That is why the chosen row keeps false alarms at ≤ 5 % even for noisy self-measurers.

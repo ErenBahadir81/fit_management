@@ -194,15 +194,17 @@ interface Situation {
 const behindLike = (s: BodyFatTrend["status"]) => s === "behind" || s === "stalled";
 
 /**
- * Recomp target reached: the latest reading is at the target and, once there are enough readings,
- * so is the smoothed body fat (`smoothedBodyFat`, which a re-plan does not reset) — one low tape
- * reading (±1.5 points) is not the finish line.
+ * Recomp target reached: the latest reading is at the target and so is the smoothed body fat
+ * (`smoothedBodyFat`: ≥ 3 weeks of readings, not reset by a re-plan) — one low tape reading
+ * (±1.5 points) is not the finish line. A plan with nothing to do (target not below the start) is
+ * reached on the reading alone.
  */
 function recompReached(input: AdjustmentInput): boolean {
   const { goal, progress, todayKey, settings } = input;
   if (progress.actualBodyFatPct === null || progress.actualBodyFatPct > goal.targetBodyFatPct) return false;
-  const smoothed = smoothedBodyFat(input.bodyEntries ?? [], todayKey, settings);
-  return smoothed === null || smoothed <= goal.targetBodyFatPct;
+  if (goal.plan.roadmap.length === 0) return true;
+  const smoothed = input.bodyFat ? input.bodyFat.smoothedPct : smoothedBodyFat(input.bodyEntries ?? [], todayKey, settings);
+  return smoothed !== null && smoothed <= goal.targetBodyFatPct;
 }
 
 /**
@@ -332,7 +334,9 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
   const sinceKey = adjustmentSinceKey(goal);
   const sit = situation(input, direction, sinceKey);
   if (!sit) return null;
-  const id = adjustmentId(goal, sit.kind, sinceKey);
+  // Tape noise can flip a slow recomp between "behind" and "stalled" from one reading to the next;
+  // it is the same situation, so it keeps one id (an open proposal stays answerable, a dismissal holds).
+  const id = adjustmentId(goal, direction === "recomp" && sit.kind === "stalled" ? "behind" : sit.kind, sinceKey);
   if ((goal.adjustments ?? []).some((a) => a.id === id)) return null;
 
   const before = currentSnapshot(goal, todayKey);
@@ -428,6 +432,19 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
           copy = slowCopy(
             "Kasını koruyalım",
             `${why}, yağsız kütlen de planın ${l} kg altında. Kaloriyi kısmak kası daha çok zorlar; proteini ve antrenman yükünü koruyup planı bugünden güncelleyelim.`
+          );
+        } else if (!bf.paceSlow) {
+          // Past the plan's end without a slow pace: the plan ran out of time (or started from a
+          // reading that was off), so more time is the answer; fewer calories only as the alternative.
+          options.push(replan("Kaloriyi koru, tarihi güncelle", true));
+          const o = option(input, "lowerCalories", "", false, { tdeeOverride: lowerStep.tdee });
+          if (Math.abs((o.after?.dailyCalorieTarget ?? before.dailyCalorieTarget) - before.dailyCalorieTarget) >= 25) {
+            o.labelTr = kcalLabel(before, o);
+            options.push(o);
+          }
+          copy = slowCopy(
+            "Biraz daha zaman",
+            `Planın süresi doldu, hedefe ${pts(input.progress.bfToGo)} puan kaldı. Tempon plana uygun; planı bugünden güncelleyelim mi?`
           );
         } else {
           const say = cutOrLater("Kaloriyi koru, tarihi güncelle", "planı bugünden güncelleyelim");

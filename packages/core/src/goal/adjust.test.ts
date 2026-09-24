@@ -353,12 +353,21 @@ describe("proposeGoalAdjustment — recomp", () => {
     expect(propose(recompGoal, flat(85, 35), 35)).toBeNull();
   });
 
-  it("reached on body fat, not weight", () => {
-    const pts = flat(85, 10);
-    const progress = { ...computeGoalProgress(recompGoal, pts, [{ dateKey: day(10), weightKg: 85, bodyFatPct: 14.8 }], [], day(10), S) };
-    const p = proposeGoalAdjustment({ goal: recompGoal, progress, weighIns: pts, todayKey: day(10), replanBase: baseFrom(recompGoal, pts), settings: S })!;
+  it("reached on body fat, not weight (three weeks of readings at the target)", () => {
+    const pts = flat(85, 14);
+    const body = [
+      { dateKey: day(0), weightKg: 85, bodyFatPct: 20 },
+      { dateKey: day(7), weightKg: 85, bodyFatPct: 15.1 },
+      { dateKey: day(14), weightKg: 85, bodyFatPct: 14.8 },
+    ];
+    const progress = computeGoalProgress(recompGoal, pts, body, [], day(14), S);
+    const p = proposeGoalAdjustment({ goal: recompGoal, progress, weighIns: pts, bodyEntries: body, todayKey: day(14), replanBase: baseFrom(recompGoal, pts), settings: S })!;
     expect(p.kind).toBe("reached");
     expect(p.options.map((o) => o.action)).toEqual(["complete"]);
+    // one low reading alone is not enough
+    const single = [body[0], body[2]];
+    const one = computeGoalProgress(recompGoal, pts, single, [], day(14), S);
+    expect(proposeGoalAdjustment({ goal: recompGoal, progress: one, weighIns: pts, bodyEntries: single, todayKey: day(14), replanBase: baseFrom(recompGoal, pts), settings: S })).toBeNull();
   });
 });
 

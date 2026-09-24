@@ -119,7 +119,7 @@ export const DEFAULT_ADAPTIVE_SETTINGS = {
    * uses 2.77 × the precision error, Slart 2024).
    */
   bfConfidenceZ: 2.25,
-  /** A verdict needs this many readings (one per day) … */
+  /** A verdict needs readings in this many weeks (a week counts once, as the mean of its readings) … */
   bfMinMeasurements: 3,
   /** … spanning at least this many days (Helms / MacroFactor: judge after ≥ 3 weeks) … */
   bfMinSpanDays: 21,
@@ -148,7 +148,7 @@ export const zAdaptiveSettings = z.object({
   bfTolerancePts: z.number().min(0).max(5).default(DEFAULT_ADAPTIVE_SETTINGS.bfTolerancePts),
   leanToleranceKg: z.number().min(0).max(5).default(DEFAULT_ADAPTIVE_SETTINGS.leanToleranceKg),
   bfConfidenceZ: z.number().min(1).max(4).default(DEFAULT_ADAPTIVE_SETTINGS.bfConfidenceZ),
-  /** A line through fewer than three readings has no scatter left to judge the noise by. */
+  /** A line through fewer than three weekly readings has no scatter left to judge the noise by. */
   bfMinMeasurements: z.number().int().min(3).max(20).default(DEFAULT_ADAPTIVE_SETTINGS.bfMinMeasurements),
   bfMinSpanDays: z.number().int().min(7).max(112).default(DEFAULT_ADAPTIVE_SETTINGS.bfMinSpanDays),
   bfMaxAgeDays: z.number().int().min(1).max(56).default(DEFAULT_ADAPTIVE_SETTINGS.bfMaxAgeDays),
