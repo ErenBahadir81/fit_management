@@ -124,7 +124,12 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
   const arrive = useCallback(
     (m: QueuedMessage) => {
       arrived.current = m.id;
-      m.onShow?.();
+      try {
+        m.onShow?.();
+      } catch (e) {
+        // The sender's bookkeeping must never leave a bubble without its clock.
+        if (__DEV__) console.warn("[floo] onShow threw", e);
+      }
       if (m.trigger) setReaction({ name: m.trigger, key: ++reactKey.current });
       if (m.tone === "warning") void haptic.warning();
       else if (m.tone === "success") void haptic.success();
@@ -134,13 +139,15 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
     [startTimer]
   );
 
-  // A new message on screen. If the app is in the background nobody sees it arrive, so the whole
-  // arrival waits for the foreground (below) instead of playing, and timing out, unseen.
+  // A new message on screen. If the app is not in the foreground (backgrounded, or covered by the
+  // app switcher / Control Center) nobody sees it arrive, so the whole arrival waits for the
+  // foreground (below) instead of playing, and timing out, unseen.
   useEffect(() => {
     stopTimer();
     arrived.current = null;
     if (!current) return;
-    if (AppState.currentState !== "background") arrive(current);
+    const away = AppState.currentState === "background" || AppState.currentState === "inactive";
+    if (!away) arrive(current);
     return stopTimer;
     // Keyed on the id only: an in-place dedupe refresh must not restart the beat or the clock.
     // eslint-disable-next-line react-hooks/exhaustive-deps

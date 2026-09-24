@@ -32,18 +32,10 @@ export function FlooEventBridge(): null {
     // about the moment, so it is neither saved up to pop out of context later nor made a toast.
     if (presence === "hidden" || delivered.has(event)) return;
     delivered.add(event);
-    const line = describeFlooEvent(event);
-    const msg: FlooMessage = {
-      text: line.text,
-      mood: line.mood,
-      trigger: line.trigger,
-      priority: line.priority,
-      tone: line.tone,
-      dedupeKey: line.key,
-      ttlMs: line.ttlMs,
-    };
+    const { key, once, ...line } = describeFlooEvent(event);
+    const msg: FlooMessage = { ...line, dedupeKey: key };
     // A fact about the day that was already told is not news (see `onceMessage`).
-    const out = line.once ? onceMessage(line.key, msg) : msg;
+    const out = once ? onceMessage(key, msg) : msg;
     if (out) say(out);
   });
   return null;

@@ -172,9 +172,9 @@ describe("Floo voice", () => {
     expect(screen.getByTestId("floo-bubble").props.accessibilityLabel).toBe("Floo: Bugün hedefini aştın.");
   });
 
-  test("a line that arrives while the app is in the background waits for the foreground, beat and clock included", async () => {
+  test.each(["background", "inactive"])("a line that arrives while the app is %s waits for the foreground, beat and clock included", async (state) => {
     const before = Object.getOwnPropertyDescriptor(AppState, "currentState");
-    Object.defineProperty(AppState, "currentState", { value: "background", configurable: true });
+    Object.defineProperty(AppState, "currentState", { value: state, configurable: true });
     const onShow = jest.fn();
     try {
       await render(
@@ -205,6 +205,30 @@ describe("Floo voice", () => {
     } finally {
       if (before) Object.defineProperty(AppState, "currentState", before);
     }
+  });
+
+  test("a sender's onShow that throws does not stall the line", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    await render(
+      <Harness>
+        <Sayer
+          msg={{
+            text: "Kaydettim.",
+            ttlMs: 1000,
+            onShow: () => {
+              throw new Error("storage full");
+            },
+          }}
+        />
+      </Harness>
+    );
+    await fireEvent.press(screen.getByTestId("say"));
+    expect(screen.getByTestId("floo-bubble")).toBeTruthy();
+    await act(async () => {
+      jest.advanceTimersByTime(1500);
+    });
+    expect(screen.queryByTestId("floo-bubble")).toBeNull();
+    warn.mockRestore();
   });
 
   test("tapping an idle Floo brings the last line back", async () => {

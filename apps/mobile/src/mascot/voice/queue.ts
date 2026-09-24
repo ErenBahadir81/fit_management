@@ -141,9 +141,10 @@ export function enqueue(state: QueueState, msg: FlooMessage, id: string, now: nu
     return { ...state, seq, current: { ...state.current, text: q.text, mood: q.mood, tone: q.tone, action: q.action } };
   }
   // Same key still waiting: the newcomer takes its place in line and keeps its age, so a screen
-  // that says its line again on every visit neither loses its turn nor escapes going stale.
+  // that says its line again on every visit neither loses its turn nor escapes going stale. One
+  // that already went stale is simply replaced by the fresh line.
   const waiting = q.dedupeKey ? state.pending.find((p) => p.dedupeKey === q.dedupeKey) : undefined;
-  if (waiting) {
+  if (waiting && now - waiting.createdAt <= STALE_MS) {
     q.seq = waiting.seq;
     q.createdAt = waiting.createdAt;
   }
