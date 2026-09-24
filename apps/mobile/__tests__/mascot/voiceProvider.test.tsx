@@ -39,6 +39,9 @@ function Toaster() {
   );
 }
 
+// The first render pays the mascot model's cold start (~5 s under a full parallel run).
+jest.setTimeout(20_000);
+
 describe("Floo voice", () => {
   beforeEach(() => {
     jest.useFakeTimers();
