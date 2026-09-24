@@ -7,6 +7,7 @@ import { z } from "zod";
 import { zActivityLevel, zDateKey, zGender, zWeekday } from "./common";
 import { zBodyEntry } from "./body";
 import { zGoal, zGoalInput } from "./goal";
+import { zProgram } from "./program";
 import { zUser } from "./user";
 
 export const zOnboardingProfile = z.object({
@@ -30,15 +31,37 @@ export type OnboardingMeasurement = z.infer<typeof zOnboardingMeasurement>;
 /** Same as `POST /goals` (T7: cut, bulk or recomp); `{ targetBodyFatPct, profile }` still means a cut. */
 export const zOnboardingGoal = zGoalInput;
 
+/**
+ * T8 — "Ne kadar süredir antrenman yapıyorsun?". Mapped to the goal engine's `trainingLevel` by
+ * `trainingLevelForExperience` (none / < 1 y → beginner, 1–3 y → intermediate, 3 y + → advanced).
+ */
+export const zTrainingExperience = z.enum(["none", "under1", "oneToThree", "overThree"]);
+export type TrainingExperience = z.infer<typeof zTrainingExperience>;
+
+/** T8 — what the first program is sized from. Optional: older clients never send it. */
+export const zOnboardingTraining = z.object({
+  daysPerWeek: z.number().int().min(2).max(6),
+  experience: zTrainingExperience,
+});
+export type OnboardingTraining = z.infer<typeof zOnboardingTraining>;
+
 export const zOnboardingInput = z.object({
   profile: zOnboardingProfile,
   measurement: zOnboardingMeasurement,
   /** `null` = "I'll set a goal later". */
   goal: zOnboardingGoal.nullish().default(null),
+  /** T8 — present: an account without a program gets a starter program sized to it. */
+  training: zOnboardingTraining.nullish(),
 });
 export type OnboardingInput = z.infer<typeof zOnboardingInput>;
 
-export const zOnboardingResponse = z.object({ user: zUser, bodyEntry: zBodyEntry, goal: zGoal.nullable() });
+export const zOnboardingResponse = z.object({
+  user: zUser,
+  bodyEntry: zBodyEntry,
+  goal: zGoal.nullable(),
+  /** T8 — the account's program after onboarding (the starter one, or the one it already had). */
+  program: zProgram.nullable().optional(),
+});
 export type OnboardingResponse = z.infer<typeof zOnboardingResponse>;
 
 /**
