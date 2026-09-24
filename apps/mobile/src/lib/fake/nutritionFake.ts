@@ -91,21 +91,26 @@ export function findByBarcode(state: FakeState, code: string): FoodDTO | null {
 
 export type ScanScenario = "plate" | "single" | "notFood";
 
-function detection(state: FakeState, id: string, confidence: number, grams: number): Detection | null {
+function detection(state: FakeState, id: string, confidence: number, grams: number, alternatives: [string, number][] = []): Detection | null {
   const f = state.foods.find((x) => x.id === id);
   if (!f) return null;
-  return { label: f.nameEn ?? f.name, labelTr: f.name, confidence, food: f, suggestedGrams: grams };
+  const alts = alternatives.flatMap(([altId, c]) => {
+    const a = state.foods.find((x) => x.id === altId);
+    return a ? [{ label: a.nameEn ?? a.name, labelTr: a.name, confidence: c, food: a, suggestedGrams: a.defaultServingG }] : [];
+  });
+  return { label: f.nameEn ?? f.name, labelTr: f.name, confidence, food: f, suggestedGrams: grams, alternatives: alts };
 }
 
 /** Deterministic scan answers for the demo: a full plate, one dish, or "this isn't food". */
 export function fakeScanResult(state: FakeState, scenario: ScanScenario = "plate", seq = 1): ScanResultDTO {
-  const picks: [string, number, number][] =
-    scenario === "single" ? [["f_iskender", 0.91, 250]] : scenario === "notFood" ? [] : [
-      ["f_tavuk", 0.86, 150],
-      ["f_pilav", 0.63, 150],
-      ["f_cacik", 0.41, 200],
+  /* [food, confidence, grams, alternatives]: the low-confidence cacık gets "Bunu mu demek istedin?". */
+  const picks: [string, number, number, [string, number][]][] =
+    scenario === "single" ? [["f_iskender", 0.91, 250, [["f_adana", 0.04]]]] : scenario === "notFood" ? [] : [
+      ["f_tavuk", 0.86, 150, [["f_hindi", 0.07]]],
+      ["f_pilav", 0.63, 150, [["f_bulgur", 0.18]]],
+      ["f_cacik", 0.41, 200, [["f_yogurt", 0.27], ["f_ayran", 0.11], ["f_salata", 0.06]]],
     ];
-  const detections = picks.map(([id, c, g]) => detection(state, id, c, g)).filter((d): d is Detection => Boolean(d));
+  const detections = picks.map(([id, c, g, alts]) => detection(state, id, c, g, alts)).filter((d): d is Detection => Boolean(d));
   return { scanId: `scan_fake_${seq}`, imageUrl: null, detections, mock: true, latencyMs: 380, modelVersion: "fake-vision-1" };
 }
 
