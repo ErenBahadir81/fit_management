@@ -155,6 +155,10 @@ function goalFor(state: FakeState, user: AdminUserDTO): GoalDTO | null {
   return {
     id: `goal_${user.id}`,
     status: user.goalStatus,
+    direction: "cut",
+    targetLeanGainKg: null,
+    trainingLevel: null,
+    adjustments: [],
     targetBodyFatPct: profile.target,
     profile: "optimal",
     start: {

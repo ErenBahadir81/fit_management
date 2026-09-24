@@ -45,7 +45,7 @@ describe("e2e flow (eren)", () => {
     expect(prog.json().program.days).toHaveLength(7);
     expect(prog.json().schedule).toHaveLength(7);
     const goal = await get("/goals/current");
-    expect(goal.json()).toEqual({ goal: null, progress: null });
+    expect(goal.json()).toEqual({ goal: null, progress: null, feedback: null, adjustment: null });
     const home = await get("/reports/home");
     expect(home.statusCode).toBe(200);
     expect(home.json().mascot.text.length).toBeGreaterThan(0);

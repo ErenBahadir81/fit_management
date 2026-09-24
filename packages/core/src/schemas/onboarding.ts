@@ -4,9 +4,9 @@
  * at the start, and turned straight into a first measurement and a goal.
  */
 import { z } from "zod";
-import { zActivityLevel, zDateKey, zGender, zGoalProfile, zWeekday } from "./common";
+import { zActivityLevel, zDateKey, zGender, zWeekday } from "./common";
 import { zBodyEntry } from "./body";
-import { zGoal } from "./goal";
+import { zGoal, zGoalInput } from "./goal";
 import { zUser } from "./user";
 
 export const zOnboardingProfile = z.object({
@@ -27,10 +27,8 @@ export const zOnboardingMeasurement = z.object({
 });
 export type OnboardingMeasurement = z.infer<typeof zOnboardingMeasurement>;
 
-export const zOnboardingGoal = z.object({
-  targetBodyFatPct: z.number().min(2).max(60),
-  profile: zGoalProfile.default("optimal"),
-});
+/** Same as `POST /goals` (T7: cut, bulk or recomp); `{ targetBodyFatPct, profile }` still means a cut. */
+export const zOnboardingGoal = zGoalInput;
 
 export const zOnboardingInput = z.object({
   profile: zOnboardingProfile,

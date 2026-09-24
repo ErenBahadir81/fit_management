@@ -10,3 +10,4 @@ export * from "./nutrition";
 export * from "./report";
 export * from "./mascot";
 export * from "./admin";
+export * from "./assessment";

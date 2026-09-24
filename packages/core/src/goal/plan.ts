@@ -2,13 +2,19 @@
  * The goal engine: target body-fat % → kg of fat to lose, safe weekly rate, daily calories,
  * macros and a week-by-week roadmap. Implements docs/plan/03-goal-engine.md steps 1–7.
  * Pure and deterministic: the same input always yields the same plan.
+ *
+ * T7: `computeGoalPlan` is the single entry point for all three directions. `cut` runs the
+ * original simulation below; `bulk` and `recomp` live in `./directions`. Every direction returns
+ * the same `GoalPlan` shape (docs/plan/11-muscle-gain-engine.md).
  */
 import { MIN_SAFE_BODY_FAT } from "../navy/index";
 import type { ActivityLevel, Gender, GoalProfile } from "../schemas/common";
-import type { GoalPlan, GoalWarning, Macros, RoadmapWeek } from "../schemas/goal";
+import { ffmi } from "../body/ffmi";
+import type { GoalDirection, GoalPlan, GoalWarning, Macros, RoadmapWeek, TrainingLevel } from "../schemas/goal";
 import type { GoalSettings } from "../schemas/settings";
 import { shiftKey } from "../time/index";
 import { round } from "../utils/index";
+import { computeBulkPlan, computeRecompPlan } from "./directions";
 import { goalMilestones, goalSummaryTr } from "./milestones";
 import { dailyTargetFor, safeWeeklyRate } from "./rate";
 import { bmrFor, fatFractionFor, macrosFor, tdeeFor } from "./tdee";
@@ -21,7 +27,14 @@ export interface GoalEngineInput {
   /** Optional — without it the BMR blend falls back to Katch-McArdle alone. */
   age?: number | null;
   activityLevel: ActivityLevel;
-  targetBodyFatPct: number;
+  /** Cut / recomp target. Required for those directions (a cut without one plans nothing). */
+  targetBodyFatPct?: number | null;
+  /** T7 — defaults to `cut`. */
+  direction?: GoalDirection;
+  /** T7 — bulk target: kg of lean mass to gain. */
+  targetLeanGainKg?: number | null;
+  /** T7 — muscle-gain rate level; inferred from FFMI when omitted. */
+  trainingLevel?: TrainingLevel | null;
   profile?: GoalProfile;
   /** dateKey the plan starts on (week 1 covers startDate … startDate + 6). */
   startDate: string;
@@ -36,7 +49,15 @@ function weightAtTargetBf(leanMassKg: number, targetBodyFatPct: number): number 
 }
 
 export function computeGoalPlan(input: GoalEngineInput): GoalPlan {
-  const { sex, weightKg, bodyFatPct, heightCm, activityLevel, targetBodyFatPct, startDate, settings } = input;
+  const direction = input.direction ?? "cut";
+  if (direction === "bulk") return computeBulkPlan(input);
+  if (direction === "recomp") return computeRecompPlan(input);
+  return computeCutPlan(input);
+}
+
+function computeCutPlan(input: GoalEngineInput): GoalPlan {
+  const { sex, weightKg, bodyFatPct, heightCm, activityLevel, startDate, settings } = input;
+  const targetBodyFatPct = input.targetBodyFatPct ?? bodyFatPct;
   const profile: GoalProfile = input.profile ?? "optimal";
   const age = input.age ?? null;
   const tdeeOverride = input.tdeeOverride ?? null;
@@ -112,6 +133,7 @@ export function computeGoalPlan(input: GoalEngineInput): GoalPlan {
       cumulativeLossKg += lossKg;
       cumulativeDeficitKcal += day.weeklyDeficitKcal;
 
+      const startLeanMassKg = startWeightKg - (startWeightKg * startBfPct) / 100;
       roadmap.push({
         weekIndex: i + 1,
         startKey: shiftKey(startDate, 7 * i),
@@ -132,6 +154,8 @@ export function computeGoalPlan(input: GoalEngineInput): GoalPlan {
           dailyCalories: day.dailyCalorieTarget,
           settings,
         }),
+        startLeanMassKg: round(startLeanMassKg, 2),
+        endLeanMassKg: round(state.leanMassKg, 2),
       });
       if (i === settings.maxWeeks - 1) hitHorizon = true;
     }
@@ -145,6 +169,7 @@ export function computeGoalPlan(input: GoalEngineInput): GoalPlan {
   const avgWeightKg = (weightKg + (reachable ? targetWeightKg : weightKg)) / 2;
 
   const base = {
+    direction: "cut" as const,
     fatToLoseKg: round(fatToLoseKg, 2),
     totalLossKg: round(totalLossKg, 2),
     targetWeightKg: round(reachable ? targetWeightKg : weightKg, 2),
@@ -167,6 +192,12 @@ export function computeGoalPlan(input: GoalEngineInput): GoalPlan {
     targetDate: shiftKey(startDate, 7 * estimatedWeeks),
     roadmap,
     warnings: [...warnings],
+    targetLeanMassKg: round(state.leanMassKg, 2),
+    leanGainKg: round(state.leanMassKg - leanMassKg, 2),
+    fatGainKg: round(state.fatMassKg - fatMassKg, 2),
+    ffmiStart: heightCm > 0 ? round(ffmi(leanMassKg, heightCm), 1) : null,
+    ffmiEnd: heightCm > 0 ? round(ffmi(state.leanMassKg, heightCm), 1) : null,
+    trainingLevel: input.trainingLevel ?? null,
   };
 
   /* C4 — the same plan, said out loud. */
