@@ -6,4 +6,17 @@ export { Floo as FlooLegacy, FLOO_SIZES, type FlooProps, type FlooSize } from ".
 export { SpeechBubble, type SpeechBubbleProps } from "./SpeechBubble";
 export { useMascot, MASCOT_FALLBACK, type MascotContext, type MascotLine } from "./useMascot";
 export { MOOD_POSE, MOOD_LABEL_TR, FLOO_COLORS, type Mood, type Pose } from "./moods";
+export { flooBus, useFlooEvents, describeFlooEvent, FLOO_EVENTS, type FlooEvent, type FlooEventName, type FlooLine } from "./events";
+export {
+  FlooModel,
+  flooBox,
+  flooTriggerPlan,
+  ambientMood,
+  GESTURES,
+  TRIGGERS as FLOO_TRIGGERS,
+  type Gesture as FlooGesture,
+  type FlooLod,
+  type Trigger as FlooTrigger,
+  type Mood as FlooModelMood,
+} from "./model";
 export * from "./voice";

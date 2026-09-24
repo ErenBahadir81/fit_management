@@ -1,17 +1,32 @@
-// Floo vs reference comparator. Usage: node compare.mjs <ours.png> <outdir>
+// Floo vs reference comparator. Usage: node compare.mjs <ours.png> <outdir> [reference.jpg]
+// Reference: 3rd arg, else $FLOO_REF, else the repo-root Gemini_Generated_Image_pgiob1pgiob1pgio.jpg.
 // Renders assumed: ours = playground canvas screenshot (body space 200x290 → canvas px).
 // Maps ours onto the reference's pixel grid using the body-space↔reference mapping
 // (base circle centre (100,158) r 62 ⇔ reference (1416,790) r 328), keys out our flat stage
 // background, composites onto the reference background colour, then pixelmatch + per-region scores.
 import fs from "node:fs"; import path from "node:path";
-import { PNG } from "pngjs"; import pixelmatch from "pixelmatch";
-import { chromium } from "playwright";
-const [,, oursPath, outDir] = process.argv; fs.mkdirSync(outDir, { recursive: true });
-const REF = "/Users/erenbahadir81/Projects/FitCycle/Gemini_Generated_Image_pgiob1pgiob1pgio.jpg";
+import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
+// pixelmatch/pngjs are not repo dependencies: resolve them normally, else from $FLOO_TOOLS
+// (default /tmp/floo-tools), the prefix you `npm i --prefix` them into.
+async function dep(name) {
+  try { return await import(name); } catch {}
+  const tools = path.resolve(process.env.FLOO_TOOLS || "/tmp/floo-tools");
+  const resolved = createRequire(path.join(tools, "package.json")).resolve(name);
+  return import(pathToFileURL(resolved).href);
+}
+const { PNG } = await dep("pngjs"); const pixelmatch = (await dep("pixelmatch")).default;
+import { launchBrowser } from "../floo-filmstrip/browser.mjs";
+const [,, oursPath, outDir, refArg] = process.argv;
+if (!oursPath || !outDir) { console.error("usage: node compare.mjs <ours.png> <outdir> [reference.jpg]"); process.exit(2); }
+fs.mkdirSync(outDir, { recursive: true });
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+const REF = path.resolve(refArg || process.env.FLOO_REF || path.join(REPO_ROOT, "Gemini_Generated_Image_pgiob1pgiob1pgio.jpg"));
+if (!fs.existsSync(REF)) { console.error(`reference image not found: ${REF}`); process.exit(2); }
 const K = 328 / 62; // reference px per body unit
 // crop of the reference we compare on (orig px): character bbox incl. limbs + shadow, excl. flying droplets
 const CROP = { x: 1000, y: 300, w: 850, h: 1150 };
-const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: CROP.w, height: CROP.h * 2 + 40 } });
+const b = await launchBrowser(); const p = await b.newPage({ viewport: { width: CROP.w, height: CROP.h * 2 + 40 } });
 const oursB64 = fs.readFileSync(oursPath).toString("base64");
 const refB64 = fs.readFileSync(REF).toString("base64");
 const { refPng, oursPng, bodyPx } = await p.evaluate(async ({ oursB64, refB64, CROP, K }) => {

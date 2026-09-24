@@ -23,6 +23,7 @@ import {
 import { useSession } from "../auth/session";
 import { useInvalidateHome } from "../home/useHome";
 import { REPORT_KEYS } from "../reports/useReport";
+import { flooBus } from "../../mascot/events";
 import { getApi } from "../../lib/api";
 import { todayKey } from "../../lib/dates";
 import { describeError } from "../../lib/errors";
@@ -176,6 +177,20 @@ function patchDay(qc: QueryClient, dateKey: string, fn: (day: NutritionDayView) 
   return prev;
 }
 
+/**
+ * Floo: announce the logged food, and `overTarget` only on the write that *crosses* the daily
+ * calorie target (prev ≤ target < now), so later snacks on an already-over day stay quiet.
+ */
+function emitMealLogged(qc: QueryClient, dateKey: string, prev: NutritionDayView | undefined, entries: MealEntryDTO[]) {
+  if (entries.length === 0) return;
+  const kcal = Math.round(entries.reduce((a, e) => a + e.totals.kcal, 0));
+  flooBus.emit("mealLogged", entries.length === 1 ? { kcal, name: entries[0]!.name } : { kcal, count: entries.length });
+  const day = qc.getQueryData<NutritionDayView>(nutritionDayKey(dateKey));
+  const target = day?.target.calories ?? 0;
+  if (!prev || !day || target <= 0) return;
+  if (prev.totals.kcal <= target && day.totals.kcal > target) flooBus.emit("overTarget", { overKcal: Math.round(day.totals.kcal - target) });
+}
+
 function useAfterWrite(dateKey: string) {
   const qc = useQueryClient();
   const invalidateHome = useInvalidateHome();
@@ -209,6 +224,7 @@ export function useAddEntry(dateKey: string) {
     },
     onSuccess: (entry, _input, ctx) => {
       if (ctx?.optimisticId) patchDay(qc, dateKey, (day) => replaceEntryInDay(day, ctx.optimisticId, entry));
+      emitMealLogged(qc, dateKey, ctx?.prev, [entry]);
     },
     onSettled: afterWrite,
   });
@@ -237,6 +253,7 @@ export function useAddEntries(dateKey: string) {
     onError: (_e, _inputs, ctx) => {
       if (ctx?.prev) qc.setQueryData(nutritionDayKey(dateKey), ctx.prev);
     },
+    onSuccess: (entries, _inputs, ctx) => emitMealLogged(qc, dateKey, ctx?.prev, entries),
     onSettled: afterWrite,
   });
 }
