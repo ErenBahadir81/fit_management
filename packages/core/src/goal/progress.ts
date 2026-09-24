@@ -434,8 +434,8 @@ export function computeGoalProgress(
     percentComplete = bfNow === null || bfSpan <= 0 ? 0 : clamp((goal.start.bodyFatPct - bfNow) / bfSpan, 0, 1) * 100;
   }
   const kgToGo = Math.max(0, sign * (targetWeightKg - (actualWeightKg ?? goal.start.weightKg)));
-  const bfForToGo = direction === "recomp" ? bfNow : actualBodyFatPct;
-  const bfToGo = direction === "bulk" ? 0 : Math.max(0, (bfForToGo ?? goal.start.bodyFatPct) - goal.targetBodyFatPct);
+  // The distance of the latest reading, as measured: clients read the target back as actual − bfToGo.
+  const bfToGo = direction === "bulk" ? 0 : Math.max(0, (actualBodyFatPct ?? goal.start.bodyFatPct) - goal.targetBodyFatPct);
 
   /* on-track classification (diff > 0 = further along than planned) and the projected end */
   let onTrack: OnTrack = "onTrack";
@@ -446,11 +446,11 @@ export function computeGoalProgress(
     // Weight is meant to stay nearly flat, so the scale says nothing here: body fat and lean mass
     // from the tape measurements do, and only once there are enough of them.
     onTrack = bf.status ?? "onTrack";
-    // One tape reading must not swing the date: the distance is the smoothed one (bfToGo), and the
-    // observed pace replaces the plan's only once a verdict shows it differs.
-    toGo = bfToGo;
-    const paceDiffers = bf.status !== null && bf.status !== "onTrack" && bf.slopePtsPerWeek !== null;
-    if (bfNow !== null) ratePerWeek = paceDiffers ? -bf.slopePtsPerWeek! : plannedBfRatePerWeek(goal);
+    // One tape reading must not swing the date: the distance is the smoothed one, and the observed
+    // pace replaces the plan's only once a verdict shows it differs. A stall projects no date.
+    toGo = Math.max(0, (bfNow ?? goal.start.bodyFatPct) - goal.targetBodyFatPct);
+    const paceDiffers = (bf.status === "ahead" || bf.status === "behind") && bf.slopePtsPerWeek !== null;
+    if (bfNow !== null && bf.status !== "stalled") ratePerWeek = paceDiffers ? -bf.slopePtsPerWeek! : plannedBfRatePerWeek(goal);
   } else {
     if (actualWeightKg !== null && expectedTrendNow !== null) {
       const ahead = sign * (actualWeightKg - expectedTrendNow);

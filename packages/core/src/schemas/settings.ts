@@ -152,14 +152,14 @@ export const zAdaptiveSettings = z.object({
   bfMinMeasurements: z.number().int().min(3).max(20).default(DEFAULT_ADAPTIVE_SETTINGS.bfMinMeasurements),
   bfMinSpanDays: z.number().int().min(7).max(112).default(DEFAULT_ADAPTIVE_SETTINGS.bfMinSpanDays),
   bfMaxAgeDays: z.number().int().min(1).max(56).default(DEFAULT_ADAPTIVE_SETTINGS.bfMaxAgeDays),
-  /** At most 180 days: the API loads 200 days of history. */
-  bfWindowDays: z.number().int().min(21).max(180).default(DEFAULT_ADAPTIVE_SETTINGS.bfWindowDays),
+  /** At most 140 days: the home and weekly reports load ≥ 150 days of history, the goal view 200. */
+  bfWindowDays: z.number().int().min(21).max(140).default(DEFAULT_ADAPTIVE_SETTINGS.bfWindowDays),
   bfStallPtsPerWeek: z.number().min(0).max(1).default(DEFAULT_ADAPTIVE_SETTINGS.bfStallPtsPerWeek),
   weighInNoisePctBw: z.number().min(0).max(3).default(DEFAULT_ADAPTIVE_SETTINGS.weighInNoisePctBw),
 })
   // Readings are only kept inside the window, so a longer span or age could never be satisfied.
-  .refine((s) => s.bfMinSpanDays <= s.bfWindowDays && s.bfMaxAgeDays <= s.bfWindowDays, {
-    message: "bfMinSpanDays and bfMaxAgeDays must fit inside bfWindowDays",
+  .refine((s) => s.bfMinSpanDays <= s.bfWindowDays && s.bfMaxAgeDays <= s.bfWindowDays && (s.bfMinMeasurements - 1) * 7 <= s.bfWindowDays, {
+    message: "bfMinSpanDays, bfMaxAgeDays and bfMinMeasurements weeks must fit inside bfWindowDays",
     path: ["bfWindowDays"],
   });
 export type AdaptiveSettings = z.infer<typeof zAdaptiveSettings>;

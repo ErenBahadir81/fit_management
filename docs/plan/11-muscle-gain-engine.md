@@ -133,9 +133,9 @@ roadmap's expected per-day values. Sources and calibration are in the research d
   goal's weekly readings in the window, counted from the goal start (whichever plan they belong
   to), read at the latest one (≥ 3 weeks of readings). A re-plan does not reset it. Every caller
   gets the same value, whatever older history it loads. Like the weight trend on a cut, it drives
-  the goal bar (`percentComplete`, and the fat bar, which is the same figure), `bfToGo`, the
+  the goal bar (`percentComplete`, and the fat bar, which is the same figure), the
   projection's distance and `reached`. `actualBodyFatPct` stays the latest reading as measured.
-- **Projection:** `bfToGo` ÷ pace. The pace is the plan's rate until a verdict shows the observed
+- **Projection:** the smoothed distance to the target ÷ pace (a stall projects no date). `bfToGo` stays the latest reading's distance, as measured. The pace is the plan's rate until a verdict shows the observed
   pace differs; then it is the observed one.
 - **A re-plan starts a new series.** Accepting a proposal, a recalibration or a PATCH re-plans
   from today, and the verdict only reads readings since then. This is intended: the calories

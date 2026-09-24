@@ -317,22 +317,25 @@ describe("computeGoalProgress — recomp reads body fat, never weight", () => {
     expect(heavyDrop.weeksRemainingProjected).toBe(Math.ceil(heavyDrop.bfToGo / PLAN_BF_RATE));
   });
 
-  it("goal bar, distance and projection follow the smoothed body fat, so one reading swings them far less", () => {
+  it("goal bar and projection follow the smoothed body fat, so one reading swings them far less", () => {
     const today = 56;
     const slipped = [...weekly(goal, 49), tape(goal, today, () => -2)];
     const onPlan = computeGoalProgress(goal, planWeights(goal, today), weekly(goal, today), [], day(today), S);
     const slip = computeGoalProgress(goal, planWeights(goal, today), slipped, [], day(today), S);
-    expect(slip.actualBodyFatPct).toBeCloseTo(onPlan.actualBodyFatPct! - 2, 1); // the reading itself is shown as measured …
-    const rawToGo = Math.max(0, slip.actualBodyFatPct! - goal.targetBodyFatPct);
-    expect(onPlan.bfToGo - rawToGo).toBeGreaterThan(1.5);
-    expect(onPlan.bfToGo - slip.bfToGo).toBeLessThan((onPlan.bfToGo - rawToGo) / 2); // … the distance moves far less
+    // the reading and its distance are shown as measured (clients read the target back as actual − bfToGo) …
+    expect(slip.actualBodyFatPct).toBeCloseTo(onPlan.actualBodyFatPct! - 2, 1);
+    expect(slip.actualBodyFatPct! - slip.bfToGo).toBeCloseTo(goal.targetBodyFatPct, 6);
+    const rawGap = onPlan.bfToGo - slip.bfToGo;
+    expect(rawGap).toBeGreaterThan(1.5);
+    // … the goal bar moves far less …
     const bfSpan = goal.start.bodyFatPct - goal.targetBodyFatPct;
-    expect(slip.percentComplete - onPlan.percentComplete).toBeLessThan(((onPlan.bfToGo - rawToGo) / bfSpan) * 100 * 0.5);
-    const rawSwing = onPlan.weeksRemainingProjected! - Math.ceil(rawToGo / PLAN_BF_RATE);
+    expect(slip.percentComplete - onPlan.percentComplete).toBeLessThan((rawGap / bfSpan) * 100 * 0.5);
+    // … and so does the projection (its distance is the smoothed one)
+    const rawSwing = onPlan.weeksRemainingProjected! - Math.ceil(slip.bfToGo / PLAN_BF_RATE);
     const swing = onPlan.weeksRemainingProjected! - slip.weeksRemainingProjected!;
     expect(rawSwing).toBeGreaterThan(5);
-    expect(Math.abs(swing)).toBeLessThanOrEqual(rawSwing / 2); // … and so does the projection
-    expect(slip.bfToGo).toBeCloseTo(smoothedBodyFat(goal, slipped, day(today), S)! - goal.targetBodyFatPct, 1);
+    expect(Math.abs(swing)).toBeLessThanOrEqual(rawSwing / 2);
+    expect(slip.weeksRemainingProjected).toBe(Math.ceil((smoothedBodyFat(goal, slipped, day(today), S)! - goal.targetBodyFatPct) / PLAN_BF_RATE));
   });
 });
 
@@ -583,7 +586,11 @@ describe("proposeGoalAdjustment — recomp on body fat", () => {
     expect(stalled.kind).toBe("stalled");
     expect(behind.kind).toBe("behind");
     expect(stalled.id).toBe(behind.id);
-    expect(stalled.id).toBe(adjustmentId(goal, "behind", START));
+    expect(stalled.id).toBe(adjustmentId(goal, "behind", START, "lowerCalories"));
+    // different advice is a different proposal: the stall while losing lean keeps calories
+    const leanStall = propose(goal, upTo(91), weekly(goal, 91, flatBf(goal), losingLean), 91)!;
+    expect(leanStall.options[0].action).toBe("replan");
+    expect(leanStall.id).not.toBe(stalled.id);
   });
 
   it("a dismissed body-fat proposal waits a new cool-down", () => {

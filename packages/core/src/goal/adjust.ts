@@ -165,8 +165,8 @@ export function estimateCurrentBody(
 }
 
 /** Deterministic proposal id: stable until the plan changes or the user answers. */
-export function adjustmentId(goal: AdaptiveGoal, kind: GoalAdjustmentKind, sinceKey: string): string {
-  return `adj_${hash32(`${goal.id}|${kind}|${goal.plan.startKey}|${sinceKey}`).toString(36)}`;
+export function adjustmentId(goal: AdaptiveGoal, kind: GoalAdjustmentKind, sinceKey: string, variant?: string): string {
+  return `adj_${hash32(`${goal.id}|${kind}|${goal.plan.startKey}|${sinceKey}${variant ? `|${variant}` : ""}`).toString(36)}`;
 }
 
 /** Latest of: goal start, plan (re)start, last answered proposal. */
@@ -334,11 +334,6 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
   const sinceKey = adjustmentSinceKey(goal);
   const sit = situation(input, direction, sinceKey);
   if (!sit) return null;
-  // Tape noise can flip a slow recomp between "behind" and "stalled" from one reading to the next;
-  // it is the same situation, so it keeps one id (an open proposal stays answerable, a dismissal holds).
-  const id = adjustmentId(goal, direction === "recomp" && sit.kind === "stalled" ? "behind" : sit.kind, sinceKey);
-  if ((goal.adjustments ?? []).some((a) => a.id === id)) return null;
-
   const before = currentSnapshot(goal, todayKey);
   const d = kg(sit.deviationKg);
   const options: GoalAdjustmentOption[] = [];
@@ -463,6 +458,15 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
       );
     }
   }
+
+  // Recomp: tape noise can flip "behind" and "stalled" from one reading to the next; that is the same
+  // situation and keeps one id as long as the advice is the same. Different advice is a new proposal,
+  // so accepting what was shown earlier gets ADJUSTMENT_STALE rather than another option.
+  const id =
+    direction === "recomp"
+      ? adjustmentId(goal, sit.kind === "stalled" ? "behind" : sit.kind, sinceKey, options.find((o) => o.recommended)?.action)
+      : adjustmentId(goal, sit.kind, sinceKey);
+  if ((goal.adjustments ?? []).some((a) => a.id === id)) return null;
 
   return {
     id,
