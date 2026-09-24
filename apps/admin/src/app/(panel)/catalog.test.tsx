@@ -114,6 +114,14 @@ describe("Exercise activation editing", () => {
     await user.type(triceps, "1,5");
     await user.tab();
     expect(triceps).toHaveValue("0,55");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(/önceki değer korundu/i);
+
+    // Clearing the field takes the muscle out, like the × button.
+    await user.clear(triceps);
+    await user.tab();
+    expect(triceps).toHaveValue("");
+    expect(within(dialog).getByRole("button", { name: "Triceps", pressed: false })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("adds and removes muscle pairs across all 17 keys", async () => {

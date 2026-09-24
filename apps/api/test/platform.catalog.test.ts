@@ -236,7 +236,7 @@ describe("admin exercises", () => {
     expect((await Exercise.findById(doc!._id).lean())!.slug).toBe("barbell-bench-press");
   });
 
-  it("has no reference for an exercise an admin made up", async () => {
+  it("has no reference for an exercise an admin made up, even under a catalog name", async () => {
     const { headers } = await asAdmin(t);
     const created = await t.app.inject({
       method: "POST",
@@ -246,6 +246,19 @@ describe("admin exercises", () => {
     });
     const res = await t.app.inject({ method: "GET", url: `${API}/admin/exercises/${created.json().exercise.id}`, headers });
     expect(res.json().reference).toBeNull();
+
+    // The seeded Face Pull is deleted and an admin makes their own: it is not the literature row.
+    const seeded = await Exercise.findOne({ nameKey: "face pull" }).lean();
+    await t.app.inject({ method: "DELETE", url: `${API}/admin/exercises/${seeded!._id}`, headers });
+    const own = await t.app.inject({
+      method: "POST",
+      url: `${API}/admin/exercises`,
+      headers,
+      payload: { name: "Face Pull", muscles: [{ key: "rearDelt", load: 1 }], defaultSets: 3, defaultReps: 15 },
+    });
+    expect(own.statusCode).toBe(201);
+    const ownRes = await t.app.inject({ method: "GET", url: `${API}/admin/exercises/${own.json().exercise.id}`, headers });
+    expect(ownRes.json().reference).toBeNull();
   });
 
   it("accepts loads on the 0.05 grid for any of the 17 keys; rejects repeated keys and loads outside 0–1", async () => {

@@ -136,12 +136,12 @@ describe("api-client", () => {
 
   it("admin.exercise GETs one exercise with its literature reference", async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      expect(url).toBe("http://api/admin/exercises/ex%2F1");
+      expect(url).toBe("http://api/admin/exercises/ex1");
       expect(init?.method ?? "GET").toBe("GET");
-      return jsonResponse(200, { exercise: { id: "ex/1", name: "Push-up" }, reference: null });
+      return jsonResponse(200, { exercise: { id: "ex1", name: "Push-up" }, reference: null });
     });
     const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never });
-    const res = await api.admin.exercise("ex/1");
+    const res = await api.admin.exercise("ex1");
     expect(res.exercise.name).toBe("Push-up");
     expect(res.reference).toBeNull();
   });

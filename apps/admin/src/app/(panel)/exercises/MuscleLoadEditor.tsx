@@ -136,20 +136,28 @@ function LoadRow({
   const on = value > 0;
   const revised = literature !== null && loadDiffers(on ? value : undefined, literature.load);
   const [draft, setDraft] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState(false);
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const hintId = useId();
+
+  /** Every change clears a pending "not a load" hint. */
+  const change = (load: number | null) => {
+    setInvalid(false);
+    onChange(load);
+  };
 
   const commit = (text: string) => {
     setDraft(null);
+    if (!text.trim()) return change(null); // clearing the field takes the muscle out
     const parsed = parseLoadInput(text);
-    if (parsed === null) return; // empty or out of range → keep the previous value
-    if (parsed === 0) onChange(null);
-    else onChange(Math.max(LOAD_STEP, snapLoad(parsed)));
+    if (parsed === null) return setInvalid(true); // not a 0–1 value: keep the previous one and say so
+    change(parsed === 0 ? null : Math.max(LOAD_STEP, snapLoad(parsed)));
   };
 
   const nudge = (dir: 1 | -1) => {
     const next = snapLoad(value + dir * LOAD_STEP);
-    onChange(next > 0 ? next : null);
+    change(next > 0 ? next : null);
   };
 
   return (
@@ -157,7 +165,7 @@ function LoadRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 sm:flex-nowrap">
         <button
           type="button"
-          onClick={() => onChange(on ? null : (literature?.load ?? 1))}
+          onClick={() => change(on ? null : (literature?.load ?? 1))}
           aria-pressed={on}
           className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
@@ -177,7 +185,7 @@ function LoadRow({
           onChange={(e) => {
             setDraft(null);
             const next = snapLoad(Number(e.target.value));
-            onChange(next > 0 ? next : null);
+            change(next > 0 ? next : null);
           }}
           className={cx(
             "h-1 w-28 shrink-0 cursor-pointer appearance-none rounded-full bg-line",
@@ -190,6 +198,8 @@ function LoadRow({
           inputMode="decimal"
           autoComplete="off"
           aria-label={`${row.name} yükü (sayı)`}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? hintId : undefined}
           value={draft ?? (on ? formatLoad(value) : "")}
           placeholder="—"
           onChange={(e) => setDraft(e.target.value)}
@@ -204,7 +214,10 @@ function LoadRow({
               nudge(e.key === "ArrowUp" ? 1 : -1);
             }
           }}
-          className="h-8 w-14 shrink-0 rounded-md border border-line bg-surface px-2 text-right text-[13px] tnum text-ink placeholder:text-subtle hover:border-line-strong focus-visible:border-brand focus-visible:outline-none"
+          className={cx(
+            "h-8 w-14 shrink-0 rounded-md border bg-surface px-2 text-right text-[13px] tnum text-ink placeholder:text-subtle focus-visible:outline-none",
+            invalid ? "border-danger" : "border-line hover:border-line-strong focus-visible:border-brand"
+          )}
         />
 
         {literature ? (
@@ -244,13 +257,19 @@ function LoadRow({
         <button
           type="button"
           aria-label={`${row.name} yükünü kaldır`}
-          onClick={() => onChange(null)}
+          onClick={() => change(null)}
           disabled={!on}
           className="grid size-6 shrink-0 place-items-center rounded text-subtle hover:text-ink disabled:invisible"
         >
           <X className="size-3.5" aria-hidden />
         </button>
       </div>
+
+      {invalid && (
+        <p id={hintId} role="alert" className="px-3 pb-2 text-xs text-danger sm:pl-8">
+          0 ile 1 arasında bir değer gir (0,05 adımla); önceki değer korundu.
+        </p>
+      )}
 
       {literature && open && (
         <div id={panelId} className="border-t border-line bg-surface-2 px-3 py-2.5 sm:pl-8">
@@ -260,7 +279,7 @@ function LoadRow({
               {LEVEL_TR[literature.confidence.level]} · {literature.confidence.n} tahmin, en büyük fark{" "}
               <span className="tnum">{formatLoad(literature.confidence.spread)}</span>
             </p>
-            <Button variant="quiet" size="sm" disabled={!revised} onClick={() => onChange(literature.load)}>
+            <Button variant="quiet" size="sm" disabled={!revised} onClick={() => change(literature.load)}>
               Bu değeri uygula
             </Button>
           </div>

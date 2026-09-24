@@ -425,4 +425,28 @@ describe("exercise catalog sync (activation v1)", () => {
     }
     expect((await runSeed(DEV_SEED)).migrated.snapshotLoads).toBe(0);
   });
+
+  it("gives refreshed snapshots the admin's catalog value where the admin had already edited the row", async () => {
+    await givenLegacyCatalog({ Squat: [{ key: "quads", load: 1 }, { key: "glutes", load: 0.5 }] });
+    const userId = new Types.ObjectId();
+    const now = new Date();
+    await Program.collection.insertOne({
+      userId,
+      name: "Eski",
+      mode: "cycle",
+      days: [{ id: "d1", order: 1, title: "Bacak", focus: "", kind: "strength", exercises: [{ name: "Squat", muscles: ["legs"], targetSets: 4, targetReps: 12 }], run: null, swim: null }],
+      currentDayId: "d1",
+      currentIndex: 0,
+      weekNumber: 1,
+      cycleNumber: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await runSeed(DEV_SEED);
+    expect(await musclesOf("Squat")).toEqual([{ key: "quads", load: 1 }, { key: "glutes", load: 0.5 }]);
+    expect((await Program.collection.findOne({ userId }))!.days[0].exercises[0].muscles).toEqual([
+      { key: "quads", load: 1 },
+      { key: "glutes", load: 0.5 },
+    ]);
+  });
 });

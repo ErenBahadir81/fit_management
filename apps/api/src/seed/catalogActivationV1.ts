@@ -37,7 +37,6 @@ export const LEGACY_V1_EXERCISE_MUSCLES: Readonly<Record<string, readonly string
 };
 
 const LEGACY_BY_KEY = new Map(Object.entries(LEGACY_V1_EXERCISE_MUSCLES).map(([name, keys]) => [exerciseNameKey(name), keys]));
-const SEED_BY_KEY = new Map(SEED_EXERCISES.map((e) => [exerciseNameKey(e.name), e]));
 
 type Pair = { key: string; load: number };
 
@@ -100,6 +99,7 @@ async function addAndUpgradeExercises(): Promise<Pick<CatalogSyncResult, "added"
   }
 
   const missing: SeedExercise[] = [];
+  const updates: mongoose.mongo.AnyBulkWriteOperation[] = [];
   let upgraded = 0;
   for (const row of SEED_EXERCISES) {
     const doc = bySlug.get(row.slug) ?? byName.get(exerciseNameKey(row.name));
@@ -113,8 +113,9 @@ async function addAndUpgradeExercises(): Promise<Pick<CatalogSyncResult, "added"
       set.muscles = row.muscles.map((m) => ({ key: m.key, load: m.load }));
       upgraded += 1;
     }
-    if (Object.keys(set).length > 0) await Exercise.collection.updateOne({ _id: doc._id }, { $set: set });
+    if (Object.keys(set).length > 0) updates.push({ updateOne: { filter: { _id: doc._id }, update: { $set: set } } });
   }
+  if (updates.length > 0) await Exercise.collection.bulkWrite(updates, { ordered: false });
 
   let added = 0;
   if (missing.length > 0) {
@@ -137,18 +138,34 @@ interface RawDay {
   exercises?: Array<Record<string, unknown>>;
 }
 
-/** Replaces untouched legacy snapshots with the catalog's values; returns the new days or null. */
-function refreshDays(days: unknown): RawDay[] | null {
+/**
+ * The catalog as it stands after the exercise step, by name key: what an untouched legacy snapshot
+ * should now say. That is the admin's value where an admin had already edited the row (so it was
+ * not upgraded), and the activation value otherwise. Rows without muscles, or still legacy, are left out.
+ */
+async function liveCatalogMuscles(): Promise<Map<string, Pair[]>> {
+  const docs = (await Exercise.collection.find({}, { projection: { name: 1, muscles: 1 } }).toArray()) as RawExercise[];
+  const out = new Map<string, Pair[]>();
+  for (const d of docs) {
+    const muscles = pairs(d.muscles);
+    if (typeof d.name !== "string" || !muscles || muscles.length === 0 || isUntouchedLegacy(d.name, d.muscles)) continue;
+    out.set(exerciseNameKey(d.name), muscles);
+  }
+  return out;
+}
+
+/** Replaces untouched legacy snapshots with the live catalog's values; returns the new days or null. */
+function refreshDays(days: unknown, live: Map<string, Pair[]>): RawDay[] | null {
   if (!Array.isArray(days)) return null;
   let changed = false;
   const next = (days as RawDay[]).map((day) => {
     if (!day || !Array.isArray(day.exercises)) return day;
     const exercises = day.exercises.map((ex) => {
       const name = String(ex?.name ?? "");
-      const row = SEED_BY_KEY.get(exerciseNameKey(name));
-      if (!row || !isUntouchedLegacy(name, ex.muscles)) return ex;
+      const muscles = live.get(exerciseNameKey(name));
+      if (!muscles || !isUntouchedLegacy(name, ex.muscles)) return ex;
       changed = true;
-      return { ...ex, muscles: row.muscles.map((m) => ({ key: m.key, load: m.load })) };
+      return { ...ex, muscles: muscles.map((m) => ({ key: m.key, load: m.load })) };
     });
     return { ...day, exercises };
   });
@@ -156,17 +173,20 @@ function refreshDays(days: unknown): RawDay[] | null {
 }
 
 async function refreshSnapshots(): Promise<number> {
+  const live = await liveCatalogMuscles();
   let n = 0;
   for (const model of [ProgramTemplate, Program] as const) {
     const col = model.collection;
+    const ops: mongoose.mongo.AnyBulkWriteOperation[] = [];
     // Every doc with an exercise: names are matched with `exerciseNameKey` folding, not exact case.
     const cursor = col.find({ "days.exercises.0": { $exists: true } }, { projection: { days: 1 } });
     for await (const doc of cursor) {
-      const days = refreshDays(doc.days);
-      if (!days) continue;
-      await col.updateOne({ _id: doc._id }, { $set: { days } });
-      n += 1;
+      const days = refreshDays(doc.days, live);
+      // Filtering on the days that were read lets a concurrent edit (e.g. PUT /program during a
+      // rolling deploy) win: its document no longer matches, so this write is skipped, not undone.
+      if (days) ops.push({ updateOne: { filter: { _id: doc._id, days: doc.days }, update: { $set: { days } } } });
     }
+    if (ops.length > 0) n += (await col.bulkWrite(ops, { ordered: false })).modifiedCount;
   }
   return n;
 }
@@ -179,7 +199,8 @@ async function refreshSnapshots(): Promise<number> {
  * - adds every catalog exercise that no row matches by slug or name (`nameKey` folding),
  * - replaces `muscles` only on untouched legacy rows (see `isUntouchedLegacy`), never admin edits,
  * - links matched rows to their catalog slug (the admin panel shows the literature next to them),
- * - refreshes untouched legacy exercise snapshots in program templates and user programs.
+ * - refreshes untouched legacy exercise snapshots in program templates and user programs with the
+ *   catalog's resulting values (the admin's, where an admin had already edited the row).
  *
  * A marker document makes it run exactly once, so exercises an admin deletes, renames or edits
  * afterwards are never resurrected or overwritten. Idempotent either way.
