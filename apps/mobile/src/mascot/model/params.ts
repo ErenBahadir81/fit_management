@@ -51,10 +51,24 @@ export interface FlooParams {
   legR: number;
 }
 
-export const MOODS = ["idle", "happy", "celebrate", "sad", "worried", "sleepy"] as const;
+export const MOODS = ["idle", "happy", "celebrate", "sad", "worried", "sleepy", "think", "proud", "energetic"] as const;
 export type Mood = (typeof MOODS)[number];
 
-export const TRIGGERS = ["mealLogged", "goalHit", "streakUp", "missedDay", "overTarget", "waterLogged", "tap"] as const;
+export const TRIGGERS = [
+  "mealLogged",
+  "goalHit",
+  "streakUp",
+  "missedDay",
+  "overTarget",
+  "waterLogged",
+  "setCompleted",
+  "workoutDone",
+  "measurementLogged",
+  "volumeWarning",
+  "goalAdjustProposal",
+  "greet",
+  "tap",
+] as const;
 export type Trigger = (typeof TRIGGERS)[number];
 
 export const MOOD_PARAMS: Record<Mood, FlooParams> = {
@@ -100,6 +114,27 @@ export const MOOD_PARAMS: Record<Mood, FlooParams> = {
     blush: 0.3, brightness: 0.55, tempo: 0.55,
     armL: -4, armR: -4, legL: 4, legR: 0,
   },
+  think: {
+    squash: 0.01, lean: 4, hop: 0, tipBend: 0.1, tipLength: 1.0,
+    eyeOpen: 0.9, eyeSquint: 0.1, lookX: 0.45, lookY: -0.55,
+    browY: -3, browAngle: -6, mouthCurve: 2, mouthOpen: 3.5, mouthWidth: 11,
+    blush: 0.3, brightness: 0.7, tempo: 0.8,
+    armL: 0, armR: 0, legL: 0, legR: 0,
+  },
+  proud: {
+    squash: -0.05, lean: -1, hop: 0, tipBend: 0.5, tipLength: 1.08,
+    eyeOpen: 0.75, eyeSquint: 0.45, lookX: 0, lookY: -0.2,
+    browY: -5, browAngle: -3, mouthCurve: 8, mouthOpen: 9, mouthWidth: 15,
+    blush: 0.85, brightness: 0.95, tempo: 1.0,
+    armL: 0, armR: 0, legL: 0, legR: 0,
+  },
+  energetic: {
+    squash: -0.04, lean: 0, hop: 0, tipBend: 0.55, tipLength: 1.1,
+    eyeOpen: 1.0, eyeSquint: 0.25, lookX: 0, lookY: -0.1,
+    browY: -5, browAngle: -6, mouthCurve: 8, mouthOpen: 16, mouthWidth: 15.5,
+    blush: 0.75, brightness: 1.0, tempo: 1.4,
+    armL: 0, armR: 0, legL: 0, legR: 0,
+  },
 };
 
 /**
@@ -113,6 +148,9 @@ export const MOOD_BROW_WEIGHT: Record<Mood, number> = {
   sad: 4.6,
   worried: 5.2,
   sleepy: 5,
+  think: 5.4,
+  proud: 5.5,
+  energetic: 5.7,
 };
 
 /** Turkish labels, for the accessibility name — the app speaks Turkish. */
@@ -123,6 +161,9 @@ export const MOOD_LABEL_TR: Record<Mood, string> = {
   sad: "üzgün",
   worried: "endişeli",
   sleepy: "uykulu",
+  think: "düşünceli",
+  proud: "gururlu",
+  energetic: "enerjik",
 };
 
 export const FLOO_MODEL_COLORS = {

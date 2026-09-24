@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BodyEntryDTO, BodyEntryInput, BodySummary, BodyTrends, WeighInDTO } from "@fitfloow/core";
+import { flooBus } from "../../mascot/events";
 import { getApi } from "../../lib/api";
 import { todayKey } from "../../lib/dates";
 import { describeError } from "../../lib/errors";
@@ -78,8 +79,9 @@ export function useQuickWeighIn() {
       for (const [key, data] of ctx?.trends ?? []) if (data) qc.setQueryData(key, data);
       toast.show({ message: describeError(e, "Tartı kaydedilemedi. Tekrar dene."), kind: "error" });
     },
-    onSuccess: () => {
+    onSuccess: (weighIn) => {
       void haptic.success();
+      flooBus.emit("measurementLogged", { dateKey: weighIn.dateKey, weightKg: weighIn.weightKg, kind: "weighIn" });
     },
     onSettled: () => void invalidate(),
   });
@@ -97,6 +99,7 @@ export function useCreateBodyEntry() {
         prev ? { ...prev, entries: [...prev.entries.filter((e) => e.dateKey !== entry.dateKey), entry].sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1)) } : prev
       );
       // The success haptic comes from the SuccessCheck the sheet shows next.
+      flooBus.emit("measurementLogged", { dateKey: entry.dateKey, kind: "entry" });
     },
     onError: (e) => toast.show({ message: describeError(e, "Ölçüm kaydedilemedi. Tekrar dene."), kind: "error" }),
     onSettled: () => void invalidate(),

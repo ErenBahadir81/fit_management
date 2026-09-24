@@ -4,9 +4,14 @@ import { useTheme } from "../../theme";
 import { FlooEffects } from "./Effects";
 import { FlooModel } from "./FlooModel";
 import { MOODS, TRIGGERS, type Mood, type Trigger } from "./params";
+import { GESTURES, type Gesture } from "./poses";
+import type { FlooLod } from "./behaviour";
 import { useFlooModel } from "./useFlooModel";
 
 const FLOO_SIZE = 240;
+/** Stage widths per LOD, so each level is judged at the size it will actually be shown at. */
+const LOD_SIZE: Record<FlooLod, number> = { full: FLOO_SIZE, mid: 80, badge: 44 };
+const LODS: FlooLod[] = ["full", "mid", "badge"];
 const HYDRATION_STEPS = [0, 25, 50, 75, 100] as const;
 
 /**
@@ -18,6 +23,10 @@ export function Playground() {
   const { colors } = useTheme();
   const floo = useFlooModel("idle", 0.75);
   const [reduced, setReduced] = useState(false);
+  const [lod, setLod] = useState<FlooLod>("full");
+  const [mirror, setMirror] = useState(false);
+  const [pointMode, setPointMode] = useState(false);
+  const [zoom, setZoom] = useState(false);
   const stage = useRef({ w: 1, h: 1 });
 
   const onStageLayout = useCallback((e: LayoutChangeEvent) => {
@@ -35,6 +44,7 @@ export function Playground() {
     [floo]
   );
   const release = useCallback(() => floo.setLook({ x: 0, y: 0 }), [floo]);
+  const flooWidth = zoom && lod !== "full" ? LOD_SIZE[lod] * 4 : LOD_SIZE[lod];
 
   const s = styles;
   const chip = (active: boolean) => [
@@ -45,7 +55,7 @@ export function Playground() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={s.page}>
-      <Text style={[s.title, { color: colors.ink }]}>Floo — damla modeli</Text>
+      <Text style={[s.title, { color: colors.ink }]}>Floo 3 — iskelet ve pozlar</Text>
 
       <View
         testID="floo-stage"
@@ -53,7 +63,17 @@ export function Playground() {
         onLayout={onStageLayout}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
-        onResponderGrant={(e) => track(e.nativeEvent.locationX, e.nativeEvent.locationY)}
+        onResponderGrant={(e) => {
+          if (pointMode) {
+            // Stage px → Floo px: the model is centred in the stage.
+            const { w, h } = stage.current;
+            const fw = flooWidth;
+            const fh = fw * (lod === "full" ? 1.45 : lod === "mid" ? 1.25 : 1);
+            floo.setPointAt({ x: e.nativeEvent.locationX - (w - fw) / 2, y: e.nativeEvent.locationY - (h - fh) / 2 });
+            return;
+          }
+          track(e.nativeEvent.locationX, e.nativeEvent.locationY);
+        }}
         onResponderMove={(e) => track(e.nativeEvent.locationX, e.nativeEvent.locationY)}
         onResponderRelease={release}
         {...(Platform.OS === "web"
@@ -81,7 +101,8 @@ export function Playground() {
         <Pressable onPress={() => floo.fire("tap")} testID="floo-tap" style={s.stageInner}>
           <FlooModel
             testID="floo-model"
-            size={FLOO_SIZE}
+            size={flooWidth}
+            lod={lod}
             animate={!reduced}
             {...floo.flooProps}
             look={reduced ? { x: 0, y: 0 } : floo.look}
@@ -108,6 +129,50 @@ export function Playground() {
         ))}
       </View>
 
+      <Text style={[s.label, { color: colors.inkMuted }]}>Jest</Text>
+      <View style={s.row}>
+        {GESTURES.map((g: Gesture) =>
+          g === "walk" ? (
+            <Pressable key={g} testID="gesture-walk" onPress={() => floo.setWalking(!floo.walking)} style={chip(floo.walking)}>
+              <Text style={chipText(floo.walking)}>walk</Text>
+            </Pressable>
+          ) : (
+            <Pressable key={g} testID={`gesture-${g}`} onPress={() => floo.play(g, mirror)} style={chip(false)}>
+              <Text style={chipText(false)}>{g}</Text>
+            </Pressable>
+          )
+        )}
+      </View>
+      <View style={[s.row, s.switchRow]}>
+        <Text style={[s.label, { color: colors.inkMuted, marginTop: 0 }]}>Sol el (ayna)</Text>
+        <Switch testID="gesture-mirror" value={mirror} onValueChange={setMirror} />
+      </View>
+      <View style={[s.row, s.switchRow]}>
+        <Text style={[s.label, { color: colors.inkMuted, marginTop: 0 }]}>Dokununca işaret et</Text>
+        <Switch
+          testID="point-mode"
+          value={pointMode}
+          onValueChange={(v) => {
+            setPointMode(v);
+            if (!v) floo.setPointAt(null);
+          }}
+        />
+      </View>
+
+      <Text style={[s.label, { color: colors.inkMuted }]}>Detay seviyesi (LOD)</Text>
+      <View style={s.row}>
+        {LODS.map((l) => (
+          <Pressable key={l} testID={`lod-${l}`} onPress={() => setLod(l)} style={chip(lod === l)}>
+            <Text style={chipText(lod === l)}>
+              {l} · {LOD_SIZE[l]}px
+            </Text>
+          </Pressable>
+        ))}
+        <Pressable testID="lod-zoom" onPress={() => setZoom(!zoom)} style={chip(zoom)}>
+          <Text style={chipText(zoom)}>4× büyüt</Text>
+        </Pressable>
+      </View>
+
       <Text style={[s.label, { color: colors.inkMuted }]}>Hidrasyon</Text>
       <View style={s.row}>
         {HYDRATION_STEPS.map((n) => {
@@ -131,6 +196,9 @@ export function Playground() {
           hydration: Math.round(floo.hydration * 100) / 100,
           look: { x: Math.round(floo.look.x * 100) / 100, y: Math.round(floo.look.y * 100) / 100 },
           trigger: floo.trigger,
+          walking: floo.walking,
+          pointAt: floo.pointAt,
+          lod,
           reduced,
         })}
       </Text>

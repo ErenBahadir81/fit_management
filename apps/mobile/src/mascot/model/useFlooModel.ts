@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from "react";
+import { TRIGGER_PLAN } from "./behaviour";
 import type { EffectKind } from "./Effects";
 import type { FlooModelProps } from "./FlooModel";
 import { MOOD_PARAMS, type Mood, type Trigger } from "./params";
+import type { Gesture } from "./poses";
 
 export interface FlooEffectState {
   kind: EffectKind | null;
@@ -16,24 +18,18 @@ export interface FlooController {
   trigger: Trigger | null;
   effect: FlooEffectState;
   fire: (trigger: Trigger) => void;
+  /** Play a gesture from the pose library on its own, without a mood change or an effect. */
+  play: (gesture: Gesture, mirror?: boolean) => void;
   setMood: (mood: Mood) => void;
+  walking: boolean;
+  setWalking: (walking: boolean) => void;
+  pointAt: { x: number; y: number } | null;
+  setPointAt: (p: { x: number; y: number } | null) => void;
   setHydration: (hydration: number) => void;
   setLook: (look: { x: number; y: number }) => void;
   /** Spread straight onto `<FlooModel />`. */
-  flooProps: Pick<FlooModelProps, "mood" | "hydration" | "look" | "trigger" | "onTriggerEnd">;
+  flooProps: Pick<FlooModelProps, "mood" | "hydration" | "look" | "trigger" | "onTriggerEnd" | "gesture" | "walking" | "pointAt">;
 }
-
-/** What each trigger does to the mood, what it throws in the air, and how long it owns the face. */
-const PLAN: Record<Trigger, { mood: Mood | null; effect: EffectKind | null; hold: number; hydration?: number }> = {
-  mealLogged: { mood: "happy", effect: "hearts", hold: 1400 },
-  goalHit: { mood: "celebrate", effect: "confetti", hold: 1800 },
-  streakUp: { mood: "celebrate", effect: "star", hold: 1600 },
-  // Sinks for a moment, then picks itself up through `worried` — it never stays punished.
-  missedDay: { mood: "sad", effect: null, hold: 1500 },
-  overTarget: { mood: "worried", effect: null, hold: 1400 },
-  waterLogged: { mood: "happy", effect: "droplets", hold: 1300, hydration: 0.15 },
-  tap: { mood: null, effect: null, hold: 0 },
-};
 
 /**
  * The state around the character: which mood is showing, how hydrated it is, where it is looking,
@@ -47,6 +43,9 @@ export function useFlooModel(initial: Mood = "idle", initialHydration = 0.75): F
   const [trigger, setTrigger] = useState<Trigger | null>(null);
   const [triggerKey, setTriggerKey] = useState(0);
   const [effect, setEffect] = useState<FlooEffectState>({ kind: null, nonce: 0 });
+  const [gesture, setGesture] = useState<{ name: Gesture; key: number; mirror?: boolean } | null>(null);
+  const [walking, setWalking] = useState(false);
+  const [pointAt, setPointAt] = useState<{ x: number; y: number } | null>(null);
 
   /** The mood to fall back to once the juice is spent. */
   const restingMood = useRef<Mood>(initial);
@@ -64,7 +63,7 @@ export function useFlooModel(initial: Mood = "idle", initialHydration = 0.75): F
   const fire = useCallback((name: Trigger) => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
-    const plan = PLAN[name];
+    const plan = TRIGGER_PLAN[name];
 
     setTrigger(name);
     setTriggerKey((k) => k + 1);
@@ -73,9 +72,10 @@ export function useFlooModel(initial: Mood = "idle", initialHydration = 0.75): F
     if (plan.mood) setMoodState(plan.mood);
 
     const back = restingMood.current;
-    if (name === "missedDay") {
+    if (plan.recover) {
       // sad → worried → back. The recovery is the whole point of the beat.
-      timers.current.push(setTimeout(() => setMoodState("worried"), plan.hold));
+      const recover = plan.recover;
+      timers.current.push(setTimeout(() => setMoodState(recover), plan.hold));
       timers.current.push(setTimeout(() => setMoodState(back), plan.hold + 900));
     } else if (plan.mood) {
       timers.current.push(setTimeout(() => setMoodState(back), plan.hold));
@@ -85,6 +85,10 @@ export function useFlooModel(initial: Mood = "idle", initialHydration = 0.75): F
     }
   }, []);
 
+  const play = useCallback((name: Gesture, mirror = false) => {
+    setGesture((g) => ({ name, key: (g?.key ?? 0) + 1, mirror }));
+  }, []);
+
   const flooProps = useMemo(
     () => ({
       mood,
@@ -92,11 +96,31 @@ export function useFlooModel(initial: Mood = "idle", initialHydration = 0.75): F
       look,
       trigger: trigger ? { name: trigger, key: triggerKey } : null,
       onTriggerEnd: undefined,
+      gesture,
+      walking,
+      pointAt,
     }),
-    [mood, hydration, look, trigger, triggerKey]
+    [mood, hydration, look, trigger, triggerKey, gesture, walking, pointAt]
   );
 
-  return { mood, hydration, look, triggerKey, trigger, effect, fire, setMood, setHydration, setLook, flooProps };
+  return {
+    mood,
+    hydration,
+    look,
+    triggerKey,
+    trigger,
+    effect,
+    fire,
+    play,
+    setMood,
+    setHydration,
+    setLook,
+    walking,
+    setWalking,
+    pointAt,
+    setPointAt,
+    flooProps,
+  };
 }
 
 export { MOOD_PARAMS };
