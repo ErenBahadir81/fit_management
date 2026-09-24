@@ -18,14 +18,15 @@ const RAMP_IN = [...VOLUME_RAMP_INPUT];
  * One muscle's weekly sets on a 0–25 axis. The recommended 10–15 band is a tinted zone on the
  * track, so "am I in range" reads without a legend; the fill blends its colour continuously along
  * the bands. It moves only because the number moved (an edit in the editor), on a spring — or a
- * 150 ms timing under reduced motion.
+ * 150 ms timing under reduced motion. `snappy`, not `gentle`: it follows every stepper tap, and
+ * a held stepper must not leave the bar trailing behind the number.
  */
 export const VolumeBar = memo(function VolumeBar({ row, suggestion, onSuggest }: { row: VolumeRow; suggestion?: string | null; onSuggest?: (key: string) => void }) {
   const { colors } = useTheme();
   const reduce = useReducedMotion();
   const sets = useSharedValue(row.sets);
   useEffect(() => {
-    sets.value = reduce ? withTiming(row.sets, timing.reduced) : withSpring(row.sets, springs.gentle);
+    sets.value = reduce ? withTiming(row.sets, timing.reduced) : withSpring(row.sets, springs.snappy);
   }, [reduce, row.sets, sets]);
 
   const ramp = useMemo(() => volumeRampOutput(colors), [colors]);

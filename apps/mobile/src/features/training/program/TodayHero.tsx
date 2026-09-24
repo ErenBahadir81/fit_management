@@ -165,7 +165,7 @@ function RestCard({ day, eyebrow, busy, onRestDone, onOther }: TodayHeroProps & 
         {day.title && day.title !== "Dinlenme" ? day.title : "Dinlenme günü"}
       </Text>
       <Text variant="body" color="inkMuted">
-        Kaslar dinlenirken büyür. Hafif yürüyüş, bol su, iyi uyku. Günü bitirdiğinde işaretle, döngü devam etsin.
+        Kaslar dinlenirken büyür. Hafif yürüyüş, bol su, iyi uyku. Günü bitirince «Dinlendim» de, program sıradaki güne geçsin.
       </Text>
       <Button label="Dinlendim" variant="primary" size="lg" icon="check" onPress={onRestDone} loading={busy} full testID="rest-done" style={styles.cta} />
       <View style={styles.secondaryRow}>
@@ -194,7 +194,7 @@ function DoneCard({ log, busy, onUndo, onOpenLog, onOther }: TodayHeroProps & { 
       </Text>
       {rest ? (
         <Text variant="body" color="inkMuted">
-          Döngü bir sonraki güne geçti. Yarın görüşürüz.
+          Program sıradaki güne geçti. Yarın görüşürüz.
         </Text>
       ) : (
         <View style={styles.chips}>

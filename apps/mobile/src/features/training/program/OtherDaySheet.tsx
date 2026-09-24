@@ -67,7 +67,7 @@ export function OtherDaySheet({ sheetRef, program, plannedDayId, busy, onLog, on
                 testID={`other-day-${index}`}
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
-                accessibilityLabel={`${c.position}, ${c.day.title}${c.planned ? ", bugün planlanan" : ""}`}
+                accessibilityLabel={`${c.position}, ${c.day.title}${c.day.kind === "rest" ? ", dinlenme günü" : ""}${c.planned ? ", bugün planlanan" : ""}`}
                 style={[
                   styles.tile,
                   { backgroundColor: selected ? colors.primarySoft : colors.surfaceMuted, borderColor: selected ? colors.primary : "transparent" },

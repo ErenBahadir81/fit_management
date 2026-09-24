@@ -129,7 +129,7 @@ function IconAction({ icon, label, onPress, disabled, danger, testID }: { icon: 
 function StepperField({ label, value, onChange, min, max, step, testID }: { label: string; value: number; onChange: (v: number) => void; min: number; max: number; step?: number; testID: string }) {
   return (
     <View style={styles.stepperField}>
-      <Text variant="caption" color="inkMuted">
+      <Text variant="label" color="inkMuted">
         {label}
       </Text>
       <Stepper value={value} onChange={onChange} min={min} max={max} step={step} size="sm" testID={testID} label={label} />
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   exerciseHead: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   iconAction: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: radii.sm },
   dim: { opacity: 0.35 },
-  stepperRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.lg },
-  stepperField: { gap: spacing.xs },
+  stepperRow: { gap: spacing.xs },
+  stepperField: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   grow: { flex: 1 },
 });

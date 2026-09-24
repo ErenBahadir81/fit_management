@@ -176,7 +176,7 @@ function DayRow({
         </Pressable>
         {canRemove ? (
           <Pressable onPress={() => onRemove(index)} haptic="medium" testID={`editor-remove-day-${index}`} accessibilityLabel={`${label} gününü sil`} style={styles.remove}>
-            <Icon icon="delete" size={18} color="danger" />
+            <Icon icon="delete" size={18} color="inkSubtle" />
           </Pressable>
         ) : null}
       </View>

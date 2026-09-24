@@ -126,7 +126,7 @@ function ProgramPane({ header, onCreate }: { header: React.ReactNode; onCreate: 
   const start = useCallback(() => router.push(WORKOUT_ROUTE), [router]);
   const restDone = useCallback(() => {
     if (!currentDay) return;
-    logDay.mutate({ dayId: currentDay.id }, { onSuccess: () => toast.show({ message: "Dinlenme günü tamam, döngü devam ediyor", kind: "success" }) });
+    logDay.mutate({ dayId: currentDay.id }, { onSuccess: () => toast.show({ message: "Dinlenme günü tamam", kind: "success" }) });
   }, [currentDay, logDay, toast]);
   const confirmBreak = useCallback(
     (reason: string | undefined) => {

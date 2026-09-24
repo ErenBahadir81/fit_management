@@ -44,6 +44,15 @@ export function createRecorder() {
 export async function open({ rec, viewport = { width: 420, height: 900 }, context = {} }) {
   const browser = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
   const ctx = await browser.newContext({ viewport, ...context });
+  // Where the CDN is out of reach (sandboxes, CI behind a TLS-inspecting proxy) Skia's wasm can be
+  // served from the local `canvaskit-wasm` package instead: E2E_CANVASKIT_DIR=node_modules/canvaskit-wasm/bin/full
+  if (process.env.E2E_CANVASKIT_DIR) {
+    const dir = process.env.E2E_CANVASKIT_DIR;
+    await ctx.route("https://cdn.jsdelivr.net/npm/canvaskit-wasm@*/bin/full/*", (route) => {
+      const file = route.request().url().split("/").pop();
+      return route.fulfill({ path: `${dir}/${file}`, contentType: file.endsWith(".wasm") ? "application/wasm" : "application/javascript" });
+    });
+  }
   const page = await ctx.newPage();
   const state = { where: "boot" };
   const at = () => state.where;
