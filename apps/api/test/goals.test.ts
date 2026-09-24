@@ -132,7 +132,7 @@ describe("GET /goals/current", () => {
   it("is null for a user without a goal", async () => {
     const { headers } = await asUser(t);
     const res = await t.app.inject({ method: "GET", url: `${api}/goals/current`, headers });
-    expect(res.json()).toEqual({ goal: null, progress: null });
+    expect(res.json()).toEqual({ goal: null, progress: null, feedback: null, adjustment: null });
   });
 
   it("returns live progress against the plan", async () => {

@@ -3,7 +3,7 @@
  * they never say *when you get where*. These pure helpers turn the roadmap into four checkpoints
  * and one sentence a person can read out loud.
  */
-import type { GoalMilestone, GoalPlan, RoadmapWeek } from "../schemas/goal";
+import type { GoalDirection, GoalMilestone, GoalPlan, RoadmapWeek } from "../schemas/goal";
 import { formatDayMonthLocativeTr } from "../time/index";
 import { round } from "../utils/index";
 
@@ -33,19 +33,29 @@ export function formatTrNumber(n: number): string {
 const FRACTIONS = [0.25, 0.5, 0.75, 1] as const;
 
 /**
- * One checkpoint per quarter of the total weight to lose, dated on the roadmap week that reaches
- * it. Short plans naturally collapse several quarters onto the same week — those are merged, so
- * a three-week plan reports three distinct dates rather than four rows saying the same thing.
+ * How far along the journey a week's end is, in the unit the direction moves: kg lost (cut),
+ * kg gained (bulk) or body-fat points lost (recomp, whose weight barely moves).
  */
-export function goalMilestones(roadmap: readonly RoadmapWeek[], totalLossKg: number): GoalMilestone[] {
-  if (roadmap.length === 0 || totalLossKg <= 0.0005) return [];
-  const startWeightKg = roadmap[0].startWeightKg;
+function progressAt(direction: GoalDirection, first: RoadmapWeek, w: RoadmapWeek): number {
+  if (direction === "bulk") return w.endWeightKg - first.startWeightKg;
+  if (direction === "recomp") return first.startBfPct - w.endBfPct;
+  return first.startWeightKg - w.endWeightKg;
+}
+
+/**
+ * One checkpoint per quarter of the journey, dated on the roadmap week that reaches it. Short
+ * plans naturally collapse several quarters onto the same week — those are merged, so a
+ * three-week plan reports three distinct dates rather than four rows saying the same thing.
+ * `total` is in the direction's unit (see `progressAt`); for a cut it is the total weight to lose.
+ */
+export function goalMilestones(roadmap: readonly RoadmapWeek[], total: number, direction: GoalDirection = "cut"): GoalMilestone[] {
+  if (roadmap.length === 0 || total <= 0.0005) return [];
+  const first = roadmap[0];
 
   const byDate = new Map<string, GoalMilestone>();
   for (const fraction of FRACTIONS) {
-    const wanted = totalLossKg * fraction;
-    const week =
-      roadmap.find((w) => startWeightKg - w.endWeightKg >= wanted - 0.0005) ?? roadmap[roadmap.length - 1];
+    const wanted = total * fraction;
+    const week = roadmap.find((w) => progressAt(direction, first, w) >= wanted - 0.0005) ?? roadmap[roadmap.length - 1];
     // Later fractions overwrite earlier ones on a shared week: the most advanced statement that
     // is true on that date is the one worth showing.
     byDate.set(week.endKey, {
@@ -67,10 +77,17 @@ export function goalSummaryTr(plan: Omit<GoalPlan, "milestones" | "summaryTr">):
   const kcal = formatTrNumber(Math.round(plan.initialDailyCalorieTarget));
   const last = plan.roadmap[plan.roadmap.length - 1];
   if (!last || plan.estimatedWeeks === 0) {
+    if (plan.direction === "bulk") return `Bu hedef için plan çıkmadı — günde yaklaşık ${kcal} kcal ile koruma kalorisindesin.`;
     return `Şu an zaten hedefindesin — günde yaklaşık ${kcal} kcal ile buradasın.`;
   }
   const when = formatDayMonthLocativeTr(last.endKey);
   const kg = Math.round(last.endWeightKg);
   const bf = formatTrNumber(round(last.endBfPct, 1));
+  if (plan.direction === "bulk" || plan.direction === "recomp") {
+    const lean = formatTrNumber(round(Math.max(0, plan.leanGainKg ?? 0), 1));
+    return plan.direction === "bulk"
+      ? `${when} ~${kg} kg, +${lean} kg kas ve %${bf} yağ oranındasın — ${plan.estimatedWeeks} hafta, günde ${kcal} kcal.`
+      : `${when} %${bf} yağ oranında ve +${lean} kg kasla ~${kg} kg'dasın — ${plan.estimatedWeeks} hafta, günde ${kcal} kcal.`;
+  }
   return `${when} ~${kg} kg ve %${bf} yağ oranındasın — ${plan.estimatedWeeks} hafta, günde ${kcal} kcal.`;
 }

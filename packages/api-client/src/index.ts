@@ -17,8 +17,13 @@ import type {
   FoodDTO,
   FoodInput,
   FoodSearchResponse,
+  BodyAssessment,
+  GoalAdjustment,
+  GoalAdjustmentAnswer,
   GoalDTO,
   GoalInput,
+  GoalUpdate,
+  TrainingLevel,
   GoalPreview,
   GoalView,
   HomeDTO,
@@ -167,10 +172,19 @@ export function createApiClient(options: ApiClientOptions) {
       current: () => r<GoalView>("/goals/current"),
       preview: (input: GoalInput) => r<GoalPreview>("/goals/preview", { body: input }),
       create: (input: GoalInput) => r<{ goal: GoalDTO }>("/goals", { body: input }),
-      update: (input: Partial<GoalInput>) => r<{ goal: GoalDTO }>("/goals/current", { method: "PATCH", body: input }),
+      update: (input: GoalUpdate) => r<{ goal: GoalDTO }>("/goals/current", { method: "PATCH", body: input }),
       recalibrate: () => r<{ goal: GoalDTO; recalibration: Recalibration }>("/goals/current/recalibrate", { method: "POST", body: {} }),
       complete: () => r<{ goal: GoalDTO }>("/goals/current/complete", { method: "POST", body: {} }),
       abandon: () => r<{ goal: GoalDTO }>("/goals/current/abandon", { method: "POST", body: {} }),
+      /** T7 — FFMI + body fat of the latest measurement and the recommended goal. */
+      assessment: (trainingLevel?: TrainingLevel) =>
+        r<{ assessment: BodyAssessment }>(`/goals/assessment${trainingLevel ? `?trainingLevel=${trainingLevel}` : ""}`),
+      /** T7 — one-tap accept of `GoalView.adjustment` (`action` omitted → the recommended option). */
+      acceptAdjustment: (answer: GoalAdjustmentAnswer) =>
+        r<{ goal: GoalDTO; adjustment: GoalAdjustment }>("/goals/current/adjustment/accept", { method: "POST", body: answer }),
+      /** T7 — "not now"; the same proposal is not repeated and the cool-down restarts. */
+      dismissAdjustment: (answer: GoalAdjustmentAnswer) =>
+        r<{ goal: GoalDTO; adjustment: GoalAdjustment }>("/goals/current/adjustment/dismiss", { method: "POST", body: answer }),
     },
 
     reports: {

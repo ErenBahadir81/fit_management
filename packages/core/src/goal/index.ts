@@ -17,8 +17,35 @@ export { etaLabelTr, formatTrNumber, goalMilestones, goalSummaryTr } from "./mil
 export { ewmaTrend, ewmaAt, ewmaChange, ewmaSlopePerWeek, latestTrendWeight, weighInsPerWeek } from "./ewma";
 export type { WeightPoint, WeightTrendPoint, EwmaSettings } from "./ewma";
 
-export { computeGoalProgress, expectedAtDay, roadmapWeekAt, tdeeAtDay, ON_TRACK_TOLERANCE_KG, STALL_THRESHOLD_KG } from "./progress";
+export {
+  computeGoalProgress,
+  expectedAtDay,
+  roadmapWeekAt,
+  tdeeAtDay,
+  trendDeviationAt,
+  directionOf,
+  weightSign,
+  ON_TRACK_TOLERANCE_KG,
+  STALL_THRESHOLD_KG,
+} from "./progress";
 export type { GoalLike, BodyPoint } from "./progress";
 
 export { recalibrateTdee, isLogged } from "./recalibrate";
 export type { RecalibrationInput, DayIntake } from "./recalibrate";
+
+/* T7 — muscle-gain engine, the two new directions, the adaptive goal and instant feedback. */
+export { muscleGainRate, recompLeanRate, ffmiTaper, inferTrainingLevel, levelAfterWeeks, TRAINING_LEVEL_TR, WEEKS_PER_MONTH } from "./muscle";
+export type { MuscleRateInput, MuscleRateResult } from "./muscle";
+export { computeBulkPlan, computeRecompPlan, bulkMacrosFor } from "./directions";
+export {
+  proposeGoalAdjustment,
+  replanGoal,
+  remainingLeanGain,
+  estimateCurrentBody,
+  planSnapshot,
+  adjustmentId,
+  adjustmentSinceKey,
+} from "./adjust";
+export type { AdaptiveGoal, ReplanBase, AdjustmentInput, GoalChange } from "./adjust";
+export { goalFeedback, evaluateGoal } from "./feedback";
+export type { FeedbackInput, EvaluateGoalInput, GoalEvaluation } from "./feedback";
