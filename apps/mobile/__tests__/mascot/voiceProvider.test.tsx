@@ -148,6 +148,30 @@ describe("Floo voice", () => {
     expect(screen.queryByTestId("floo-bubble")).toBeNull();
   });
 
+  test("useFlooOnce only uses up its key once the line was on screen", async () => {
+    function Once() {
+      useFlooOnce("home:over:2026-09-24", { text: "Bugün hedefini aştın." });
+      return null;
+    }
+    const ui = (enabled: boolean, once: boolean) => (
+      <Harness enabled={enabled}>
+        <Sayer msg={{ text: "Önce bu satır.", ttlMs: null }} />
+        {once ? <Once /> : null}
+      </Harness>
+    );
+    const r = await render(ui(true, false));
+    await fireEvent.press(screen.getByTestId("say"));
+    // The once-line waits behind the one on screen...
+    await r.rerender(ui(true, true));
+    expect(screen.getByTestId("floo-bubble").props.accessibilityLabel).toBe("Floo: Önce bu satır.");
+    // ...and is dropped unseen when the mascot is switched off.
+    await r.rerender(ui(false, true));
+    await r.rerender(ui(true, false));
+    // Next visit: it was never seen, so it is said now.
+    await r.rerender(ui(true, true));
+    expect(screen.getByTestId("floo-bubble").props.accessibilityLabel).toBe("Floo: Bugün hedefini aştın.");
+  });
+
   test("tapping an idle Floo brings the last line back", async () => {
     await render(
       <Harness>

@@ -17,17 +17,19 @@ const delivered = new WeakSet<FlooEvent>();
  * Mounted once, inside `FlooVoiceProvider` at the root (`app/_layout.tsx`), so every tab and modal
  * hears the same events without subscribing. Renders nothing.
  *
- * - Only events that happen while it is mounted are spoken; nothing is replayed from the bus's
- *   history, so a remount can never say an old line again.
+ * - Only events that happen while it is mounted, and while a Floo can be seen, are spoken; nothing
+ *   is replayed from the bus's history, so a remount can never say an old line again.
  * - With the mascot switched off, events stay silent: Floo's asides are not worth a toast, and the
  *   mutations behind them already confirm themselves.
  * - "Once" lines (today went over its target) share their memory with `useFlooOnce`, so the home
  *   screen does not repeat what the meal that crossed the line already said, and vice versa.
  */
 export function FlooEventBridge(): null {
-  const { say, enabled } = useFloo();
+  const { say, enabled, presence } = useFloo();
   useFlooEvents((event) => {
-    if (!enabled || delivered.has(event)) return;
+    // No Floo on screen (onboarding draws its own): a reaction is about the moment, so it is not
+    // saved up to pop out of context minutes later.
+    if (!enabled || presence === "hidden" || delivered.has(event)) return;
     delivered.add(event);
     const line = describeFlooEvent(event);
     // A fact about the day that was already told is not news. It is only marked as told once it is

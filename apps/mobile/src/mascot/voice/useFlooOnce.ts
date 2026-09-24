@@ -37,6 +37,10 @@ export function claimOnce(key: string, now = Date.now()): boolean {
  * than an event: "you're over target today", the day's greeting, a weekly nudge. Put the date in
  * the key when the line is daily (`over:2026-09-24`). Pass `null` while there is nothing to say.
  * Screens mount and remount constantly; without this the same warning would pop on every visit.
+ *
+ * The key is used up when the line is actually on screen, not when it is queued: a line still
+ * waiting can be dropped unseen, and then the next visit says it. Until then a remount only
+ * re-queues it under the same dedupe key, so it never piles up.
  */
 export function useFlooOnce(key: string | null, message: FlooMessage | null): void {
   const { say, enabled, presence } = useFloo();
@@ -44,8 +48,16 @@ export function useFlooOnce(key: string | null, message: FlooMessage | null): vo
   const text = message?.text;
   useEffect(() => {
     if (!ready || !key || !message || !text) return;
-    if (!claimOnce(key)) return;
-    say({ dedupeKey: key, ...message });
+    if (wasSaid(key)) return;
+    const onShow = message.onShow;
+    say({
+      dedupeKey: key,
+      ...message,
+      onShow: () => {
+        claimOnce(key);
+        onShow?.();
+      },
+    });
     // `message` is a fresh object each render; the key and text are what identify the line.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, key, text, say]);

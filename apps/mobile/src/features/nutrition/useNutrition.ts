@@ -180,7 +180,7 @@ function patchDay(qc: QueryClient, dateKey: string, fn: (day: NutritionDayView) 
 /**
  * Floo: announce the logged food, and `overTarget` only on the write that *crosses* today's
  * calorie target (prev ≤ target < now), so later snacks on an already-over day stay quiet. A meal
- * filed under another day never says it: Floo's lines and the home warning are about today.
+ * filed under another day never sends `overTarget`: its lines and the home warning say "today".
  */
 function emitMealLogged(qc: QueryClient, dateKey: string, prev: NutritionDayView | undefined, entries: MealEntryDTO[]) {
   if (entries.length === 0) return;
