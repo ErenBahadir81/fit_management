@@ -63,7 +63,8 @@ function bars(input: FeedbackInput): GoalFeedback["bars"] {
   let fat: number | null = null;
   const bfSpan = goal.start.bodyFatPct - goal.targetBodyFatPct;
   if (direction !== "bulk" && latestBody && bfSpan > 0.01) {
-    fat = clamp((goal.start.bodyFatPct - latestBody.bodyFatPct) / bfSpan, 0, 1) * 100;
+    // A recomp's goal *is* its body fat: same (smoothed) figure as the goal bar, never a second one.
+    fat = direction === "recomp" ? progress.percentComplete : clamp((goal.start.bodyFatPct - latestBody.bodyFatPct) / bfSpan, 0, 1) * 100;
   }
   return {
     goal: round(progress.percentComplete, 0),
@@ -97,7 +98,7 @@ export function goalFeedback(input: FeedbackInput): GoalFeedback {
 
   if (adjustment?.kind === "reached") return say("reached", "positive", "proud", "goal.completed", adjustment.messageTr);
   // A recomp is read from tape measurements, which carry their own weight: those count as data too.
-  const hasTape = (bodyFat?.count ?? 0) > 0;
+  const hasTape = direction === "recomp" && (input.latestBody !== null || (bodyFat?.count ?? 0) > 0);
   if (progress.actualWeightKg === null && !hasTape) {
     return say("noData", "neutral", "curious", "goal.feedback.noData", "İlk tartını gir, gidişatını birlikte çizelim.");
   }
@@ -125,29 +126,35 @@ export function goalFeedback(input: FeedbackInput): GoalFeedback {
     }
     const p = pts(bodyFat.deviationPts ?? 0);
     const l = kg(bodyFat.deviationLeanKg ?? 0);
+    // Lean-mass advice only without a pending proposal: that one confirms lean loss at the previous
+    // reading too and gives the advice itself, so the two never contradict each other.
+    const leanLoss = bodyFat.leanLoss && !adjustment;
     switch (progress.onTrack) {
       case "ahead":
-        return bodyFat.leanLoss
+        return leanLoss
           ? say("ahead", "attention", "think", "goal.feedback.ahead", `Yağ oranın hızlı düşüyor ama yağsız kütlen planın ${l} kg altında.${pending}`)
           : say("ahead", "positive", "cheer", "goal.feedback.ahead", `Yağ oranında plandan ${p} puan öndesin!${faster}${pending}`);
       case "behind":
       case "stalled": {
         if (!bodyFat.paceSlow) {
-          // Past the plan's end at the planned pace: more time, not fewer calories.
-          return say(progress.onTrack, "attention", "think", `goal.feedback.${progress.onTrack}`, `Planın süresi doldu, hedefe ${pts(progress.bfToGo)} puan kaldı; tempon plana uygun, biraz daha zaman lazım.${pending}`);
+          // Past the plan's end without a pace shown to be slow: a fresh plan, not fewer calories.
+          return say(progress.onTrack, "attention", "think", `goal.feedback.${progress.onTrack}`, `Planın süresi doldu, hedefe ${pts(progress.bfToGo)} puan kaldı; planı güncelleyip yeni bir tempo çizebiliriz.${pending}`);
         }
         const stalled = progress.onTrack === "stalled";
         const what = stalled ? "Son haftalarda yağ oranın yerinde sayıyor" : `Yağ oranında planın ${p} puan gerisindesin`;
         // Losing lean mass as well: fewer calories would cost more muscle (the proposal keeps them).
-        const next = bodyFat.leanLoss
+        // With a proposal pending, the line states the verdict and points at it; the remedy is the proposal's.
+        const next = leanLoss
           ? `, yağsız kütlen de planın ${l} kg altında; kaloriyi kısmadan protein ve antrenmana odaklanalım.`
-          : stalled
-            ? "; gerekirse kaloriyi ayarlarız."
-            : "; ölçümlerle birlikte izliyoruz.";
+          : adjustment
+            ? "."
+            : stalled
+              ? "; gerekirse kaloriyi ayarlarız."
+              : "; ölçümlerle birlikte izliyoruz.";
         return say(progress.onTrack, "attention", stalled ? "worried" : "think", `goal.feedback.${progress.onTrack}`, `${what}${next}${pending}`);
       }
       default:
-        if (bodyFat.leanLoss) {
+        if (leanLoss) {
           return say("onTrack", "attention", "think", "goal.feedback.onTrack", `Yağ oranın planda ama yağsız kütlen planın ${l} kg altında; proteini ve antrenmanı aksatma.${pending}`);
         }
         // Past the plan's end the plan sits at the target, so "on plan" would read wrong while body fat is still above it.

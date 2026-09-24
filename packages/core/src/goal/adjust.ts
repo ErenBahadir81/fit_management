@@ -203,7 +203,7 @@ function recompReached(input: AdjustmentInput): boolean {
   const { goal, progress, todayKey, settings } = input;
   if (progress.actualBodyFatPct === null || progress.actualBodyFatPct > goal.targetBodyFatPct) return false;
   if (goal.plan.roadmap.length === 0) return true;
-  const smoothed = input.bodyFat ? input.bodyFat.smoothedPct : smoothedBodyFat(input.bodyEntries ?? [], todayKey, settings);
+  const smoothed = input.bodyFat ? input.bodyFat.smoothedPct : smoothedBodyFat(goal, input.bodyEntries ?? [], todayKey, settings);
   return smoothed !== null && smoothed <= goal.targetBodyFatPct;
 }
 
@@ -345,7 +345,9 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
   let copy: Copy;
 
   const lowerStep = tdeeStep(input, -1);
-  const lower = () => option(input, "lowerCalories", "", true, { tdeeOverride: lowerStep.tdee });
+  const lower = (recommended = true) => option(input, "lowerCalories", "", recommended, { tdeeOverride: lowerStep.tdee });
+  /** At the calorie floor a lower TDEE cannot lower the target: such an option would change nothing. */
+  const atCalorieFloor = (o: GoalAdjustmentOption) => Math.abs((o.after?.dailyCalorieTarget ?? before.dailyCalorieTarget) - before.dailyCalorieTarget) < 25;
   const raise = () => option(input, "raiseCalories", "", true, { tdeeOverride: tdeeStep(input, 1).tdee });
   const replan = (label: string, recommended = false) => option(input, "replan", label, recommended, {});
 
@@ -392,8 +394,8 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
     const cutOrLater = (lateLabel: string, later: string) => {
       const o = lower();
       o.labelTr = kcalLabel(before, o);
-      // At the calorie floor a lower TDEE cannot lower the target: offer only the later date.
-      const atFloor = Math.abs((o.after?.dailyCalorieTarget ?? before.dailyCalorieTarget) - before.dailyCalorieTarget) < 25;
+      // At the calorie floor offer only the later date.
+      const atFloor = atCalorieFloor(o);
       if (atFloor) options.push(replan(lateLabel, true));
       else options.push(o, replan(lateLabel));
       const measured = lowerStep.measured ? "Ölçülen harcaman plandakinden düşük çıktı. " : "";
@@ -420,7 +422,7 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
           mood: "think",
           trigger: "goal.adjust.ahead",
           titleTr: "Kasını koruyalım",
-          messageTr: `${fat} ama yağsız kütlen planın ${l} kg altında. Kası korumak için ${kcalLet(before, o)} mı?`,
+          messageTr: `${fat} ama yağsız kütlen planın ${l} kg altında. Kası korumak için ${kcalLet(before, o)} mi?`,
         };
       } else if (sit.kind === "ahead") {
         copy = { mood: "cheer", trigger: "goal.adjust.ahead", titleTr: "Plandan öndesin!", messageTr: `Yağ oranında plandan ${p} puan öndesin!${earlier()}` };
@@ -434,17 +436,17 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
             `${why}, yağsız kütlen de planın ${l} kg altında. Kaloriyi kısmak kası daha çok zorlar; proteini ve antrenman yükünü koruyup planı bugünden güncelleyelim.`
           );
         } else if (!bf.paceSlow) {
-          // Past the plan's end without a slow pace: the plan ran out of time (or started from a
-          // reading that was off), so more time is the answer; fewer calories only as the alternative.
-          options.push(replan("Kaloriyi koru, tarihi güncelle", true));
-          const o = option(input, "lowerCalories", "", false, { tdeeOverride: lowerStep.tdee });
-          if (Math.abs((o.after?.dailyCalorieTarget ?? before.dailyCalorieTarget) - before.dailyCalorieTarget) >= 25) {
+          // Past the plan's end without a pace shown to be slow: the plan ran out of time (or started
+          // from a reading that was off). A fresh plan sets a new pace; fewer calories only as the alternative.
+          options.push(replan("Kaloriyi koru, planı güncelle", true));
+          const o = lower(false);
+          if (!atCalorieFloor(o)) {
             o.labelTr = kcalLabel(before, o);
             options.push(o);
           }
           copy = slowCopy(
-            "Biraz daha zaman",
-            `Planın süresi doldu, hedefe ${pts(input.progress.bfToGo)} puan kaldı. Tempon plana uygun; planı bugünden güncelleyelim mi?`
+            "Plan süresi doldu",
+            `Planın süresi doldu, hedefe ${pts(input.progress.bfToGo)} puan kaldı. Planı bugünden güncelleyip yeni bir tempo çizelim mi?`
           );
         } else {
           const say = cutOrLater("Kaloriyi koru, tarihi güncelle", "planı bugünden güncelleyelim");

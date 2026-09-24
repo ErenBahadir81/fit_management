@@ -205,12 +205,15 @@ function fitLine(xs: number[], ys: number[]) {
   };
 }
 
-/** Fixed anchor for plan-independent weekly buckets (a Monday), so the buckets do not shift day to day. */
-const WEEK_ANCHOR = "2000-01-03";
-
-/** The window's readings as one line, read at the latest reading: the value and its SE factor. */
-function smoothedFit(bodyEntries: BodyPoint[], todayKey: string, settings: GoalSettings) {
-  const readings = weeklyReadings(bodyEntries, WEEK_ANCHOR, shiftKey(todayKey, -settings.adaptive.bfWindowDays), todayKey);
+/**
+ * The goal's readings of the window as one line, read at the latest reading: the value, its SE
+ * factor and the scatter. Counted from the goal start (not the plan's), in weeks anchored there,
+ * so a re-plan does not reset it and every caller gets the same value whatever history it loads.
+ */
+function smoothedFit(goal: GoalLike, bodyEntries: BodyPoint[], todayKey: string, settings: GoalSettings) {
+  const goalStartKey = goal.start.dateKey;
+  const windowStartKey = shiftKey(todayKey, -settings.adaptive.bfWindowDays);
+  const readings = weeklyReadings(bodyEntries, goalStartKey, goalStartKey > windowStartKey ? goalStartKey : windowStartKey, todayKey);
   if (readings.length < Math.max(2, settings.adaptive.bfMinMeasurements)) return null;
   const xs = readings.map((r) => r.day);
   const line = fitLine(
@@ -222,12 +225,12 @@ function smoothedFit(bodyEntries: BodyPoint[], todayKey: string, settings: GoalS
 }
 
 /**
- * Body fat now, smoothed: the least-squares line through the readings of the last `bfWindowDays`
- * (whichever plan they belong to, one per week), read at the latest one. It needs no plan, so a
- * re-plan does not reset it. null below `bfMinMeasurements` weeks of readings.
+ * Body fat now, smoothed: the least-squares line through the goal's readings of the last
+ * `bfWindowDays` (whichever plan they belong to, one per week), read at the latest one. A re-plan
+ * does not reset it. null below `bfMinMeasurements` weeks of readings.
  */
-export function smoothedBodyFat(bodyEntries: BodyPoint[], todayKey: string, settings: GoalSettings): number | null {
-  const fit = smoothedFit(bodyEntries, todayKey, settings);
+export function smoothedBodyFat(goal: GoalLike, bodyEntries: BodyPoint[], todayKey: string, settings: GoalSettings): number | null {
+  const fit = smoothedFit(goal, bodyEntries, todayKey, settings);
   return fit === null ? null : round(fit.pct, 2);
 }
 
@@ -279,10 +282,12 @@ export function bodyFatTrend(goal: GoalLike, bodyEntries: BodyPoint[], todayKey:
   const windowStartKey = shiftKey(todayKey, -a.bfWindowDays);
   const points = weeklyReadings(bodyEntries, planStartKey, planStartKey > windowStartKey ? planStartKey : windowStartKey, todayKey);
   const count = points.length;
-  if (count === 0) return EMPTY_TREND;
+  // Plan-independent: kept even right after a re-plan, before any reading of the new plan.
+  const smoothed = smoothedFit(goal, bodyEntries, todayKey, settings);
+  const smoothedPct = smoothed === null ? null : round(smoothed.pct, 2);
+  if (count === 0) return { ...EMPTY_TREND, smoothedPct };
   const latest = points[count - 1];
   const spanDays = daysBetween(points[0].dateKey, latest.dateKey);
-  const smoothed = smoothedFit(bodyEntries, todayKey, settings);
   const base = {
     ...EMPTY_TREND,
     count,
@@ -290,7 +295,7 @@ export function bodyFatTrend(goal: GoalLike, bodyEntries: BodyPoint[], todayKey:
     latestKey: latest.dateKey,
     previousKey: count >= 2 ? points[count - 2].dateKey : null,
     latestWeightKg: latest.weightKg,
-    smoothedPct: smoothed === null ? null : round(smoothed.pct, 2),
+    smoothedPct,
   };
   if (count < 2) return base;
 
@@ -320,19 +325,22 @@ export function bodyFatTrend(goal: GoalLike, bodyEntries: BodyPoint[], todayKey:
     if (planEnded) {
       // The plan has arrived and expects body fat to sit at the target: compare where it sits with
       // the target itself — the mean of the readings since the end once there are enough of them
-      // (a plateau), else the smoothed line.
+      // (a plateau), else the smoothed line, else this plan's own fitted line.
       const after = points.filter((p) => p.day >= goal.plan.roadmap.length * 7).map((p) => p.bodyFatPct);
-      let level: number | null = null;
-      let se = Infinity;
+      let level: number;
+      let se: number;
       if (after.length >= a.bfMinMeasurements) {
-        level = mean(after);
-        const sd = Math.sqrt(after.reduce((s, v) => s + (v - level!) ** 2, 0) / (after.length - 1));
-        se = Math.max(a.bfNoisePts, sd) / Math.sqrt(after.length);
+        const m = mean(after);
+        level = m;
+        se = Math.max(a.bfNoisePts, Math.sqrt(after.reduce((s, v) => s + (v - m) ** 2, 0) / (after.length - 1))) / Math.sqrt(after.length);
       } else if (smoothed !== null) {
         level = smoothed.pct;
         se = Math.max(a.bfNoisePts, smoothed.scatter ?? 0) * smoothed.seFactor;
+      } else {
+        level = expected[count - 1].bodyFatPct + deviationPts;
+        se = sigmaBf * bfRes.seFactor(xLast);
       }
-      const gap = level === null ? 0 : level - goal.targetBodyFatPct;
+      const gap = level - goal.targetBodyFatPct;
       status = gap >= Math.max(a.bfTolerancePts, a.bfConfidenceZ * se) ? stalledOrBehind : "onTrack";
     } else if (paceZ >= a.bfConfidenceZ && deviationPts >= a.bfTolerancePts) status = stalledOrBehind;
     else if (paceZ <= -a.bfConfidenceZ && deviationPts <= -a.bfTolerancePts) status = "ahead";

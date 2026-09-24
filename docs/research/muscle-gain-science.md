@@ -203,9 +203,10 @@ it, and these have to be judged against their own noise.
   the tape's reproducibility and Foulis's ≥ 1-point criterion. For lean mass that floor is 1 kg.
 - **Past the plan's end.** The plan now expects the target itself, and the target is absolute, so
   no start reading can bias the comparison. The level still above the target counts with the same
-  z and tolerance: the mean of the readings since the end (SE σ/√n), or the smoothed line until
-  there are 3 of them. Only a pace shown to be slow recommends fewer calories. Otherwise the
-  recommendation is more time (a re-plan): the plan ran out of time, or started from a low reading.
+  z and tolerance. The estimate is the mean of the readings since the end (SE σ/√n); until there
+  are 3 of them it is the smoothed line, else this plan's own fitted line. Only a pace shown to be
+  slow recommends fewer calories. Otherwise the recommendation is a fresh plan with a new pace:
+  the plan ran out of time, or started from a low reading.
 - **Minimum data.** At least 3 weeks with readings spanning ≥ 21 days (§7's "≥ 3 weeks"), the
   latest ≤ 14 days old. In practice the pace test needs about 10 or more weekly readings: at ±1.5
   points, a pace gap of 0.28 points a week only clears 2.25 SE once Σ(t − t̄)² ≳ 150 week².
@@ -216,8 +217,9 @@ it, and these have to be judged against their own noise.
   of the cut's "today and 7 days ago" rule. It also needs a reading newer than the last answer, and
   the 21-day cool-down still applies.
 - **Reached.** "Reached" needs the latest reading at the target and the smoothed body fat at the
-  target too: the line through the window's weekly readings, read at the latest one, from at least
-  3 weeks of readings. With 1.5 points of noise, someone 1 point above target reads at or below it
+  target too. The smoothed value is the line through the goal's weekly readings in the window
+  (counted from the goal start, so a re-plan does not reset it), read at the latest one, from at
+  least 3 weeks of readings. With 1.5 points of noise, someone 1 point above target reads at or below it
   on about 25 % of single readings. The smoothed value also drives the goal bar and the projection,
   as the weight trend does on a cut.
 - Confidence: medium-low. The structure is standard regression; the calibration is mine (below).

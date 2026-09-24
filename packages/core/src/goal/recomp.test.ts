@@ -300,7 +300,7 @@ describe("computeGoalProgress — recomp reads body fat, never weight", () => {
     // twice as fast for 7 weeks is not yet beyond the tape noise: still the plan's pace
     const early = computeGoalProgress(goal, planWeights(goal, today), weekly(goal, today, twiceAsFast(goal)), [], day(today), S);
     expect(early.onTrack).toBe("onTrack");
-    const smoothedEarly = smoothedBodyFat(weekly(goal, today, twiceAsFast(goal)), day(today), S)!;
+    const smoothedEarly = smoothedBodyFat(goal, weekly(goal, today, twiceAsFast(goal)), day(today), S)!;
     expect(early.weeksRemainingProjected).toBe(Math.ceil(Math.max(0, smoothedEarly - 15) / PLAN_BF_RATE));
     // by week 11 it is: the observed pace takes over and the end comes closer
     const L = 77;
@@ -332,19 +332,51 @@ describe("computeGoalProgress — recomp reads body fat, never weight", () => {
     const swing = onPlan.weeksRemainingProjected! - slip.weeksRemainingProjected!;
     expect(rawSwing).toBeGreaterThan(5);
     expect(Math.abs(swing)).toBeLessThanOrEqual(rawSwing / 2); // … and so does the projection
-    expect(slip.bfToGo).toBeCloseTo(smoothedBodyFat(slipped, day(today), S)! - goal.targetBodyFatPct, 1);
+    expect(slip.bfToGo).toBeCloseTo(smoothedBodyFat(goal, slipped, day(today), S)! - goal.targetBodyFatPct, 1);
+  });
+});
+
+describe("smoothed body fat across re-plans and callers", () => {
+  it("survives a re-plan made before any reading of the new plan", () => {
+    const body = weekly(goal, 84);
+    const replanned: AdaptiveGoal = { ...goal, plan: replanGoal(goal, {}, baseFrom(planWeights(goal, 86)), day(86)) };
+    const t = bodyFatTrend(replanned, body, day(86), S);
+    expect(t.count).toBe(0);
+    expect(t.smoothedPct!).toBeCloseTo(smoothedBodyFat(goal, body, day(86), S)!, 6);
+    const p = computeGoalProgress(replanned, planWeights(goal, 86), body, [], day(86), S);
+    expect(p.bfToGo).toBeCloseTo(t.smoothedPct! - goal.targetBodyFatPct, 1);
+  });
+
+  it("counts from the goal start, so a caller loading older history gets the same value", () => {
+    const body = weekly(goal, 49);
+    const older = [...Array.from({ length: 6 }, (_, i) => ({ dateKey: shiftKey(START, -7 * (6 - i)), weightKg: 90, bodyFatPct: 25 })), ...body];
+    expect(smoothedBodyFat(goal, older, day(49), S)).toBe(smoothedBodyFat(goal, body, day(49), S));
+    expect(computeGoalProgress(goal, planWeights(goal, 49), older, [], day(49), S).percentComplete).toBe(
+      computeGoalProgress(goal, planWeights(goal, 49), body, [], day(49), S).percentComplete
+    );
+  });
+
+  it("past the end with too few readings for either smoothed estimate, the plan's own line still judges", () => {
+    // re-planned on a Thursday into a 3-week plan; readings fall into 3 plan weeks but 2 goal weeks
+    const short: AdaptiveGoal = { ...goal, plan: { ...goal.plan, startKey: day(3), roadmap: goal.plan.roadmap.slice(0, 3) } };
+    const body = [9, 10, 31].map((d) => ({ dateKey: day(d), weightKg: 85, bodyFatPct: 20 }));
+    expect(smoothedBodyFat(short, body, day(31), S)).toBeNull();
+    const t = bodyFatTrend(short, body, day(31), S);
+    expect(t.enough).toBe(true);
+    expect(t.planEnded).toBe(true);
+    expect(["behind", "stalled"]).toContain(t.status); // 5 points above the 15 % target, not "onTrack"
   });
 });
 
 describe("smoothedBodyFat — body fat now, from the recent readings of any plan", () => {
   it("the fitted line at the latest reading; null below the minimum number of readings", () => {
     const body = weekly(goal, 49);
-    expect(smoothedBodyFat(body, day(49), S)!).toBeCloseTo(expectedAtDay(goal, 49).bodyFatPct, 1);
-    expect(smoothedBodyFat(body.slice(0, 2), day(7), S)).toBeNull();
-    expect(smoothedBodyFat([], day(7), S)).toBeNull();
+    expect(smoothedBodyFat(goal, body, day(49), S)!).toBeCloseTo(expectedAtDay(goal, 49).bodyFatPct, 1);
+    expect(smoothedBodyFat(goal, body.slice(0, 2), day(7), S)).toBeNull();
+    expect(smoothedBodyFat(goal, [], day(7), S)).toBeNull();
     // readings outside the window or after today do not count
-    expect(smoothedBodyFat(body, day(49 + A.bfWindowDays + 1), S)).toBeNull();
-    expect(smoothedBodyFat([...body, tape(goal, 56, () => 9)], day(49), S)!).toBeCloseTo(expectedAtDay(goal, 49).bodyFatPct, 1);
+    expect(smoothedBodyFat(goal, body, day(49 + A.bfWindowDays + 1), S)).toBeNull();
+    expect(smoothedBodyFat(goal, [...body, tape(goal, 56, () => 9)], day(49), S)!).toBeCloseTo(expectedAtDay(goal, 49).bodyFatPct, 1);
   });
 });
 
@@ -489,7 +521,7 @@ describe("proposeGoalAdjustment — recomp on body fat", () => {
     const body = [...weekly(goal, 84), tape(goal, 91, () => -2)];
     expect(body.at(-1)!.bodyFatPct).toBeLessThanOrEqual(15);
     expect(bodyFatTrend(replanned, body, day(91), S).count).toBeLessThan(A.bfMinMeasurements);
-    expect(smoothedBodyFat(body, day(91), S)!).toBeGreaterThan(15);
+    expect(smoothedBodyFat(goal, body, day(91), S)!).toBeGreaterThan(15);
     expect(propose(replanned, upTo(91), body, 91)).toBeNull();
   });
 
@@ -528,7 +560,7 @@ describe("proposeGoalAdjustment — recomp on body fat", () => {
     expect(p.options.find((o) => o.action === "lowerCalories")?.recommended ?? false).toBe(false);
     expect(p.messageTr).toContain("Planın süresi doldu");
     const ev = evaluate(goal, planWeights(goal, today), body, today);
-    expect(ev.feedback.textTr).toContain("biraz daha zaman");
+    expect(ev.feedback.textTr).toContain("yeni bir tempo");
     // a real stall past the end still gets fewer calories
     const stalled = propose(goal, planWeights(goal, today), weekly(goal, today, flatBf(goal)), today)!;
     expect(stalled.options[0]).toMatchObject({ action: "lowerCalories", recommended: true });
@@ -662,13 +694,40 @@ describe("goalFeedback — recomp", () => {
     expect(ev.feedback.textTr).toContain("yağsız kütlen");
   });
 
-  it("stalled while losing lean mass: the line does not hint at cutting calories", () => {
-    const ev = evaluate(goal, upTo(91), weekly(goal, 91, flatBf(goal), losingLean), 91);
+  it("stalled while losing lean mass: the line never hints at cutting calories", () => {
+    const body = weekly(goal, 91, flatBf(goal), losingLean);
+    // with the proposal pending, the line points at it and leaves the advice to it
+    const ev = evaluate(goal, upTo(91), body, 91);
     expect(ev.feedback.status).toBe("stalled");
     expect(ev.adjustment!.options.map((o) => o.action)).toEqual(["replan"]);
-    expect(ev.feedback.textTr).toContain("yağsız kütlen");
-    expect(ev.feedback.textTr).toContain("kaloriyi kısmadan");
+    expect(ev.adjustment!.messageTr).toContain("Kaloriyi kısmak");
+    expect(ev.feedback.textTr).toContain("öneri");
     expect(ev.feedback.textTr).not.toContain("kaloriyi ayarlarız");
+    // without a proposal (e.g. just answered), the line gives the advice itself
+    const trend = bodyFatTrend(goal, body, day(91), S);
+    const progress = computeGoalProgress(goal, upTo(91), body, [], day(91), S, trend);
+    const fb = goalFeedback({ goal, progress, deviationKg: 0, latestBody: body.at(-1)!, todayKey: day(91), bodyFat: trend });
+    expect(fb.textTr).toContain("yağsız kütlen");
+    expect(fb.textTr).toContain("kaloriyi kısmadan");
+  });
+
+  it("a pending proposal is never contradicted by the line's own advice", () => {
+    // A stall proposal that cuts calories is pending, and today's verdict alone also sees lean loss
+    // (the proposal needs it at the previous reading too, so it still cuts calories).
+    const body = weekly(goal, 91, flatBf(goal));
+    const ev = evaluate(goal, upTo(91), body, 91);
+    expect(ev.adjustment!.options[0]).toMatchObject({ action: "lowerCalories", recommended: true });
+    const trend = { ...bodyFatTrend(goal, body, day(91), S), leanLoss: true };
+    const fb = goalFeedback({ goal, progress: ev.progress, deviationKg: 0, latestBody: body.at(-1)!, todayKey: day(91), adjustment: ev.adjustment, bodyFat: trend });
+    expect(fb.textTr).not.toContain("kaloriyi kısmadan");
+    expect(fb.textTr).not.toContain("kaloriyi ayarlarız");
+    expect(fb.textTr).toContain("öneri");
+  });
+
+  it("recomp: the fat bar is the goal bar (both smoothed)", () => {
+    const slipped = [...weekly(goal, 49), tape(goal, 56, () => -2)];
+    const ev = evaluate(goal, upTo(56), slipped, 56);
+    expect(ev.feedback.bars.fat).toBe(ev.feedback.bars.goal);
   });
 
   it("tape readings without separate weigh-ins still get the body-fat line", () => {

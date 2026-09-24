@@ -122,10 +122,18 @@ roadmap's expected per-day values. Sources and calibration are in the research d
   falling.
 - **Verdict past the plan's end** (`planEnded`): the plan now expects the target itself, which no
   start reading can bias. The body fat still above it is judged with the same z and tolerance. The
-  estimate is the mean of the readings since the end (≥ 3 weeks), or the smoothed line before that.
-- **Smoothed body fat now** (`smoothedPct`, `smoothedBodyFat`): the line through the window's
-  weekly readings, whichever plan they belong to, read at the latest one (≥ 3 weeks of readings).
-  Like the weight trend on a cut, it drives the goal bar (`percentComplete`), `bfToGo`, the
+  estimate is the first of these that is available:
+  1. the mean of the readings since the end (≥ 3 weeks)
+  2. the smoothed line
+  3. this plan's own fitted line
+
+  Without a pace shown to be slow (`paceSlow`), the recommendation is a fresh plan, not fewer
+  calories.
+- **Smoothed body fat now** (`smoothedPct`, `smoothedBodyFat(goal, …)`): the line through the
+  goal's weekly readings in the window, counted from the goal start (whichever plan they belong
+  to), read at the latest one (≥ 3 weeks of readings). A re-plan does not reset it. Every caller
+  gets the same value, whatever older history it loads. Like the weight trend on a cut, it drives
+  the goal bar (`percentComplete`, and the fat bar, which is the same figure), `bfToGo`, the
   projection's distance and `reached`. `actualBodyFatPct` stays the latest reading as measured.
 - **Projection:** `bfToGo` ÷ pace. The pace is the plan's rate until a verdict shows the observed
   pace differs; then it is the observed one.
@@ -192,9 +200,13 @@ start toward the lean target counted from the goal start), `fat` (cut/recomp).
 
 A recomp speaks in body fat. Typical lines: `"Yağ oranında plandan 1,2 puan öndesin!"`, `"Yağ oranın
 planda, %40 tamamlandı."`, or a lean-mass warning.
-- **Past the plan's end:** "Planın süresi doldu, hedefe 1,4 puan kaldı…". With the planned pace this
-  continues "biraz daha zaman lazım". If lean mass is falling while body fat lags, the line says
-  "kaloriyi kısmadan protein ve antrenmana odaklanalım", because the proposal keeps calories.
+- **Past the plan's end:** "Planın süresi doldu, hedefe 1,4 puan kaldı…". If the pace is not shown
+  to be slow it continues "planı güncelleyip yeni bir tempo çizebiliriz".
+- **Lean mass falling while body fat lags:** the line says "kaloriyi kısmadan protein ve antrenmana
+  odaklanalım".
+- **While a proposal is pending,** the line states the verdict and points at the proposal ("Sana
+  bir öneri hazırladım."), with no remedy of its own. The proposal gives the advice, and the two
+  never contradict each other.
 - **`deviationBfPts`** is the trend-vs-plan gap in points. It is null on cut/bulk and until there
   are enough readings.
 - **Not enough readings yet:** the line invites a measurement (trigger `goal.feedback.measure`, tone
