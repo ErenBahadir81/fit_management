@@ -14,6 +14,10 @@ export type SpringKind = keyof typeof springs;
 export const durations = { fast: 120, base: 200, slow: 320 } as const;
 
 export const easeOut = Easing.out(Easing.cubic);
+/** Strong ease-out (0.23, 1, 0.32, 1): instant response, long soft landing. Entrances. */
+export const easeOutStrong = Easing.bezier(0.23, 1, 0.32, 1);
+/** Strong ease-in-out (0.77, 0, 0.175, 1): things moving across the screen. */
+export const easeInOutStrong = Easing.bezier(0.77, 0, 0.175, 1);
 export const timing = {
   fast: { duration: durations.fast, easing: easeOut } satisfies WithTimingConfig,
   base: { duration: durations.base, easing: easeOut } satisfies WithTimingConfig,

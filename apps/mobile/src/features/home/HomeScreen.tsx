@@ -2,16 +2,16 @@ import React, { useCallback } from "react";
 import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { HomeDTO } from "@fitfloow/core";
-import { Floo } from "../../mascot";
+import { Floo, useFlooOnce } from "../../mascot";
+import { fmtInt } from "../../lib/format";
 import { spacing } from "../../theme/tokens";
 import { EmptyState } from "../../ui/EmptyState";
-import { Entry } from "../../ui/Entry";
 import { Reveal } from "../../ui/Reveal";
 import { Screen } from "../../ui/Screen";
 import { HomeSkeleton } from "./HomeSkeleton";
 import { CalorieCard } from "./components/CalorieCard";
-import { GoalHero } from "./components/GoalHero";
-import { MascotHeader } from "./components/MascotHeader";
+import { GoalStrip } from "./components/GoalStrip";
+import { HomeHeader } from "./components/HomeHeader";
 import { RecoveryStrip } from "./components/RecoveryStrip";
 import { StreaksRow } from "./components/StreaksRow";
 import { TodayCard } from "./components/TodayCard";
@@ -61,36 +61,33 @@ interface HomeContentProps {
 }
 
 /**
- * Order matters here: the goal is the anchor and everything under it is the day's work *toward*
- * that goal. The weigh-in nudge used to be a floating strip; it now lives inside the hero, because
- * weighing in is how the goal stays honest, not a separate chore.
+ * Order: the goal is the line the day hangs from (compact, at the top), then the day's sum, then
+ * the day's workout, then how the body is doing. One primary action on the screen: start the
+ * workout. No entry cascade: `Reveal` crossfades the skeleton once, and a warm cache shows the
+ * screen as it is. Six cards sliding in on every visit was what made the screen feel tiring.
  */
 function HomeContent({ data, onProgram, onNutrition, onBody, onRoadmap, onSetGoal }: HomeContentProps) {
   const targetBf = data.goal?.actualBodyFatPct != null ? data.goal.actualBodyFatPct - data.goal.bfToGo : null;
+  const over = data.today.calories.remaining < 0 ? -data.today.calories.remaining : 0;
+  // Going over the day's target is a warning, so it is Floo's to say, once per day.
+  useFlooOnce(over > 0 ? `home:over:${data.today.dateKey}` : null, {
+    text: `Bugün hedefini ${fmtInt(over)} kcal aştın. Sorun değil, yarın biraz dengeleriz.`,
+    priority: "high",
+    mood: "worried",
+    action: { label: "Beslenmeye git", onPress: onNutrition },
+  });
   return (
     <View style={styles.stack}>
-      <Entry index={0}>
-        <MascotHeader data={data} />
-      </Entry>
-      <Entry index={1}>
-        <GoalHero goal={data.goal} today={data.today} targetBf={targetBf} onOpenRoadmap={onRoadmap} onSetGoal={onSetGoal} onWeighIn={onBody} />
-      </Entry>
-      <Entry index={2}>
-        <TodayCard today={data.today} onOpenProgram={onProgram} />
-      </Entry>
-      <Entry index={3}>
-        <CalorieCard today={data.today} onPress={onNutrition} />
-      </Entry>
-      <Entry index={4}>
-        <RecoveryStrip recovery={data.recovery} onPress={onProgram} />
-      </Entry>
-      <Entry index={5}>
-        <StreaksRow streaks={data.streaks} />
-      </Entry>
+      <HomeHeader data={data} />
+      <GoalStrip goal={data.goal} today={data.today} targetBf={targetBf} onOpenRoadmap={onRoadmap} onSetGoal={onSetGoal} onWeighIn={onBody} />
+      <CalorieCard today={data.today} onPress={onNutrition} />
+      <TodayCard today={data.today} onOpenProgram={onProgram} />
+      <RecoveryStrip recovery={data.recovery} onPress={onProgram} />
+      <StreaksRow streaks={data.streaks} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stack: { gap: spacing.lg },
+  stack: { gap: spacing.cardGap },
 });

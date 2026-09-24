@@ -16,7 +16,10 @@ export interface ProgressBarProps extends ViewProps {
   valueLabel?: string;
 }
 
-/** Animated horizontal progress (spring), with optional label row. */
+/**
+ * Flat pill progress (6–8 pt, default 8): a quiet `ringTrack` groove and a solid fill that springs
+ * to the value. `warning` fills with `warningFill` (the text colour is too dark for a mark).
+ */
 export function ProgressBar({ value, tone = "primary", height = 8, label, valueLabel, style, ...rest }: ProgressBarProps) {
   const { colors } = useTheme();
   const reduce = useReducedMotion();
@@ -26,7 +29,7 @@ export function ProgressBar({ value, tone = "primary", height = 8, label, valueL
     w.value = reduce ? withTiming(pct, timing.reduced) : withSpring(pct, springs.gentle);
   }, [pct, reduce, w]);
   const fill = useAnimatedStyle(() => ({ width: `${w.value}%` }));
-  const color = { primary: colors.primary, success: colors.success, warning: colors.warning, danger: colors.danger, neutral: colors.inkSubtle }[tone];
+  const color = { primary: colors.primary, success: colors.success, warning: colors.warningFill, danger: colors.danger, neutral: colors.inkSubtle }[tone];
 
   return (
     <View

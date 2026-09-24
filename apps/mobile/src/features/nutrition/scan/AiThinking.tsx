@@ -17,9 +17,12 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Floo } from "../../../mascot";
 import { useTheme } from "../../../theme/ThemeProvider";
-import { absoluteFill, radii, spacing } from "../../../theme/tokens";
+import { absoluteFill, dark, radii, spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
 import { SCAN_STATUS_LABELS } from "../model/scanMachine";
+
+/** Marks drawn over the camera / photo scrim: always light. `onPrimary` is navy in dark mode. */
+const ON_SCRIM = dark.ink;
 
 const SWEEP_MS = 1600;
 const BRACKET = 42;
@@ -75,22 +78,22 @@ export function AiThinking({ uri, statusIndex, testID = "ai-thinking" }: AiThink
 
       <Animated.View pointerEvents="none" style={[styles.sweep, { width }, sweepStyle]}>
         <LinearGradient
-          colors={["transparent", `${colors.gradient[1]}66`, colors.gradient[1], `${colors.gradient[1]}66`, "transparent"]}
+          colors={["transparent", `${colors.floo}66`, colors.floo, `${colors.floo}66`, "transparent"]}
           locations={[0, 0.35, 0.5, 0.65, 1]}
           style={styles.sweepFill}
         />
       </Animated.View>
 
       <View pointerEvents="none" style={styles.frame}>
-        <Animated.View style={[styles.bracket, styles.tl, { borderColor: colors.onPrimary }, bracketStyle]} />
-        <Animated.View style={[styles.bracket, styles.tr, { borderColor: colors.onPrimary }, bracketStyle]} />
-        <Animated.View style={[styles.bracket, styles.bl, { borderColor: colors.onPrimary }, bracketStyle]} />
-        <Animated.View style={[styles.bracket, styles.br, { borderColor: colors.onPrimary }, bracketStyle]} />
+        <Animated.View style={[styles.bracket, styles.tl, { borderColor: ON_SCRIM }, bracketStyle]} />
+        <Animated.View style={[styles.bracket, styles.tr, { borderColor: ON_SCRIM }, bracketStyle]} />
+        <Animated.View style={[styles.bracket, styles.bl, { borderColor: ON_SCRIM }, bracketStyle]} />
+        <Animated.View style={[styles.bracket, styles.br, { borderColor: ON_SCRIM }, bracketStyle]} />
       </View>
 
       <View pointerEvents="none" style={styles.particles} testID="scan-particles">
         {particles.map((p) => (
-          <Particle key={p.key} left={`${p.left}%`} size={p.size} delay={p.delay} distance={p.distance} color={colors.gradient[1]} reduce={reduce} />
+          <Particle key={p.key} left={`${p.left}%`} size={p.size} delay={p.delay} distance={p.distance} color={colors.floo} reduce={reduce} />
         ))}
       </View>
 
@@ -99,7 +102,7 @@ export function AiThinking({ uri, statusIndex, testID = "ai-thinking" }: AiThink
           <Floo mood="think" size="s" testID="scan-floo" />
         </View>
         <Animated.View key={label} entering={FadeIn.duration(220)} exiting={FadeOut.duration(160)} style={[styles.statusPill, { backgroundColor: colors.overlay }]}>
-          <Text variant="bodyStrong" style={{ color: colors.onPrimary }} accessibilityLiveRegion="polite" testID="scan-status">
+          <Text variant="bodyStrong" style={{ color: ON_SCRIM }} accessibilityLiveRegion="polite" testID="scan-status">
             {label}
           </Text>
         </Animated.View>

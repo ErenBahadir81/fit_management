@@ -13,7 +13,7 @@ import { getApi } from "../../../lib/api";
 import { todayKey, trHour } from "../../../lib/dates";
 import { haptic } from "../../../lib/haptics";
 import { useTheme } from "../../../theme/ThemeProvider";
-import { absoluteFill, radii, spacing } from "../../../theme/tokens";
+import { absoluteFill, dark, radii, spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { EmptyState } from "../../../ui/EmptyState";
 import { Header } from "../../../ui/Header";
@@ -30,6 +30,9 @@ import { useAddEntries } from "../useNutrition";
 import { AiThinking } from "./AiThinking";
 import { ScanResults } from "./ScanResults";
 import { CAMERA_SUPPORTED, scanUploadFrom } from "./camera";
+
+/** Marks drawn over the camera / photo scrim: always light. `onPrimary` is navy in dark mode. */
+const ON_SCRIM = dark.ink;
 
 const TICK_MS = 200;
 const DONE_MS = 1100;
@@ -261,7 +264,7 @@ function CameraStage({ cameraRef, granted, canAskAgain, onRequest, onShutter, on
       {live ? (
         <>
           <View pointerEvents="none" style={styles.guideWrap}>
-            <View style={[styles.guide, { borderColor: colors.onPrimary }]} />
+            <View style={[styles.guide, { borderColor: ON_SCRIM }]} />
           </View>
           <View pointerEvents="none" style={styles.mascotLine}>
             <Floo mood="happy" size="s" testID="scan-camera-floo" />
@@ -292,9 +295,9 @@ function CameraStage({ cameraRef, granted, canAskAgain, onRequest, onShutter, on
             haptic="none"
             minTarget={false}
             accessibilityLabel="Fotoğraf çek"
-            style={[styles.shutter, { borderColor: colors.onPrimary }]}
+            style={[styles.shutter, { borderColor: ON_SCRIM }]}
           >
-            <View style={[styles.shutterCore, { backgroundColor: colors.onPrimary }]} />
+            <View style={[styles.shutterCore, { backgroundColor: ON_SCRIM }]} />
           </Pressable>
         ) : (
           <Button testID="scan-gallery-primary" label="Galeriden seç" icon="photo" onPress={onGallery} />

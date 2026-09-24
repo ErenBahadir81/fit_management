@@ -24,18 +24,19 @@ import { LineTrend, RingChart, BarWeek, Sparkline } from "@/charts";
 6. **Pull-to-refresh** on every data screen (`<Screen onRefresh>`; FlashList screens pass `refreshControl={<ListRefreshControl …/>}`), FlashList for long lists (`<Screen scroll={false}>` + `FlashList`, `memo` rows, `useCallback` renderItem, no inline style objects), expo-image with `cachePolicy="memory-disk"`.
 8. **Destructive = swipe + undo.** Rows wrap in `SwipeToDelete` (short swipe reveals a tappable "Sil", long swipe commits); the screen keeps a 5 s `UndoBar` through `useUndoWindow` (`src/lib`). Every row also exposes a `delete` accessibility action.
 7. **Turkish copy, short and warm.** Sentence case, no exclamation spam, Floo's voice comes from the API.
+9. **Flat, one blue.** Cards cast no shadow: their hairline `colors.border` is the edge (`shadows.card` is empty on purpose). Only layers that float over content (sheets, toasts, the undo bar, a FAB) use `shadows.elevated` / `shadows.primary`. `colors.gradient` exists for **one** thing, the primary `Ring` (goal / calorie ring); everything else is a solid fill. In dark mode `onPrimary` is **navy** (`#04213A`), not white: text and icons on a primary fill always use `onPrimary` / `onPrimaryMuted`, never a raw white, and nothing on a non-primary dark background (camera scrim, off switch track) may use `onPrimary` as "white".
 
 ## Theme (`src/theme`)
 | Export | What |
 |---|---|
 | `useTheme()` | `{ colors, scheme, isDark, mode, setMode, spacing, radii, type, shadows }`. Throws outside `ThemeProvider` (root layout provides it). |
 | `useThemedStyles(t => ({...}))` | memoised style factory on the current scheme. |
-| `colors.*` | semantic only: `bg surface surfaceElevated surfaceMuted ink inkMuted inkSubtle inkInverse primary primaryStrong primarySoft onPrimary onPrimaryMuted onPrimaryBorder gradient success/successSoft warning/warningSoft danger/dangerSoft border borderStrong overlay skeleton skeletonHighlight ringTrack chartGrid tabBar`. On a `Card variant="primary"` use `<Text color="onPrimary">` / `"onPrimaryMuted"` — never a raw white. |
-| `spacing` | 4-pt grid `xxs 2 · xs 4 · sm 8 · md 12 · lg 16 · xl 20 · xxl 24 · xxxl 32 · huge 48`, `gutter 20`, `cardPad 20`, `touch 44` |
-| `radii` | `xs 6 · sm 10 · control 14 · md 18 · card 24 · sheet 28 · pill 999` |
-| `type` | `caption 11 · label 13 · body 15 · bodyStrong 15 · title 17 · heading 22 · display 28 · hero 40` |
+| `colors.*` | semantic only: `bg surface surfaceElevated surfaceMuted ink inkMuted inkSubtle inkInverse primary primaryStrong primarySoft onPrimary onPrimaryMuted onPrimaryBorder gradient success/successSoft warning/warningSoft warningFill danger/dangerSoft border borderStrong controlBorder focus overlay skeleton skeletonHighlight ringTrack chartGrid tabBar tabBarBorder floo flooBubble flooBubbleBorder macroProtein macroCarbs macroFat`. On a `Card variant="primary"` use `<Text color="onPrimary">` / `"onPrimaryMuted"` (navy in dark) — never a raw white. `warning` is for text, `warningFill` for bars/marks. `controlBorder` (≥ 3:1) edges inputs; `border` is the quiet card/row hairline. `floo` is decoration only, never text. |
+| `spacing` | 4-pt grid `xxs 2 · xs 4 · sm 8 · md 12 · lg 16 · xl 20 · xxl 24 · xxxl 32 · huge 48`, `gutter 16`, `cardPad 16`, `cardGap 12`, `touch 44`, `rowMin 52`, `rowTall 68` |
+| `radii` | `xs 6 · sm 10 · control 12 · md 14 · card 16 · sheet 24 · pill 999` |
+| `type` | `caption 12 · label 13 · body 15 · bodyStrong 15 · title 17 · heading 20 · number 22 · display 28 · hero 44` |
 | `statusTone` | maps API statuses (`ready/recovering/fatigued`, `ahead/onTrack/behind/stalled`) to a `Tone` |
-| motion | `springs.snappy {18/260} · gentle {20/140} · bouncy {12/220}`, `durations {120/200/320}`, `timing.fast/base/slow/reduced`, `easeOut`, `enterCard(i, reduce)`, `staggerDelay(i)`, `resolveSpring(kind, reduce)`, `PRESS_SCALE 0.97` |
+| motion | `springs.snappy {18/260} · gentle {20/140} · bouncy {12/220}`, `durations {120/200/320}`, `timing.fast/base/slow/reduced`, `easeOut`, `easeOutStrong` (enter), `easeInOutStrong` (on-screen movement), `enterCard(i, reduce)`, `staggerDelay(i)`, `resolveSpring(kind, reduce)`, `PRESS_SCALE 0.97` |
 
 Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`timing.reduced` — every primitive already does.
 
@@ -45,9 +46,9 @@ Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`ti
 - **`Screen`** `{ scroll=true, keyboard, refreshing, onRefresh, tabBar=true, edges=["top"], contentStyle }` — safe areas, 20 pt gutters, `gap: 16` between children, pull-to-refresh, bottom clearance for the floating tab bar. `keyboard` swaps in `KeyboardAwareScrollView`. Do: one `Screen` per route. Don't: nest `ScrollView`s; for FlashList use `scroll={false}` and pad with `useTabBarSpace()`.
 - **`Header`** `{ title, subtitle?, eyebrow?, left?, right?: {icon,label,onPress}, compact?, trailing? }` — large 28 pt title (role=header); `compact` for sheets/modals.
 - **`Box`** spacing shorthands (`p px py pt pb pl pr m mx my mt mb gap`), `row wrap center align justify flex bg radius border`.
-- **`Surface`** `{ elevated?, muted?, radius, bordered? }` themed plane, no padding.
-- **`Card`** `{ variant: "default"|"primary"|"muted", onPress?, padded=true }` — 24 pt radius, 20 pt padding, soft shadow; `primary` = violet gradient (use white text); `onPress` makes the whole card a 0.98 pressable.
-- **`Divider`** `{ inset? }`.
+- **`Surface`** `{ elevated?, muted?, radius, bordered? }` themed plane, no padding. `elevated` is for floating layers only (it casts `shadows.elevated`).
+- **`Card`** `{ variant: "default"|"primary"|"muted", onPress?, padded=true }` — flat: 16 pt radius, 16 pt padding, **no shadow**. `default` = `surface` + 1 pt `border` hairline; `muted` = `surfaceMuted`, no edge; `primary` = **solid** `primary` fill (no gradient, no glow), content in `onPrimary` / `onPrimaryMuted`, hairlines in `onPrimaryBorder`, actions as `Button variant="inverse"`. `onPress` makes the whole card a 0.98 pressable. Space cards with `spacing.cardGap`.
+- **`Divider`** `{ inset? }` — 1 pt `border` line.
 - **`Entry`** `{ index }` — staggered entering animation wrapper (Animated.View).
 - **`Reveal`** `{ ready, skeleton }` — skeleton ⇄ content crossfade (see rule 1).
 
@@ -58,27 +59,27 @@ Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`ti
 
 ### Pressables
 - **`Pressable`** `{ haptic: "tap"|"select"|"medium"|"none", scaleTo=0.97, minTarget=true, disabled }` — role=button, 44 pt min height, `accessibilityState.disabled`. Base of every interactive element. Don't use RN `Pressable`/`TouchableOpacity` directly.
-- **`Button`** `{ label, variant: "primary"|"secondary"|"ghost"|"danger"|"inverse", size: "sm"|"md"|"lg", icon?, iconRight?, loading, full }` — `loading` shows a spinner, blocks presses, sets `busy`. `inverse` is white-on-violet for use inside `Card variant="primary"`.
+- **`Button`** `{ label, variant: "primary"|"secondary"|"ghost"|"danger"|"inverse", size: "sm"|"md"|"lg", icon?, iconRight?, loading, full }` — heights **sm 40 · md 48 · lg 52**, radius `control` (12). Flat, no glow: `primary` = solid primary, darkens to `primaryStrong` while pressed (plus the 0.97 scale); `secondary` = `primarySoft` + primary text; `ghost` = transparent + `borderStrong` edge + ink text (pressed: `surfaceMuted`); `danger` = `dangerSoft` + danger text; `inverse` = `surface` pill + primary text, for use inside `Card variant="primary"` (correct in both schemes). `loading` shows a spinner, blocks presses, sets `busy`.
 - **`Chip`** `{ label, selected, tone, icon?, dot?: color, size, onPress? }` — pill; selected = solid primary; `onPress` gives a selection haptic; `dot` for muscle colors.
-- **`ListRow`** `{ label, value?, hint?, icon?, right?: node, onPress?, chevron, destructive }` — settings rows; put `Toggle`/`Segmented`/`Stepper` in `right`.
+- **`ListRow`** `{ label, value?, hint?, icon?, right?: node, onPress?, chevron, destructive, divider? }` — settings rows, min height `spacing.rowMin` (52), 32 pt soft icon tile; put `Toggle`/`Segmented`/`Stepper` in `right`. Group rows in one `Card` and pass `divider` on every row but the last: a hairline that starts at the text column (test id `${testID}-divider`).
 
 ### Controls
-- **`TextField`** `{ label, error, hint, icon, secure, unit, ...TextInputProps }` — animated focus ring, error line (live region), eye toggle. Forward-ref to `TextInput`.
-- **`Stepper`** `{ value, onChange, step, min, max, format, size }` — −/+ with clamp, press-and-hold repeat, tabular value. Test ids: `${testID}-dec/-inc`.
-- **`Segmented<T>`** `{ options: {value,label}[], value, onChange, size }` — spring pill indicator, role=tablist/tab, test ids `${testID}-${value}`.
-- **`Toggle`** `{ value, onChange }` — role=switch, `checked` state, animated track colour.
+- **`TextField`** `{ label, error, hint, icon, secure, unit, ...TextInputProps }` — label above; idle edge `controlBorder` (≥ 3:1), on focus the edge turns `focus` and a 3 pt halo fades in outside it (opacity only, no layout shift); `danger` edge on error. Error line (live region), eye toggle. Forward-ref to `TextInput`.
+- **`Stepper`** `{ value, onChange, step, min, max, format, size }` — flat −/+ tiles (`surfaceMuted` / `primarySoft`), `number` (22 pt) value, clamp, press-and-hold repeat, tabular value. Test ids: `${testID}-dec/-inc`.
+- **`Segmented<T>`** `{ options: {value,label}[], value, onChange, size }` — flat `surfaceMuted` track, hairline-edged thumb (one step lighter than the track in dark) on a spring, no shadow; role=tablist/tab, test ids `${testID}-${value}`.
+- **`Toggle`** `{ value, onChange }` — role=switch, `checked` state, track springs from `borderStrong` to `primary`; the knob is white / near-white ink in both schemes (never `onPrimary`).
 - **`WheelPicker<T>`** `{ options: {value,label}[], value, onChange, label }` — snapping 44 pt column, one `onChange` + one selection tick per settle, `role=adjustable` with increment/decrement, and every row directly tappable. `WHEEL_ROW_HEIGHT` / `WHEEL_HEIGHT` exported.
 - **`DatePicker`** `{ value: dateKey|null, onChange, label, minYear?, maxYear? }` — day / Turkish month / year as three wheels. A day that does not exist in the new month clamps, so it can never emit an impossible date. Use this for any date input; **never a text field asking for `YYYY-AA-GG`**.
 
 ### Progress
-- **`ProgressBar`** `{ value 0..1, tone, height=8, label?, valueLabel? }` — spring-animated width, role=progressbar with `accessibilityValue`.
-- **`Ring`** `{ value 0..1, size=120, stroke?, tone, color?, gradient=true, trackColor?, children }` — SVG ring, animated dash offset; children centred. `ringGeometry()` is exported for maths.
-- **`StatTile`** `{ label, value, hint?, icon?, tone? }` — compact number tile (streaks, deltas).
+- **`ProgressBar`** `{ value 0..1, tone, height=8, label?, valueLabel? }` — flat pill (use 6–8), `ringTrack` groove, solid fill (`warning` fills with `warningFill`), spring-animated width, role=progressbar with `accessibilityValue`.
+- **`Ring`** `{ value 0..1, size=120, stroke?, tone, color?, gradient=true, trackColor?, children }` — SVG ring, round caps, animated dash offset; children centred. `tone="primary"` strokes with `colors.gradient`, **the app's only gradient**. `ringGeometry()` is exported for maths.
+- **`StatTile`** `{ label, value, hint?, icon?, tone? }` — flat `surfaceMuted` tile, `number` (22 pt) tabular value (streaks, deltas).
 
 ### Feedback
-- **`useToast().show({ message, kind: "success"|"error"|"info", duration })`** — top toast, haptic per kind, auto-hides, tap to dismiss, role=alert. Provided at the root.
+- **`useToast().show({ message, kind: "success"|"error"|"info", duration })`** — top toast, flat `surfaceElevated` + hairline + `shadows.elevated`, haptic per kind, auto-hides, tap to dismiss, role=alert. Provided at the root. `useToast().route(claim)` lets another channel (Floo) claim toasts first; the claimer returns `true` to take one.
 - **`EmptyState`** `{ title, body?, icon?, illustration?, action?: {label,onPress,icon}, compact }` — pass `illustration={<Floo mood="sleepy" size="m" />}` for empty data, `mood="worried"` for errors.
-- **`SuccessCheck`** `{ size=72, withHaptic=true }` — circle pops (bouncy) + check draws (320 ms). Use in completion sheets.
+- **`SuccessCheck`** `{ size=72, withHaptic=true }` — circle pops from 0.6 with a fade (bouncy, never from 0) + check draws (320 ms, strong ease-out). Use in completion sheets.
 - **`Skeleton`** `{ width, height, radius=8, circle }`, **`SkeletonText`** `{ lines, lineHeight, lastWidth }`, **`SkeletonGroup`** — 1.2 s diagonal shimmer, hidden from screen readers (query with `includeHiddenElements: true` in tests).
 
 ### Sheets & navigation
@@ -92,7 +93,7 @@ Reduced motion: use `useReducedMotion()` from reanimated and `resolveSpring`/`ti
 The goal decision is one component used in two places, so onboarding and in-app setup cannot drift:
 - **`goalIntent.ts`** (pure) — `INTENT_OPTIONS` (`lose | maintain | gain`), `PACE_OPTIONS`, `ON_TRACK_TR`, `milestonesOf(plan)` / `summaryOf(plan)` (C4, with a local fallback for plans cached before it), `dateLocativeTr` ("17 Ocak'ta"), `etaBetweenTr(from,to)`, `maintenanceEnergy(body)` / `gainCalories(maintenance)`.
 - **`components/GoalChooserSection`** — intent → target → pace → consequence. Rendered by `GoalSetupScreen` *and* onboarding step 5.
-- **`components/PlanOutcome`** — "what that choice means", arrival **date** as the hero. `components/MilestoneSpine` — the four quarter-points, `compact` (inside the violet card) or `full` (the roadmap's spine).
+- **`components/PlanOutcome`** — "what that choice means", arrival **date** as the hero. `components/MilestoneSpine` — the four quarter-points, `compact` (inside the blue card) or `full` (the roadmap's spine).
 - **`useLocalPlan.usePlansByPace`** — all three paces computed on device, so the pace picker shows each option's real arrival date and daily calories.
 
 ## Onboarding (`src/features/onboarding`)

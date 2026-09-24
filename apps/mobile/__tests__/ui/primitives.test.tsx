@@ -12,6 +12,7 @@ import { ListRow } from "../../src/ui/ListRow";
 import { Divider } from "../../src/ui/Divider";
 import { Surface } from "../../src/ui/Surface";
 import { StatTile } from "../../src/ui/StatTile";
+import { light } from "../../src/theme/tokens";
 
 describe("Text", () => {
   test("applies the variant scale and tabular numerals", async () => {
@@ -25,8 +26,8 @@ describe("Text", () => {
         </Text>
       </>
     );
-    expect(screen.getByTestId("h")).toHaveStyle({ fontSize: 40, fontVariant: ["tabular-nums"] });
-    expect(screen.getByTestId("c")).toHaveStyle({ fontSize: 11, color: "#5B6273" });
+    expect(screen.getByTestId("h")).toHaveStyle({ fontSize: 44, fontVariant: ["tabular-nums"] });
+    expect(screen.getByTestId("c")).toHaveStyle({ fontSize: 12, color: light.inkMuted });
   });
   test("defaults to body and ink color; supports align/tone", async () => {
     await renderUI(
@@ -34,7 +35,7 @@ describe("Text", () => {
         b
       </Text>
     );
-    expect(screen.getByTestId("b")).toHaveStyle({ fontSize: 15, textAlign: "center", color: "#EF4444" });
+    expect(screen.getByTestId("b")).toHaveStyle({ fontSize: 15, textAlign: "center", color: light.danger });
   });
 });
 
@@ -48,10 +49,10 @@ describe("Box / Surface / Card / Divider", () => {
       alignItems: "center",
       justifyContent: "space-between",
       backgroundColor: "#FFFFFF",
-      borderRadius: 24,
+      borderRadius: 16,
     });
   });
-  test("Card uses 24 pt radius + 20 pt padding and can be pressable", async () => {
+  test("Card is flat: 16 pt radius + 16 pt padding, hairline edge, no shadow, and can be pressable", async () => {
     const onPress = jest.fn();
     await renderUI(
       <Card testID="card" onPress={onPress}>
@@ -59,9 +60,26 @@ describe("Box / Surface / Card / Divider", () => {
       </Card>
     );
     const el = screen.getByTestId("card");
-    expect(el).toHaveStyle({ borderRadius: 24, padding: 20 });
+    expect(el).toHaveStyle({ borderRadius: 16, padding: 16, backgroundColor: light.surface, borderWidth: 1, borderColor: light.border });
+    expect(el).not.toHaveStyle({ shadowOpacity: 0.1 });
     await fireEvent.press(el);
     expect(onPress).toHaveBeenCalled();
+  });
+  test("Card primary is a solid primary fill (no gradient); muted has no edge", async () => {
+    await renderUI(
+      <>
+        <Card testID="p" variant="primary">
+          <Text color="onPrimary">p</Text>
+        </Card>
+        <Card testID="m" variant="muted">
+          <Text>m</Text>
+        </Card>
+      </>
+    );
+    expect(screen.getByTestId("p")).toHaveStyle({ backgroundColor: light.primary });
+    expect(screen.getByTestId("p").children).toHaveLength(1); // just the content: no gradient layer
+    expect(screen.getByTestId("m")).toHaveStyle({ backgroundColor: light.surfaceMuted });
+    expect(screen.getByTestId("m")).not.toHaveStyle({ borderWidth: 1 });
   });
   test("Surface and Divider render", async () => {
     await renderUI(
@@ -140,6 +158,21 @@ describe("ProgressBar / Ring / StatTile / ListRow", () => {
     await renderUI(<StatTile label="Seri" value="4" hint="gün" />);
     expect(screen.getByText("Seri")).toBeTruthy();
     expect(screen.getByText("4")).toBeTruthy();
+  });
+  test("ListRow is at least rowMin tall and draws a hairline divider only when asked", async () => {
+    await renderUI(
+      <>
+        <ListRow label="Bir" icon="settings" divider testID="r1" />
+        <ListRow label="İki" testID="r2" />
+      </>
+    );
+    expect(screen.getByTestId("r1")).toHaveStyle({ minHeight: 52 });
+    expect(screen.getByTestId("r1-divider")).toHaveStyle({ backgroundColor: light.border, left: 44 });
+    expect(screen.queryByTestId("r2-divider")).toBeNull();
+  });
+  test("ProgressBar warning fills with warningFill", async () => {
+    await renderUI(<ProgressBar value={0.5} tone="warning" testID="pw" />);
+    expect(JSON.stringify(screen.toJSON())).toContain(light.warningFill);
   });
   test("ListRow shows label/value and forwards presses", async () => {
     const onPress = jest.fn();

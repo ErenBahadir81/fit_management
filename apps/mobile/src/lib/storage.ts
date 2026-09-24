@@ -32,4 +32,6 @@ export const STORAGE_KEYS = {
   restPrefs: "training.rest.prefs.v1",
   /** First-run answers, kept so a crash mid-signup does not cost the whole flow. */
   onboardingDraft: "onboarding.draft.v1",
+  /** Floo lines already said (`useFlooOnce`), so a remount does not repeat them. */
+  flooSaid: "floo.said.v1",
 } as const;
