@@ -29,9 +29,9 @@ const both = (spec: Record<string, number>): PoseSpec => {
 export const MOOD_RIG_SPEC: Record<Mood, PoseSpec> = {
   idle: {},
   happy: { ...both({ sh: 30, el: -12, wr: -6, curl: 0, spread: 0.4 }) },
-  // Arms open and a little up — the pose a cheer settles into. Not straight up: a mood is held for
+  // Arms open, hands down and out — the pose a cheer settles into. Not straight up: a mood is held for
   // seconds, and arms held overhead read as a gesture that forgot to finish.
-  celebrate: { ...both({ sh: 58, el: 22, wr: 4, curl: 0, spread: 0.85 }) },
+  celebrate: { ...both({ sh: 38, el: 6, wr: 2, curl: 0, spread: 0.85 }) },
   sad: { ...both({ sh: 13, el: -6, wr: -4, curl: 0.35, spread: 0 }), L_fx: -1.5, R_fx: -1.5 },
   // Hands wrung together in front of the belly.
   worried: {
@@ -144,7 +144,7 @@ const SPEC: Record<Gesture, GestureSpec> = {
       { t: 680, pose: { L_sh: 156, R_sh: 152, L_el: 12, R_el: 18, squash: -0.03 }, ease: "out" },
       { t: 1000, pose: { L_sh: 144, R_sh: 148, L_el: 22, R_el: 18 } },
       // Arms come down bent, not as two straight poles, and land on the mood's own pose.
-      { t: 1260, pose: { L_sh: 82, R_sh: 78, L_el: 34, R_el: 28, L_curl: 0.5, R_curl: 0.5, L_thumb: 0, R_thumb: 0, squash: 0 } },
+      { t: 1260, pose: { L_sh: 64, R_sh: 60, L_el: 26, R_el: 22, L_curl: 0.5, R_curl: 0.5, L_thumb: 0, R_thumb: 0, squash: 0 } },
       { t: 1500, pose: {} },
     ],
   },
