@@ -94,6 +94,8 @@ export const ERROR_CODES = [
   "CONFLICT",
   "GOAL_EXISTS",
   "NO_BODY_ENTRY",
+  /** T7 — the adjustment the client answered is no longer the one on offer (data changed). */
+  "ADJUSTMENT_STALE",
   "RATE_LIMITED",
   "VISION_UNAVAILABLE",
   "UPSTREAM_ERROR",

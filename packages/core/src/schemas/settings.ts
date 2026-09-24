@@ -1,6 +1,113 @@
 import { z } from "zod";
 import { zActivityLevel, zGender, zWeekday } from "./common";
 
+/* Bounds only; the values live in `muscleDefaults()` below. */
+const perLevel = (max: number) =>
+  z.object({ beginner: z.number().min(0).max(max), intermediate: z.number().min(0).max(max), advanced: z.number().min(0).max(max) });
+const perSex = (min: number, max: number) => z.object({ male: z.number().min(min).max(max), female: z.number().min(min).max(max) });
+
+/**
+ * T7 — muscle-gain engine constants (bulk / recomp / FFMI). Every value is a literature average;
+ * sources in docs/research/muscle-gain-science.md. Defaulted as a block so settings stored before
+ * T7 parse unchanged.
+ */
+const muscleDefaults = () => ({
+  /**
+   * Lean mass gained per month as % of bodyweight, men, optimal lean bulk. Average of Aragon
+   * (1–1.5 / 0.5–1 / 0.25–0.5) and McDonald (≈10 / 5 / 2.5 kg per year) → ≈1.0 / 0.45 / 0.2 kg a
+   * month for an 80 kg man.
+   */
+  leanGainPctBwPerMonth: { beginner: 1.15, intermediate: 0.6, advanced: 0.3 },
+  /**
+   * Women vs men on the %BW rate. McDonald/Aragon say half in kg, meta-analyses (Roberts 2020,
+   * Refalo 2025) find equal relative gains; 0.75 on %BW ≈ 0.6× in kg at typical bodyweights.
+   */
+  femaleRateFactor: 0.75,
+  /** kg of fat per kg of lean on an optimal lean bulk (MacroFactor lean share, McDonald 1:1 → 1:2). */
+  fatPerLeanKg: { beginner: 0.7, intermediate: 1.1, advanced: 1.4 },
+  /** Energy per kg lean tissue gained incl. synthesis cost (Hall 2008; Slater 2019: 1,800–2,800). */
+  kcalPerKgLeanGain: 2500,
+  /** Energy per kg adipose tissue gained (Hall 2008). */
+  kcalPerKgFatGain: 7700,
+  /** Bulk profile multipliers: lean rate and fat per lean (a bigger surplus mostly adds fat, Helms 2023). */
+  bulkProfiles: {
+    conservative: { lean: 0.85, fat: 0.7 },
+    optimal: { lean: 1, fat: 1 },
+    aggressive: { lean: 1.1, fat: 1.6 },
+  },
+  /** Protein on a bulk, g per kg bodyweight (Morton 2018: 1.6 average, 2.2 upper CI; Iraki 2019). */
+  bulkProteinGPerKg: 1.8,
+  /** Lean-bulk body-fat ceiling (practitioner consensus: end a bulk at 18–20 % men, 26–28 % women). */
+  bulkBfCeiling: { male: 20, female: 28 },
+  /** Height-normalised FFMI rarely exceeded without drugs (Kouri 1995: 25 men; women ≈ 21.5). */
+  ffmiCeiling: { male: 25, female: 21.5 },
+  /** FFMI points below the ceiling where the gain rate starts tapering linearly toward `taperFloor`. */
+  ffmiTaperWindow: 3,
+  taperFloor: 0.15,
+  /** Level inferred from FFMI when the user did not say (untrained medians: men 18.9, women 15.4). */
+  levelFfmi: { male: { intermediate: 20, advanced: 22.5 }, female: { intermediate: 16.5, advanced: 19 } },
+  /** Recomp: daily deficit as a fraction of TDEE, capped in kcal (MacroFactor; Barakat 2020: 0 to −15 %). */
+  recompDeficitPct: 0.1,
+  recompMaxDeficitKcal: 500,
+  /** Share of the bulk lean rate a recomp still achieves (Barakat 2020 review, ≈ 0.5 for novices). */
+  recompLeanFactor: { beginner: 0.5, intermediate: 0.4, advanced: 0.25 },
+});
+
+export const zMuscleSettings = z.object({
+  leanGainPctBwPerMonth: perLevel(3),
+  femaleRateFactor: z.number().min(0.2).max(1),
+  fatPerLeanKg: perLevel(5),
+  kcalPerKgLeanGain: z.number().min(1000).max(8000),
+  kcalPerKgFatGain: z.number().min(6000).max(10000),
+  bulkProfiles: z.object({
+    conservative: z.object({ lean: z.number().min(0.3).max(1.5), fat: z.number().min(0.2).max(3) }),
+    optimal: z.object({ lean: z.number().min(0.3).max(1.5), fat: z.number().min(0.2).max(3) }),
+    aggressive: z.object({ lean: z.number().min(0.3).max(1.5), fat: z.number().min(0.2).max(3) }),
+  }),
+  bulkProteinGPerKg: z.number().min(1.2).max(3),
+  bulkBfCeiling: perSex(8, 45),
+  ffmiCeiling: perSex(15, 30),
+  ffmiTaperWindow: z.number().min(0.5).max(8),
+  taperFloor: z.number().min(0).max(1),
+  levelFfmi: z.object({
+    male: z.object({ intermediate: z.number(), advanced: z.number() }),
+    female: z.object({ intermediate: z.number(), advanced: z.number() }),
+  }),
+  recompDeficitPct: z.number().min(0).max(0.25),
+  recompMaxDeficitKcal: z.number().min(0).max(1000),
+  recompLeanFactor: perLevel(1),
+});
+export type MuscleSettings = z.infer<typeof zMuscleSettings>;
+export const DEFAULT_MUSCLE_SETTINGS: MuscleSettings = muscleDefaults();
+
+/** T7 — when and how far Floo proposes adjusting an active goal. */
+export const DEFAULT_ADAPTIVE_SETTINGS = {
+  /** Trend vs plan difference (kg) that counts as ahead/behind — same as ON_TRACK_TOLERANCE_KG (≈ daily noise SD). */
+  toleranceKg: 0.4,
+  /** The deviation must hold at today and `sustainDays` ago before anything is proposed. */
+  sustainDays: 7,
+  /**
+   * No proposal until this many days after the plan (re)started or the last answer (Helms,
+   * MacroFactor: judge after ≥ 3 usable weeks; the first bulk week is mostly water and glycogen).
+   */
+  cooldownDays: 21,
+  /** Calorie step of a one-tap "lower/raise calories" when no measured TDEE is available (≈ 5 %). */
+  kcalStep: 150,
+  /** Bulk: observed gain above this × plan → too fast (extra is fat); below `bulkSlowRatio` × plan → too slow. */
+  bulkFastRatio: 1.5,
+  bulkSlowRatio: 0.5,
+} as const;
+
+export const zAdaptiveSettings = z.object({
+  toleranceKg: z.number().min(0.1).max(3),
+  sustainDays: z.number().int().min(0).max(28),
+  cooldownDays: z.number().int().min(3).max(56),
+  kcalStep: z.number().min(25).max(500),
+  bulkFastRatio: z.number().min(1).max(4),
+  bulkSlowRatio: z.number().min(0).max(1),
+});
+export type AdaptiveSettings = z.infer<typeof zAdaptiveSettings>;
+
 export const zRateBand = z.object({
   sex: zGender,
   bfMin: z.number().min(0).max(100),
@@ -75,6 +182,9 @@ export const zGoalSettings = z.object({
   /** Navy tape SEE shown as ± uncertainty in the UI. */
   bodyFatUncertaintyPct: z.number().min(0).max(10).default(3.5),
   rateTable: z.array(zRateBand).min(1),
+  /* T7 */
+  muscle: zMuscleSettings.default(muscleDefaults),
+  adaptive: zAdaptiveSettings.default({ ...DEFAULT_ADAPTIVE_SETTINGS }),
 });
 export type GoalSettings = z.infer<typeof zGoalSettings>;
 
@@ -162,6 +272,8 @@ export const DEFAULT_GOAL_SETTINGS: GoalSettings = {
   maxWeeks: 104,
   bodyFatUncertaintyPct: 3.5,
   rateTable: DEFAULT_RATE_TABLE,
+  muscle: muscleDefaults(),
+  adaptive: { ...DEFAULT_ADAPTIVE_SETTINGS },
 };
 
 export const DEFAULT_SETTINGS: SettingsDTO = {

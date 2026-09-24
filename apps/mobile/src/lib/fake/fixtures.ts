@@ -455,6 +455,7 @@ export function makePlan(start: BodyEntryDTO, targetBf: number, profile: GoalDTO
     w = end;
   }
   const plan: Omit<GoalPlan, "milestones" | "summaryTr"> = {
+    direction: "cut",
     fatToLoseKg: fatToLose,
     totalLossKg: totalLoss,
     targetWeightKg: targetWeight,
@@ -488,6 +489,10 @@ export function makeGoal(today: string, entries: BodyEntryDTO[]): GoalDTO {
   return {
     id: "g_demo",
     status: "active",
+    direction: "cut",
+    targetLeanGainKg: null,
+    trainingLevel: null,
+    adjustments: [],
     targetBodyFatPct: 15,
     profile: "optimal",
     start: { dateKey: startKey, weightKg: start.weightKg, bodyFatPct: start.bodyFatPct, leanMassKg: start.leanMassKg, fatMassKg: start.fatMassKg, bodyEntryId: start.id },

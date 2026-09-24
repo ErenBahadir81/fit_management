@@ -6,8 +6,12 @@
  * report "behind" forever. We therefore push the plan's expected trajectory through the identical
  * EWMA (same dates, same gaps, same alpha) and compare trend against trend; `expectedWeightKg` in
  * the DTO stays the plain roadmap value the UI should draw.
+ *
+ * T7: direction-aware. "ahead" always means *further along the plan's direction than planned*
+ * (cut/recomp: lighter than planned; bulk: heavier). A recomp is tracked on body fat for the goal
+ * bar, since its weight barely moves.
  */
-import type { GoalDTO, GoalProgress, RoadmapWeek } from "../schemas/goal";
+import type { GoalDirection, GoalDTO, GoalProgress, RoadmapWeek } from "../schemas/goal";
 import type { OnTrack } from "../schemas/common";
 import type { GoalSettings } from "../schemas/settings";
 import { daysBetween, shiftKey } from "../time/index";
@@ -15,7 +19,17 @@ import { clamp, round } from "../utils/index";
 import { ewmaChange, ewmaSlopePerWeek, ewmaTrend, type WeightPoint } from "./ewma";
 import { isLogged, type DayIntake } from "./recalibrate";
 
-export type GoalLike = Pick<GoalDTO, "targetBodyFatPct" | "start" | "plan">;
+export type GoalLike = Pick<GoalDTO, "targetBodyFatPct" | "start" | "plan"> & { direction?: GoalDirection };
+
+/** Direction of a goal or plan, `cut` for anything stored before directions existed. */
+export function directionOf(goal: GoalLike): GoalDirection {
+  return goal.direction ?? goal.plan.direction ?? "cut";
+}
+
+/** +1 when the plan moves weight up (bulk), −1 when it moves it down (cut, recomp). */
+export function weightSign(direction: GoalDirection): 1 | -1 {
+  return direction === "bulk" ? 1 : -1;
+}
 
 export interface BodyPoint {
   dateKey: string;
@@ -106,26 +120,34 @@ export function computeGoalProgress(
     if (isLogged(day)) deficitBankedKcal += tdee - day!.kcal;
   }
 
-  /* distance to the goal */
+  /* distance to the goal — measured along the plan's direction */
+  const direction = directionOf(goal);
+  const sign = weightSign(direction);
   const targetWeightKg = goal.plan.targetWeightKg;
-  const span = goal.start.weightKg - targetWeightKg;
-  const percentComplete = actualWeightKg === null || span <= 0 ? 0 : clamp((goal.start.weightKg - actualWeightKg) / span, 0, 1) * 100;
-  const kgToGo = Math.max(0, (actualWeightKg ?? goal.start.weightKg) - targetWeightKg);
-  const bfToGo = Math.max(0, (actualBodyFatPct ?? goal.start.bodyFatPct) - goal.targetBodyFatPct);
+  const span = sign * (targetWeightKg - goal.start.weightKg);
+  let percentComplete = actualWeightKg === null || span <= 0 ? 0 : clamp((sign * (actualWeightKg - goal.start.weightKg)) / span, 0, 1) * 100;
+  if (direction === "recomp") {
+    // Weight is nearly flat on a recomp; body fat is what moves.
+    const bfSpan = goal.start.bodyFatPct - goal.targetBodyFatPct;
+    percentComplete = actualBodyFatPct === null || bfSpan <= 0 ? 0 : clamp((goal.start.bodyFatPct - actualBodyFatPct) / bfSpan, 0, 1) * 100;
+  }
+  const kgToGo = Math.max(0, sign * (targetWeightKg - (actualWeightKg ?? goal.start.weightKg)));
+  const bfToGo = direction === "bulk" ? 0 : Math.max(0, (actualBodyFatPct ?? goal.start.bodyFatPct) - goal.targetBodyFatPct);
 
-  /* on-track classification */
+  /* on-track classification (diff > 0 = further along than planned) */
   let onTrack: OnTrack = "onTrack";
   if (actualWeightKg !== null && expectedTrendNow !== null) {
-    const diff = actualWeightKg - expectedTrendNow;
-    if (diff <= -ON_TRACK_TOLERANCE_KG) onTrack = "ahead";
-    else if (diff >= ON_TRACK_TOLERANCE_KG) onTrack = "behind";
+    const ahead = sign * (actualWeightKg - expectedTrendNow);
+    if (ahead >= ON_TRACK_TOLERANCE_KG) onTrack = "ahead";
+    else if (ahead <= -ON_TRACK_TOLERANCE_KG) onTrack = "behind";
   }
+  // A recomp is *supposed* to hold weight roughly flat, so a flat trend is not a stall there.
   const twoWeekChange = ewmaChange(trend, shiftKey(todayKey, -14), todayKey);
-  if (weeksElapsed >= 2 && twoWeekChange !== null && twoWeekChange > STALL_THRESHOLD_KG) onTrack = "stalled";
+  if (direction !== "recomp" && weeksElapsed >= 2 && twoWeekChange !== null && sign * twoWeekChange < -STALL_THRESHOLD_KG) onTrack = "stalled";
 
   /* projection from the observed slope (falls back to the plan rate when the slope is unknown) */
   const slope = ewmaSlopePerWeek(trend, todayKey, 28);
-  const observedRate = slope === null ? goal.plan.initialRateKgPerWeek : -slope;
+  const observedRate = slope === null ? goal.plan.initialRateKgPerWeek : sign * slope;
   let weeksRemainingProjected: number | null = null;
   let projectedDate: string | null = null;
   if (actualWeightKg !== null && observedRate > 0.01) {
@@ -154,4 +176,23 @@ export function computeGoalProgress(
     // day it ran), so `currentWeek` must use planOffset — exactly like weekIndexInPlan and tdeeAtDay.
     currentWeek: roadmapWeekAt(roadmap, planOffset),
   };
+}
+
+/**
+ * T7 — trend minus the plan's lag-matched expected trend at `atKey`, kg (positive = heavier than
+ * planned). Same comparison `computeGoalProgress` makes for today, available for any day so the
+ * adaptive goal can check that a deviation has *held*. null without weigh-ins up to that day.
+ */
+export function trendDeviationAt(goal: GoalLike, weighIns: WeightPoint[], atKey: string, settings: GoalSettings): number | null {
+  const planStartKey = goal.plan.startKey || goal.start.dateKey;
+  const trend = ewmaTrend(
+    weighIns.filter((p) => p.dateKey <= atKey),
+    settings.ewma
+  );
+  if (trend.length === 0) return null;
+  const expected = ewmaTrend(
+    trend.map((p) => ({ dateKey: p.dateKey, weightKg: expectedAtDay(goal, daysBetween(planStartKey, p.dateKey)).weightKg })),
+    settings.ewma
+  );
+  return trend[trend.length - 1].ewma - expected[expected.length - 1].ewma;
 }

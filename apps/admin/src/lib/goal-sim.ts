@@ -60,4 +60,8 @@ export const GOAL_WARNING_TR: Record<GoalWarning, string> = {
   LONG_HORIZON: "Plan bir yılı aşıyor; ara hedef önerilir.",
   NO_BODY_ENTRY: "Ölçüm kaydı yok; plan varsayılan değerlerle hesaplandı.",
   ALPERT_LIMITED: "Yağ mobilizasyon tavanı (Alpert) hızı sınırlıyor.",
+  BULK_BF_CEILING: "Bulk, yağ oranını tavanın (erkek %20, kadın %28) üstüne çıkarıyor; önce yağ yakımı ya da rekomp önerilir.",
+  NEAR_NATURAL_LIMIT: "Hedef FFMI doğal sınıra yakın; kas kazanım hızı ciddi yavaşlar.",
+  RECOMP_SLOW: "İleri seviyede rekomp çok yavaş; ayrı yağ yakımı ya da bulk daha hızlı.",
+  TARGET_NOT_BELOW_CURRENT: "Rekomp hedefi mevcut yağ oranının altında olmalı.",
 };
