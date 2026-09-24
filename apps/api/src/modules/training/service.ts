@@ -103,8 +103,10 @@ type StrengthInput = CompleteWorkoutInput["strength"][number];
 
 /**
  * Resolves a logged exercise into a self-contained entry:
- * muscles come from the payload → the catalog → the planned day, in that order, so an admin
- * catalog edit is picked up immediately while ad-hoc exercises keep what the client sent.
+ * muscles come from the catalog (when it knows the exercise and gives it muscles) → the payload →
+ * the planned day. Clients send the program's snapshot for planned exercises, so the catalog has to
+ * win for an admin's activation edit to reach the next log — the same rule `programVolume` uses for
+ * planned volume. Ad-hoc exercises the catalog does not know keep what the client sent.
  * Planned targets come from the payload → the entry being edited (`previous`, B6) → the
  * planned day, so editing a log after the fact never loses what was planned.
  */
@@ -132,12 +134,8 @@ export function buildStrengthEntries(
           ? { targetSets: planEx.targetSets, targetReps: planEx.targetReps, targetRIR: planEx.targetRIR, muscles: planEx.muscles, metric: planEx.metric }
           : null;
     const cat = catalog.get(key) ?? null;
-    const muscles =
-      raw.muscles !== undefined
-        ? raw.muscles
-        : cat
-          ? cat.muscles.map((m) => ({ key: m.key, load: m.load ?? 1 }))
-          : (plan?.muscles ?? []);
+    const fromCatalog = cat && cat.muscles?.length ? cat.muscles.map((m) => ({ key: m.key, load: m.load ?? 1 })) : null;
+    const muscles = fromCatalog ?? (raw.muscles !== undefined ? raw.muscles : (plan?.muscles ?? []));
     const skipped = raw.skipped ?? false;
     const sets: SetEntryDTO[] = skipped ? [] : (raw.sets ?? []).slice(0, 40);
     return {

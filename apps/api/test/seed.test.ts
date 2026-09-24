@@ -14,6 +14,7 @@ import { DietTarget } from "../src/models/nutrition";
 import { MascotMessage } from "../src/models/mascot";
 import { Settings, getSettings } from "../src/models/settings";
 import { hashPassword } from "../src/modules/platform/auth.service";
+import { LEGACY_V1_EXERCISE_MUSCLES } from "../src/seed/catalogActivationV1";
 
 const DEV_SEED = { adminPassword: "Asd*123", userPassword: "Asd*123" };
 
@@ -280,5 +281,146 @@ describe("runSeed accounts (production safety)", () => {
     expect(report.warnings).toHaveLength(1);
     expect(report.warnings[0]).toContain("eren");
     expect((await runSeed(DEV_SEED)).warnings).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Exercise catalog sync (activation v1): an existing database gets the 143-exercise catalog once.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** What a pre-3.0 database holds: the 20 legacy exercises with every load at 1 (the v1 seed). */
+async function givenLegacyCatalog(overrides: Record<string, Array<{ key: string; load: number }>> = {}) {
+  const now = new Date("2026-01-01T00:00:00Z");
+  await Exercise.collection.insertMany(
+    Object.entries(LEGACY_V1_EXERCISE_MUSCLES).map(([name, keys]) => ({
+      name,
+      nameKey: name.toLowerCase(),
+      muscles: overrides[name] ?? keys.map((key) => ({ key, load: 1 })),
+      defaultSets: 3,
+      defaultReps: 10,
+      metric: "reps",
+      kind: keys.length ? "strength" : "mobility",
+      equipment: [],
+      instructions: "eski",
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    }))
+  );
+}
+
+const musclesOf = async (name: string) =>
+  (await Exercise.findOne({ name }).lean())?.muscles.map((m) => ({ key: m.key, load: m.load }));
+const seedMuscles = (name: string) => SEED_EXERCISES.find((e) => e.name === name)!.muscles;
+
+describe("exercise catalog sync (activation v1)", () => {
+  it("seeds the full 143-exercise catalog on an empty database, each row linked by slug", async () => {
+    const report = await runSeed(DEV_SEED);
+    expect(report.created.exercises).toBe(143);
+    expect(await Exercise.countDocuments()).toBe(143);
+    expect(await Exercise.countDocuments({ slug: { $type: "string" } })).toBe(143);
+    expect(await Exercise.countDocuments({ "muscles.key": "legs" })).toBe(0);
+    expect(await musclesOf("Barbell Bench Press")).toEqual(seedMuscles("Barbell Bench Press"));
+    expect((await runSeed(DEV_SEED)).created.exercises).toBe(0);
+  });
+
+  it("adds the missing exercises and upgrades only untouched legacy loads on a pre-3.0 database", async () => {
+    await givenLegacyCatalog({
+      "Push-up": [{ key: "chest", load: 0.8 }], // admin edited a load → kept
+      Dips: [{ key: "chest", load: 1 }], // admin dropped keys but left load 1 → not the legacy set, kept
+    });
+    await Exercise.create({ name: "Face Pull", nameKey: "face pull", muscles: [{ key: "rearDelt", load: 1 }], defaultSets: 3, defaultReps: 15 });
+    await Exercise.create({ name: "Kendi Hareketim", nameKey: "kendi hareketim", muscles: [{ key: "chest", load: 1 }], defaultSets: 3, defaultReps: 10 });
+
+    const report = await runSeed(DEV_SEED);
+
+    expect(await Exercise.countDocuments()).toBe(143 + 1);
+    expect(report.created.exercises).toBe(143 - 20 - 1);
+    // 20 legacy rows − 2 edited − Stretch/Mobility (no muscles to upgrade) = 16
+    expect(report.migrated.exerciseLoads).toBe(16);
+    expect(await musclesOf("Squat")).toEqual(seedMuscles("Squat"));
+    expect(await musclesOf("Wall Sit")).toEqual(seedMuscles("Wall Sit"));
+    expect(await Exercise.countDocuments({ "muscles.key": "legs" })).toBe(0);
+    expect(await musclesOf("Push-up")).toEqual([{ key: "chest", load: 0.8 }]);
+    expect(await musclesOf("Dips")).toEqual([{ key: "chest", load: 1 }]);
+    expect(await musclesOf("Face Pull")).toEqual([{ key: "rearDelt", load: 1 }]);
+    expect(await musclesOf("Kendi Hareketim")).toEqual([{ key: "chest", load: 1 }]);
+    // Legacy rows keep everything but their loads; matches get linked to their catalog row.
+    expect(await Exercise.findOne({ name: "Squat" }).lean()).toMatchObject({ instructions: "eski", slug: "squat" });
+    expect((await Exercise.findOne({ name: "Face Pull" }).lean())!.slug).toBe("face-pull");
+    expect((await Exercise.findOne({ name: "Kendi Hareketim" }).lean())!.slug ?? null).toBeNull();
+  });
+
+  it("upgrades a legacy row whose muscles are still v1 strings", async () => {
+    await givenLegacyCatalog();
+    await Exercise.collection.updateOne({ name: "Squat" }, { $set: { muscles: ["legs"] } });
+    await runSeed(DEV_SEED);
+    expect(await musclesOf("Squat")).toEqual(seedMuscles("Squat"));
+  });
+
+  it("runs once: later admin edits, deletions and renames are never undone", async () => {
+    await givenLegacyCatalog();
+    await runSeed(DEV_SEED);
+    const total = await Exercise.countDocuments();
+
+    await Exercise.updateOne({ name: "Squat" }, { $set: { muscles: [{ key: "quads", load: 1 }] } });
+    await Exercise.updateOne({ name: "Lunge" }, { $set: { muscles: [{ key: "legs", load: 1 }] } }); // looks legacy again
+    await Exercise.deleteOne({ name: "Plank" });
+    await Exercise.updateOne({ name: "Push-up" }, { $set: { name: "Şınav", nameKey: "şınav" } });
+
+    const report = await runSeed(DEV_SEED);
+    expect(report.created.exercises).toBe(0);
+    expect(report.migrated.exerciseLoads).toBe(0);
+    expect(await Exercise.countDocuments()).toBe(total - 1);
+    expect(await Exercise.exists({ name: "Plank" })).toBeNull();
+    expect(await Exercise.exists({ name: "Push-up" })).toBeNull();
+    expect(await musclesOf("Squat")).toEqual([{ key: "quads", load: 1 }]);
+    expect(await musclesOf("Lunge")).toEqual([{ key: "legs", load: 1 }]);
+  });
+
+  it("refreshes untouched legacy snapshots in templates and programs, keeps edited ones", async () => {
+    await givenLegacyCatalog();
+    const userId = new Types.ObjectId();
+    const legacyDay = {
+      id: "d1",
+      order: 1,
+      title: "Bacak",
+      focus: "",
+      kind: "strength",
+      exercises: [
+        { name: "Squat", muscles: [{ key: "legs", load: 1 }], targetSets: 4, targetReps: 12, targetRIR: 2, metric: "reps" },
+        { name: "Lunge", muscles: [{ key: "quads", load: 0.7 }], targetSets: 3, targetReps: 12, targetRIR: 2, metric: "reps" },
+        { name: "Uydurma", muscles: [{ key: "legs", load: 1 }], targetSets: 3, targetReps: 10, targetRIR: null, metric: "reps" },
+      ],
+      run: null,
+      swim: null,
+    };
+    const now = new Date();
+    await ProgramTemplate.collection.insertOne({ name: "Eski Şablon", description: "", days: [legacyDay], tags: [], createdAt: now, updatedAt: now });
+    await Program.collection.insertOne({
+      userId,
+      name: "Eski",
+      mode: "cycle",
+      days: [legacyDay],
+      currentDayId: "d1",
+      currentIndex: 0,
+      weekNumber: 1,
+      cycleNumber: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const report = await runSeed(DEV_SEED);
+    expect(report.migrated.snapshotLoads).toBe(2);
+
+    const docs = [await ProgramTemplate.collection.findOne({ name: "Eski Şablon" }), await Program.collection.findOne({ userId })];
+    for (const doc of docs) {
+      const [squat, lunge, custom] = doc!.days[0].exercises;
+      expect(squat.muscles).toEqual(seedMuscles("Squat"));
+      expect(squat).toMatchObject({ targetSets: 4, targetReps: 12 });
+      expect(lunge.muscles).toEqual([{ key: "quads", load: 0.7 }]);
+      expect(custom.muscles).toEqual([{ key: "legs", load: 1 }]); // ad-hoc exercise: not ours to change
+    }
+    expect((await runSeed(DEV_SEED)).migrated.snapshotLoads).toBe(0);
   });
 });

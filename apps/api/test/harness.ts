@@ -99,6 +99,18 @@ import { MascotMessage } from "../src/models/mascot";
 import { ProgramTemplate } from "../src/models/program";
 import { SEED_EXERCISES, SEED_MUSCLES, SEED_TEMPLATES } from "../src/seed/data/index";
 
+/** The seed catalog's muscles for an exercise (activation data v1). */
+export function seedMuscles(name: string): Array<{ key: string; load: number }> {
+  const found = SEED_EXERCISES.find((e) => e.name === name);
+  if (!found) throw new Error(`${name} is not in SEED_EXERCISES`);
+  return found.muscles.map((m) => ({ key: m.key, load: m.load }));
+}
+
+/** The seed catalog's load for one exercise–muscle pair; 0 when the exercise does not work it. */
+export function seedLoad(name: string, key: string): number {
+  return seedMuscles(name).find((m) => m.key === key)?.load ?? 0;
+}
+
 /** Inserts muscles, exercises, program templates, settings and mascot messages (idempotent). Use in beforeEach after reset(). */
 export async function seedBasics(): Promise<void> {
   if ((await Muscle.countDocuments()) === 0) await Muscle.insertMany(SEED_MUSCLES);

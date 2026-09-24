@@ -12,6 +12,7 @@ import type {
   DashboardDTO,
   DietTargetDTO,
   EnergyDTO,
+  ExerciseActivationReference,
   ExerciseDTO,
   ExerciseInput,
   FoodDTO,
@@ -262,6 +263,9 @@ export function createApiClient(options: ApiClientOptions) {
       reorderMuscles: (keys: string[]) => r<{ muscles: MuscleDTO[] }>("/admin/muscles/order", { method: "PUT", body: { keys } }),
 
       exercises: (q?: { q?: string; muscle?: string }) => r<{ exercises: ExerciseDTO[] }>("/admin/exercises", { query: q }),
+      /** One exercise plus the literature values it was seeded with (`reference`, read-only; null for admin-made ones). */
+      exercise: (id: string) =>
+        r<{ exercise: ExerciseDTO; reference: ExerciseActivationReference | null }>(`/admin/exercises/${encodeURIComponent(id)}`),
       createExercise: (input: ExerciseInput) => r<{ exercise: ExerciseDTO }>("/admin/exercises", { body: input }),
       updateExercise: (id: string, input: Partial<ExerciseInput>) =>
         r<{ exercise: ExerciseDTO }>(`/admin/exercises/${id}`, { method: "PATCH", body: input }),

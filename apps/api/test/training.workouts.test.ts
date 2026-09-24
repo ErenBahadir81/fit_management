@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Types } from "mongoose";
-import { asUser, createTestApp, seedBasics, type TestApp } from "./harness";
+import { asUser, createTestApp, seedBasics, seedMuscles, type TestApp } from "./harness";
 import { WorkoutLog } from "../src/models/workoutLog";
 import { WeeklyReportCache } from "../src/models/goal";
 import { zWorkoutLog } from "@fitfloow/core";
@@ -111,7 +111,7 @@ describe("GET/PATCH/DELETE /workouts/:id", () => {
     expect(res.statusCode).toBe(200);
     const updated = res.json().log;
     expect(updated.strength).toHaveLength(1);
-    expect(updated.strength[0]).toMatchObject({ name: "Pull-up", muscles: [{ key: "lats", load: 1 }], sets: sets(5) });
+    expect(updated.strength[0]).toMatchObject({ name: "Pull-up", muscles: seedMuscles("Pull-up"), sets: sets(5) });
     expect(updated).toMatchObject({ durationMin: 42, notes: "düzeltildi", rpe: 7, dateKey: "2026-09-09" });
   });
 

@@ -134,6 +134,18 @@ describe("api-client", () => {
     expect(res.sets[0].weightKg).toBe(60);
   });
 
+  it("admin.exercise GETs one exercise with its literature reference", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://api/admin/exercises/ex%2F1");
+      expect(init?.method ?? "GET").toBe("GET");
+      return jsonResponse(200, { exercise: { id: "ex/1", name: "Push-up" }, reference: null });
+    });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never });
+    const res = await api.admin.exercise("ex/1");
+    expect(res.exercise.name).toBe("Push-up");
+    expect(res.reference).toBeNull();
+  });
+
   it("204 resolves to undefined", async () => {
     const api = createApiClient({ baseUrl: "http://api", fetch: (async () => new Response(null, { status: 204 })) as never });
     await expect(api.training.deleteWorkout("x")).resolves.toBeUndefined();

@@ -5,6 +5,7 @@ import { Muscle } from "../models/muscle";
 import { Exercise } from "../models/exercise";
 import { Program, ProgramTemplate, plainDays } from "../models/program";
 import { upgradeMusclesToV3 } from "./catalogV3";
+import { syncExerciseCatalogV1 } from "./catalogActivationV1";
 import { WorkoutLog } from "../models/workoutLog";
 import { BodyEntry } from "../models/body";
 import { DietTarget } from "../models/nutrition";
@@ -34,6 +35,10 @@ export interface SeedReport {
     workoutLogDateKeys: number;
     bodyEntryDateKeys: number;
     dietTargetModes: number;
+    /** Legacy exercises whose untouched all-1 loads became the activation-v1 values (one-time sync). */
+    exerciseLoads: number;
+    /** Templates/programs whose untouched legacy exercise snapshots were refreshed (one-time sync). */
+    snapshotLoads: number;
   };
   /** Seed accounts not created because no password was provided (production without SEED_*_PASSWORD). */
   skippedUsers: string[];
@@ -74,6 +79,8 @@ function emptyReport(): SeedReport {
       workoutLogDateKeys: 0,
       bodyEntryDateKeys: 0,
       dietTargetModes: 0,
+      exerciseLoads: 0,
+      snapshotLoads: 0,
     },
     skippedUsers: [],
     warnings: [],
@@ -178,6 +185,10 @@ async function ensureCatalogs(report: SeedReport): Promise<void> {
     await ProgramTemplate.insertMany(SEED_TEMPLATES);
     report.created.templates += SEED_TEMPLATES.length;
   }
+  const sync = await syncExerciseCatalogV1();
+  report.created.exercises += sync.added;
+  report.migrated.exerciseLoads += sync.upgraded;
+  report.migrated.snapshotLoads += sync.snapshots;
   if ((await MascotMessage.countDocuments()) === 0) {
     await MascotMessage.insertMany(DEFAULT_MASCOT_MESSAGES.map((m) => ({ ...m, active: true })));
     report.created.mascotMessages += DEFAULT_MASCOT_MESSAGES.length;

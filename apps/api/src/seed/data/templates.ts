@@ -1,52 +1,59 @@
-import type { DayDTO, ProgramTemplateInput } from "@fitfloow/core";
+import { exerciseNameKey, type DayDTO, type ExerciseTargetDTO, type ProgramTemplateInput } from "@fitfloow/core";
+import { SEED_EXERCISES } from "./exercises";
 
-const L = (keys: string[]) => keys.map((key) => ({ key, load: 1 }));
+const CATALOG = new Map(SEED_EXERCISES.map((e) => [exerciseNameKey(e.name), e]));
 
-/** Eren's 7-day split (v1 SEED_PROGRAM_DAYS). Weekly sets: chest 17, frontDelt 9, sideDelt 6, traps 9, lats 10, abs 6, legs 14. */
+/**
+ * A planned exercise whose muscles (and metric) come from the seed catalog by name, so templates
+ * always carry the same activation values as the catalog. A name the catalog lacks is a bug here.
+ */
+function ex(name: string, targetSets: number, targetReps: number, targetRIR: number | null): ExerciseTargetDTO {
+  const row = CATALOG.get(exerciseNameKey(name));
+  if (!row) throw new Error(`seed templates: "${name}" is not in SEED_EXERCISES`);
+  return { name: row.name, muscles: row.muscles.map((m) => ({ ...m })), targetSets, targetReps, targetRIR, metric: row.metric ?? "reps" };
+}
+
+/**
+ * Eren's 7-day split (v1 SEED_PROGRAM_DAYS). Planned weekly effective sets with the v1 activation
+ * loads: quads 15.1, front delt 14, chest 13.6, biceps 11.7, adductors 10, traps 9.8, side delt 9.6,
+ * lats 9 — the rest lower (v1 counted every set in full: chest 17, legs 14).
+ */
 export const EREN_DAYS: DayDTO[] = [
   { id: "d1", order: 1, title: "Push A", focus: "Göğüs & Yan Omuz", kind: "strength", exercises: [
-      { name: "Push-up", muscles: L(["chest", "frontDelt", "traps"]), targetSets: 5, targetReps: 12, targetRIR: 2, metric: "reps" },
-      { name: "DB Fly", muscles: L(["chest"]), targetSets: 4, targetReps: 12, targetRIR: 2, metric: "reps" },
-      { name: "Lateral Raise", muscles: L(["sideDelt"]), targetSets: 3, targetReps: 15, targetRIR: 1, metric: "reps" },
+      ex("Push-up", 5, 12, 2),
+      ex("DB Fly", 4, 12, 2),
+      ex("Lateral Raise", 3, 15, 1),
     ], run: null, swim: null },
   { id: "d2", order: 2, title: "Kondisyon", focus: "Lats & Karın", kind: "strength", exercises: [
-      { name: "Pull-up", muscles: L(["lats"]), targetSets: 5, targetReps: 8, targetRIR: 2, metric: "reps" },
-      { name: "Leg Raises", muscles: L(["abs"]), targetSets: 3, targetReps: 15, targetRIR: 2, metric: "reps" },
+      ex("Pull-up", 5, 8, 2),
+      ex("Leg Raises", 3, 15, 2),
     ], run: { targetKm: 5, targetMin: 30, label: "Koşu" }, swim: null },
   { id: "d3", order: 3, title: "Bacak", focus: "Quad & Hamstring", kind: "strength", exercises: [
-      { name: "Squat", muscles: L(["legs"]), targetSets: 4, targetReps: 12, targetRIR: 2, metric: "reps" },
-      { name: "Lunge", muscles: L(["legs"]), targetSets: 3, targetReps: 12, targetRIR: 2, metric: "reps" },
+      ex("Squat", 4, 12, 2),
+      ex("Lunge", 3, 12, 2),
     ], run: null, swim: null },
   { id: "d4", order: 4, title: "Push B", focus: "Üst Göğüs & Yan Omuz", kind: "strength", exercises: [
-      { name: "HSPU", muscles: L(["chest", "frontDelt", "traps"]), targetSets: 4, targetReps: 6, targetRIR: 2, metric: "reps" },
-      { name: "DB Fly", muscles: L(["chest"]), targetSets: 4, targetReps: 12, targetRIR: 2, metric: "reps" },
-      { name: "Lateral Raise", muscles: L(["sideDelt"]), targetSets: 3, targetReps: 15, targetRIR: 1, metric: "reps" },
+      ex("HSPU", 4, 6, 2),
+      ex("DB Fly", 4, 12, 2),
+      ex("Lateral Raise", 3, 15, 1),
     ], run: null, swim: null },
   { id: "d5", order: 5, title: "Kondisyon", focus: "Lats & Karın", kind: "strength", exercises: [
-      { name: "Pull-up", muscles: L(["lats"]), targetSets: 5, targetReps: 8, targetRIR: 2, metric: "reps" },
-      { name: "Leg Raises", muscles: L(["abs"]), targetSets: 3, targetReps: 15, targetRIR: 2, metric: "reps" },
+      ex("Pull-up", 5, 8, 2),
+      ex("Leg Raises", 3, 15, 2),
     ], run: { targetKm: 5, targetMin: 30, label: "Koşu" }, swim: null },
   { id: "d6", order: 6, title: "Bacak", focus: "Quad & Hamstring", kind: "strength", exercises: [
-      { name: "Squat", muscles: L(["legs"]), targetSets: 4, targetReps: 12, targetRIR: 2, metric: "reps" },
-      { name: "Lunge", muscles: L(["legs"]), targetSets: 3, targetReps: 12, targetRIR: 2, metric: "reps" },
+      ex("Squat", 4, 12, 2),
+      ex("Lunge", 3, 12, 2),
     ], run: null, swim: null },
   { id: "d7", order: 7, title: "Aktif Dinlenme", focus: "Sadece Koşu", kind: "run", exercises: [], run: { targetKm: 5, targetMin: 35, label: "Hafif Koşu" }, swim: null },
 ];
 
 /** İnci's 4-day cycle (v1 SEED_INCI_PROGRAM_DAYS). */
 export const INCI_DAYS: DayDTO[] = [
-  { id: "d1", order: 1, title: "Squat", focus: "Bacak", kind: "strength", exercises: [
-      { name: "Squat", muscles: L(["legs"]), targetSets: 5, targetReps: 10, targetRIR: 2, metric: "reps" },
-    ], run: null, swim: null },
-  { id: "d2", order: 2, title: "Handstand", focus: "Omuz & Denge", kind: "strength", exercises: [
-      { name: "Handstand", muscles: L(["frontDelt", "sideDelt", "traps"]), targetSets: 5, targetReps: 30, targetRIR: null, metric: "time" },
-    ], run: null, swim: null },
-  { id: "d3", order: 3, title: "Leg Raises", focus: "Karın", kind: "strength", exercises: [
-      { name: "Leg Raises", muscles: L(["abs"]), targetSets: 5, targetReps: 6, targetRIR: 2, metric: "reps" },
-    ], run: null, swim: null },
-  { id: "d4", order: 4, title: "Stretch", focus: "Esneklik", kind: "stretch", exercises: [
-      { name: "Stretch", muscles: [], targetSets: 1, targetReps: 1, targetRIR: null, metric: "stretch" },
-    ], run: null, swim: null },
+  { id: "d1", order: 1, title: "Squat", focus: "Bacak", kind: "strength", exercises: [ex("Squat", 5, 10, 2)], run: null, swim: null },
+  { id: "d2", order: 2, title: "Handstand", focus: "Omuz & Denge", kind: "strength", exercises: [ex("Handstand", 5, 30, null)], run: null, swim: null },
+  { id: "d3", order: 3, title: "Leg Raises", focus: "Karın", kind: "strength", exercises: [ex("Leg Raises", 5, 6, 2)], run: null, swim: null },
+  { id: "d4", order: 4, title: "Stretch", focus: "Esneklik", kind: "stretch", exercises: [ex("Stretch", 1, 1, null)], run: null, swim: null },
 ];
 
 export const SEED_TEMPLATES: ProgramTemplateInput[] = [

@@ -117,6 +117,6 @@ describe("harness", () => {
     await seedBasics();
     await seedBasics();
     expect(await Muscle.countDocuments({ active: true })).toBe(17);
-    expect(await Exercise.countDocuments()).toBe(20);
+    expect(await Exercise.countDocuments()).toBe(143);
   });
 });

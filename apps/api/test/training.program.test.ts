@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { HydratedDocument, Types } from "mongoose";
-import { asUser, createTestApp, seedBasics, type TestApp } from "./harness";
+import { asUser, createTestApp, seedBasics, seedLoad, seedMuscles, type TestApp } from "./harness";
 import { Program, type ProgramDoc } from "../src/models/program";
 import { WorkoutLog } from "../src/models/workoutLog";
+import { Exercise } from "../src/models/exercise";
 import { WeeklyReportCache } from "../src/models/goal";
 import { EREN_DAYS, INCI_DAYS } from "../src/seed/data/index";
 import { MUSCLE_KEYS_V3 } from "../src/seed/data/muscles";
-import { zProgramView, zWorkoutLog, type DayDTO } from "@fitfloow/core";
+import { round, volumeZone, zProgramView, zWorkoutLog, type DayDTO } from "@fitfloow/core";
 
 let t: TestApp;
 beforeAll(async () => {
@@ -70,7 +71,10 @@ describe("GET /program", () => {
     expect(body.weeklyVolume.map((v: { key: string }) => v.key)).toEqual(MUSCLE_KEYS_V3);
     expect(body.weeklyVolume[0]).toMatchObject({ key: "chest", done: 0, status: "none", zone: "none", target: { min: 10, max: 15 } });
     expect(body.plannedVolume.cycleLength).toBe(7);
-    expect(body.plannedVolume.muscles.find((m: { key: string }) => m.key === "chest")).toMatchObject({ weekly: 17, zone: "optimal" });
+    // Fractional: Push-up 5 + DB Fly 4 + HSPU 4 + DB Fly 4 sets, each at its catalog chest load.
+    const chestWeekly = round(5 * seedLoad("Push-up", "chest") + 8 * seedLoad("DB Fly", "chest") + 4 * seedLoad("HSPU", "chest"), 1);
+    expect(chestWeekly).toBe(13.6);
+    expect(body.plannedVolume.muscles.find((m: { key: string }) => m.key === "chest")).toMatchObject({ weekly: chestWeekly, zone: volumeZone(chestWeekly) });
     expect(() => zProgramView.parse(body)).not.toThrow(); // the DTO contract frontends compile against
   });
 
@@ -102,11 +106,7 @@ describe("PUT /program", () => {
     const program = res.json().program;
     expect(program.name).toBe("Yeni Program");
     expect(program.days).toHaveLength(2);
-    expect(program.days[0].exercises[0].muscles).toEqual([
-      { key: "chest", load: 1 },
-      { key: "frontDelt", load: 1 },
-      { key: "traps", load: 1 },
-    ]);
+    expect(program.days[0].exercises[0].muscles).toEqual(seedMuscles("Push-up"));
     expect(program.days[1].exercises[0].metric).toBe("time");
     expect(program.currentIndex).toBe(1); // pointer kept inside the shorter cycle
   });
@@ -195,11 +195,7 @@ describe("POST /program/complete", () => {
     expect(res.statusCode).toBe(200);
     const { log, program } = res.json();
     expect(log).toMatchObject({ dateKey: TODAY, dayOrder: 1, title: "Push A", kind: "strength", isOffDay: false, durationMin: 55, notes: "İyi geçti", rpe: 8 });
-    expect(log.strength[0].muscles).toEqual([
-      { key: "chest", load: 1 },
-      { key: "frontDelt", load: 1 },
-      { key: "traps", load: 1 },
-    ]);
+    expect(log.strength[0].muscles).toEqual(seedMuscles("Push-up"));
     expect(log.strength[0]).toMatchObject({ plannedSets: 5, plannedReps: 12, plannedRIR: 2, source: "planned", metric: "reps" });
     expect(log.strength[2]).toMatchObject({ skipped: true, sets: [] });
     expect(program.currentIndex).toBe(1);
@@ -217,7 +213,7 @@ describe("POST /program/complete", () => {
     expect(view.schedule[0]).toMatchObject({ status: "done", isToday: true });
     expect(view.schedule[0].day.order).toBe(1);
     expect(view.schedule[1].day.order).toBe(2);
-    expect(view.weeklyVolume.find((v: { key: string }) => v.key === "chest")).toMatchObject({ done: 5 });
+    expect(view.weeklyVolume.find((v: { key: string }) => v.key === "chest")).toMatchObject({ done: 5 * seedLoad("Push-up", "chest") });
     expect(view.current.index).toBe(1);
   });
 
@@ -231,6 +227,27 @@ describe("POST /program/complete", () => {
       payload: { strength: [{ name: "Farmer Walk", muscles: [{ key: "traps", load: 0.8 }], metric: "time", sets: sets(2, 60) }] },
     });
     expect(res.json().log.strength[0]).toMatchObject({ source: "extra", metric: "time", muscles: [{ key: "traps", load: 0.8 }] });
+  });
+
+  it("logs the catalog's current loads, not the stale program snapshot the client sends", async () => {
+    const { user, headers } = await asUser(t);
+    await givenProgram(user._id, { currentIndex: 0 });
+    // An admin revises the push-up after the program was built; the client still sends the old snapshot.
+    await Exercise.updateOne({ nameKey: "push-up" }, { $set: { muscles: [{ key: "chest", load: 0.9 }, { key: "triceps", load: 0.45 }] } });
+    const res = await t.app.inject({
+      method: "POST",
+      url: "/api/v1/program/complete",
+      headers,
+      payload: { strength: [{ name: "Push-up", muscles: [{ key: "legs", load: 1 }], sets: sets(5, 12) }] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().log.strength[0]).toMatchObject({
+      source: "planned",
+      muscles: [
+        { key: "chest", load: 0.9 },
+        { key: "triceps", load: 0.45 },
+      ],
+    });
   });
 
   it("wraps the cycle and bumps the week number on the last day", async () => {

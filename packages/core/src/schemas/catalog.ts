@@ -55,3 +55,36 @@ export const zExerciseInput = zExercise.omit({ id: true }).partial({
 });
 export type ExerciseInput = z.infer<typeof zExerciseInput>;
 export const zExerciseUpdate = zExercise.omit({ id: true }).partial();
+
+/* -------- literature reference (activation data v1) — read-only next to the editable loads -------- */
+
+export const zActivationConfidence = z.object({
+  level: z.enum(["high", "medium", "low"]),
+  /** Number of literature estimates averaged. */
+  n: z.number().int().min(0),
+  /** max − min of those estimates. */
+  spread: z.number().min(0),
+});
+export type ActivationConfidenceDTO = z.infer<typeof zActivationConfidence>;
+
+export const zActivationReferenceSource = z.object({
+  id: z.string(),
+  title: z.string(),
+  url: z.string(),
+  kind: z.enum(["exrx", "emg", "volume-method", "review"]),
+  year: z.number().int().optional(),
+});
+export type ActivationReferenceSource = z.infer<typeof zActivationReferenceSource>;
+
+/** The seed catalog's literature average for one exercise: per muscle load, confidence and source ids. */
+export const zExerciseActivationReference = z.object({
+  version: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  muscles: z.array(
+    z.object({ key: zMuscleKey, load: z.number().min(0).max(1), confidence: zActivationConfidence, sources: z.array(z.string()) })
+  ),
+  /** Every source cited by `muscles`, once. */
+  sources: z.array(zActivationReferenceSource),
+});
+export type ExerciseActivationReference = z.infer<typeof zExerciseActivationReference>;
