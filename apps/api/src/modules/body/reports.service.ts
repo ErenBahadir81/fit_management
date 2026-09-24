@@ -7,6 +7,7 @@ import {
   buildWeeklyReport,
   computeGoalProgress,
   computeRecovery,
+  currentIndexFor,
   homeMascotKey,
   previousWeekKeys,
   shiftKey,
@@ -32,7 +33,7 @@ import { BodyEntry, WeighIn, type BodyEntryDoc } from "../../models/body";
 import { Goal, WeeklyReportCache, toGoalDTO, type GoalDoc } from "../../models/goal";
 import { listActiveMuscles } from "../../models/muscle";
 import { DietTarget } from "../../models/nutrition";
-import { Program, type ProgramDoc } from "../../models/program";
+import { Program, plainDays, type ProgramDoc } from "../../models/program";
 import { WorkoutLog, toWorkoutLogDTO, type WorkoutLogDoc } from "../../models/workoutLog";
 import { toUserDTO } from "../../models/user";
 import { dayIntakeFor, goalSettings, loadUser, mascotCatalog, mascotFor, plannedSessionsForProgram, type UserLean } from "./shared";
@@ -245,7 +246,12 @@ export async function homeView(ctx: AppContext, userId: string): Promise<HomeDTO
   const proteinEaten = Math.round((today?.protein ?? 0) * 10) / 10;
 
   /* program day + recovery */
-  const day = program && program.days.length > 0 ? program.days[Math.min(program.currentIndex, program.days.length - 1)] : null;
+  // B7: the one pointer engine (core) — same answer as the program screen.
+  const programDays = program ? plainDays(program.days) : [];
+  const day =
+    program && programDays.length > 0
+      ? programDays[currentIndexFor({ ...program, days: programDays }, todayKey, Boolean(todayLog))]
+      : null;
   const recoveryView = computeRecovery(bundle.rawLogs, bundle.muscles, now);
   const recovery = {
     ...recoveryView.overall,

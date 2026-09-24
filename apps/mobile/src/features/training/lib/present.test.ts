@@ -93,8 +93,11 @@ describe("groupLogsByWeek", () => {
     id: `l-${dateKey}`,
     date: `${dateKey}T15:00:00.000Z`,
     dateKey,
+    dayId: null,
     dayOrder: 1,
+    cycleNumber: 6,
     weekNumber: 6,
+    isBreak: false,
     title: "Üst Vücut A",
     kind: "strength",
     isOffDay: false,
@@ -166,6 +169,7 @@ describe("dayCounts", () => {
   test("summarises a strength day as exercises and sets", () => {
     expect(
       dayCounts({
+        id: "d1",
         order: 1,
         title: "Üst",
         focus: "",
@@ -181,7 +185,7 @@ describe("dayCounts", () => {
   });
 
   test("summarises a cardio day as km and minutes", () => {
-    expect(dayCounts({ order: 3, title: "Koşu", focus: "", kind: "run", exercises: [], run: { targetKm: 5, targetMin: 30, label: "" }, swim: null })).toEqual({
+    expect(dayCounts({ id: "d3", order: 3, title: "Koşu", focus: "", kind: "run", exercises: [], run: { targetKm: 5, targetMin: 30, label: "" }, swim: null })).toEqual({
       exercises: 0,
       sets: 0,
       km: 5,
@@ -233,8 +237,11 @@ describe("tonnage and the last-session comparison", () => {
     id: `l-${dateKey}`,
     date: `${dateKey}T15:00:00.000Z`,
     dateKey,
+    dayId: null,
     dayOrder: 1,
+    cycleNumber: 6,
     weekNumber: 6,
+    isBreak: false,
     title: "Üst Vücut A",
     kind: "strength",
     isOffDay: false,
@@ -294,6 +301,17 @@ describe("tonnage and the last-session comparison", () => {
     expect(findLastSameDay(logs, 1, "2026-09-10")?.id).toBe("match");
     expect(findLastSameDay(logs, 9, "2026-09-10")).toBeNull();
     expect(findLastSameDay([], 1, "2026-09-10")).toBeNull();
+  });
+
+  test("findLastSameDay follows the day id when both sides have one (a reordered day keeps its history)", () => {
+    const logs = [
+      log("2026-09-07", { id: "moved", dayId: "d1", dayOrder: 3 }),
+      log("2026-09-05", { id: "other", dayId: "d2", dayOrder: 1 }),
+      log("2026-09-03", { id: "legacy", dayId: null, dayOrder: 1 }),
+    ];
+    expect(findLastSameDay(logs, 1, "2026-09-10", "d1")?.id).toBe("moved");
+    // A legacy log (no id) still matches by order.
+    expect(findLastSameDay(logs.slice(1), 1, "2026-09-10", "d1")?.id).toBe("legacy");
   });
 
   test("the comparison says how much more you moved", () => {

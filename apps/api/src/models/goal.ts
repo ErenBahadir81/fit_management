@@ -1,15 +1,21 @@
 import mongoose, { Schema, model, type Model, type Types } from "mongoose";
-import type { GoalDTO, GoalPlan, GoalProfile } from "@fitfloow/core";
+import type { GoalAdjustment, GoalDirection, GoalDTO, GoalPlan, GoalProfile, TrainingLevel } from "@fitfloow/core";
 
 export interface GoalDoc {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
   status: "active" | "completed" | "abandoned";
+  /** T7 — absent on goals created before directions existed (→ "cut"). */
+  direction?: GoalDirection;
   targetBodyFatPct: number;
+  targetLeanGainKg?: number | null;
+  trainingLevel?: TrainingLevel | null;
   profile: GoalProfile;
   start: { dateKey: string; weightKg: number; bodyFatPct: number; leanMassKg: number; fatMassKg: number; bodyEntryId: Types.ObjectId | null };
   plan: GoalPlan;
   tdeeOverride: number | null;
+  /** T7 — answered adjustment proposals (dates stored as ISO strings, like the DTO). */
+  adjustments?: GoalAdjustment[];
   history: Array<{ at: Date; event: string; snapshot: unknown }>;
   completedAt: Date | null;
   createdAt: Date;
@@ -20,7 +26,10 @@ const GoalSchema = new Schema<GoalDoc>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     status: { type: String, enum: ["active", "completed", "abandoned"], default: "active" },
+    direction: { type: String, enum: ["cut", "bulk", "recomp"], default: "cut" },
     targetBodyFatPct: { type: Number, required: true },
+    targetLeanGainKg: { type: Number, default: null },
+    trainingLevel: { type: String, enum: ["beginner", "intermediate", "advanced", null], default: null },
     profile: { type: String, enum: ["conservative", "optimal", "aggressive"], default: "optimal" },
     start: {
       dateKey: String,
@@ -32,6 +41,7 @@ const GoalSchema = new Schema<GoalDoc>(
     },
     plan: { type: Schema.Types.Mixed, required: true },
     tdeeOverride: { type: Number, default: null },
+    adjustments: { type: [Schema.Types.Mixed], default: [] },
     history: { type: [{ at: Date, event: String, snapshot: Schema.Types.Mixed, _id: false }], default: [] },
     completedAt: { type: Date, default: null },
   },
@@ -46,11 +56,16 @@ export function toGoalDTO(g: GoalDoc): GoalDTO {
   return {
     id: String(g._id),
     status: g.status,
+    direction: g.direction ?? "cut",
     targetBodyFatPct: g.targetBodyFatPct,
+    targetLeanGainKg: g.targetLeanGainKg ?? null,
+    trainingLevel: g.trainingLevel ?? null,
     profile: g.profile,
     start: { ...g.start, bodyEntryId: g.start.bodyEntryId ? String(g.start.bodyEntryId) : null },
-    plan: g.plan,
+    // Plans stored before T7 have no direction; everything else new on the plan is optional.
+    plan: { ...g.plan, direction: g.plan.direction ?? g.direction ?? "cut" },
     tdeeOverride: g.tdeeOverride ?? null,
+    adjustments: g.adjustments ?? [],
     createdAt: g.createdAt.toISOString(),
     updatedAt: g.updatedAt.toISOString(),
     completedAt: g.completedAt ? g.completedAt.toISOString() : null,

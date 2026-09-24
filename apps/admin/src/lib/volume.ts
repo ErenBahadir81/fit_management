@@ -1,12 +1,12 @@
 /**
  * Weekly volume matrix for the program-template builder.
  *
- * The cycle totals come from `templateWeeklyVolume` in `@fitfloow/core/training` — the same
+ * The cycle totals come from `templateVolume` in `@fitfloow/core/training` — the same
  * function the API uses for `ProgramTemplateDTO.weeklyVolume`, so the matrix and the stored
- * value can never disagree. The per-day breakdown and the target comparison are the admin's
- * own view on top of it.
+ * value can never disagree. Status is the app-wide volume band (`bandStatus`: recommended
+ * 10–15 weekly sets, soft warning from ~20), the same one users see in the app.
  */
-import { round, templateWeeklyVolume, type DayDTO, type MuscleDTO } from "@fitfloow/core";
+import { RECOMMENDED_WEEKLY_SETS, bandStatus, round, templateVolume as coreTemplateVolume, type DayDTO, type MuscleDTO } from "@fitfloow/core";
 
 export type VolumeStatus = "under" | "in" | "over" | "none";
 
@@ -27,21 +27,18 @@ export interface VolumeRow {
   status: VolumeStatus;
 }
 
-export function volumeStatus(weeklySets: number, target: MuscleDTO["weeklyTarget"]): VolumeStatus {
-  if (weeklySets <= 0.001) return "none";
-  const min = target.min ?? 0;
-  if (weeklySets < min - 0.001) return "under";
-  if (weeklySets > target.max + 0.001) return "over";
-  return "in";
+export function volumeStatus(weeklySets: number): VolumeStatus {
+  return bandStatus(weeklySets);
 }
 
 export function templateVolume(days: DayDTO[], muscles: MuscleDTO[]): VolumeRow[] {
   const cycleLength = days.length;
-  const totals = templateWeeklyVolume(days);
+  const totals = coreTemplateVolume(days);
   // Per-day split for the matrix columns; the row total still comes from core.
   const perDay = new Map<string, number[]>(muscles.map((m) => [m.key, new Array<number>(cycleLength).fill(0)]));
   days.forEach((day, dayIdx) => {
     for (const ex of day.exercises) {
+      if (ex.metric === "stretch") continue; // mobility never counts, as in core
       for (const load of ex.muscles ?? []) {
         const row = perDay.get(load.key);
         if (!row) continue; // muscle removed from the catalog since the template was written
@@ -65,8 +62,8 @@ export function templateVolume(days: DayDTO[], muscles: MuscleDTO[]): VolumeRow[
       weeklySets,
       cycleLength,
       byDay,
-      target: m.weeklyTarget,
-      status: volumeStatus(weeklySets, m.weeklyTarget),
+      target: { ...RECOMMENDED_WEEKLY_SETS },
+      status: volumeStatus(weeklySets),
     };
   });
 }

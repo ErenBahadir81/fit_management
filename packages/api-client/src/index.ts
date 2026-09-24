@@ -17,12 +17,18 @@ import type {
   FoodDTO,
   FoodInput,
   FoodSearchResponse,
+  BodyAssessment,
+  GoalAdjustment,
+  GoalAdjustmentAnswer,
   GoalDTO,
   GoalInput,
+  GoalUpdate,
+  TrainingLevel,
   GoalPreview,
   GoalView,
   HomeDTO,
   LastPerformance,
+  LogDayInput,
   LoginResponse,
   MascotMessage,
   MascotTemplateDTO,
@@ -57,6 +63,9 @@ import type {
 import { createTransport, type ApiClientOptions, type RequestOptions, type Transport } from "./http";
 
 export * from "./http";
+
+/** `LogDayInput` with its defaulted fields optional, as a caller writes it. */
+export type LogDayRequest = Pick<LogDayInput, "dayId"> & Partial<Omit<LogDayInput, "dayId">>;
 
 export type ScanImage =
   | { uri: string; name?: string; type?: string } // React Native file object
@@ -130,7 +139,11 @@ export function createApiClient(options: ApiClientOptions) {
     training: {
       program: () => r<ProgramView>("/program"),
       updateProgram: (input: ProgramInput) => r<{ program: ProgramDTO }>("/program", { method: "PUT", body: input }),
-      jump: (index: number) => r<{ program: ProgramDTO }>("/program/jump", { body: { index } }),
+      /** "Continue from here" — by day id (3.0), or by position for older callers. */
+      jump: (day: string | number) =>
+        r<{ program: ProgramDTO }>("/program/jump", { body: typeof day === "string" ? { dayId: day } : { index: day } }),
+      /** "Today I did this day" — the single pointer-moving write (see `zLogDayInput`). */
+      logDay: (input: LogDayRequest) => r<{ log: WorkoutLogDTO; program: ProgramDTO }>("/program/log-day", { body: input }),
       complete: (input: CompleteWorkoutInput) =>
         r<{ log: WorkoutLogDTO; program: ProgramDTO }>("/program/complete", { body: input }),
       skip: (reason?: string) => r<{ log: WorkoutLogDTO; program: ProgramDTO }>("/program/skip", { body: { reason } }),
@@ -167,10 +180,19 @@ export function createApiClient(options: ApiClientOptions) {
       current: () => r<GoalView>("/goals/current"),
       preview: (input: GoalInput) => r<GoalPreview>("/goals/preview", { body: input }),
       create: (input: GoalInput) => r<{ goal: GoalDTO }>("/goals", { body: input }),
-      update: (input: Partial<GoalInput>) => r<{ goal: GoalDTO }>("/goals/current", { method: "PATCH", body: input }),
+      update: (input: GoalUpdate) => r<{ goal: GoalDTO }>("/goals/current", { method: "PATCH", body: input }),
       recalibrate: () => r<{ goal: GoalDTO; recalibration: Recalibration }>("/goals/current/recalibrate", { method: "POST", body: {} }),
       complete: () => r<{ goal: GoalDTO }>("/goals/current/complete", { method: "POST", body: {} }),
       abandon: () => r<{ goal: GoalDTO }>("/goals/current/abandon", { method: "POST", body: {} }),
+      /** T7 — FFMI + body fat of the latest measurement and the recommended goal. */
+      assessment: (trainingLevel?: TrainingLevel) =>
+        r<{ assessment: BodyAssessment }>(`/goals/assessment${trainingLevel ? `?trainingLevel=${trainingLevel}` : ""}`),
+      /** T7 — one-tap accept of `GoalView.adjustment` (`action` omitted → the recommended option). */
+      acceptAdjustment: (answer: GoalAdjustmentAnswer) =>
+        r<{ goal: GoalDTO; adjustment: GoalAdjustment }>("/goals/current/adjustment/accept", { method: "POST", body: answer }),
+      /** T7 — "not now"; the same proposal is not repeated and the cool-down restarts. */
+      dismissAdjustment: (answer: GoalAdjustmentAnswer) =>
+        r<{ goal: GoalDTO; adjustment: GoalAdjustment }>("/goals/current/adjustment/dismiss", { method: "POST", body: answer }),
     },
 
     reports: {

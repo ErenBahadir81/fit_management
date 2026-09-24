@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import type { MuscleDTO, WorkoutLogDTO } from "@fitfloow/core";
+import { isBreakLog, type MuscleDTO, type WorkoutLogDTO } from "@fitfloow/core";
 import { fmtDate, fmtDuration, fmtInt, fmtNumber } from "../../../lib/format";
 import { spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
@@ -29,7 +29,7 @@ export function LogDetailSheet({ sheetRef, log, muscles, onDelete }: LogDetailSh
         {log && s ? (
           <>
             <Text variant="label" color="inkMuted">
-              {fmtDate(log.dateKey, "weekday")} · {log.weekNumber}. hafta
+              {fmtDate(log.dateKey, "weekday")} · {log.cycleNumber ?? log.weekNumber}. hafta
             </Text>
 
             <View style={styles.chips}>
@@ -50,7 +50,7 @@ export function LogDetailSheet({ sheetRef, log, muscles, onDelete }: LogDetailSh
               </View>
             ) : null}
 
-            {log.isOffDay ? (
+            {isBreakLog(log) ? (
               <Text variant="body" color="inkMuted">
                 Bu gün atlandı — kayıtlı set yok.
               </Text>

@@ -116,7 +116,7 @@ describe("harness", () => {
     const { Exercise } = await import("../src/models/exercise");
     await seedBasics();
     await seedBasics();
-    expect(await Muscle.countDocuments({ active: true })).toBe(7);
+    expect(await Muscle.countDocuments({ active: true })).toBe(17);
     expect(await Exercise.countDocuments()).toBe(20);
   });
 });

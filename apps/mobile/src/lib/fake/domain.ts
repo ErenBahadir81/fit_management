@@ -98,6 +98,10 @@ export function goalFor(today: string, user: UserDTO, entries: BodyEntryDTO[]): 
   return {
     id: "g_demo",
     status: "active",
+    direction: "cut",
+    targetLeanGainKg: null,
+    trainingLevel: null,
+    adjustments: [],
     targetBodyFatPct: target,
     profile,
     start: { dateKey: startKey, weightKg: start.weightKg, bodyFatPct: start.bodyFatPct, leanMassKg: start.leanMassKg, fatMassKg: start.fatMassKg, bodyEntryId: start.id },
@@ -114,6 +118,10 @@ export function goalCreate(today: string, user: UserDTO, start: BodyEntryDTO, ta
   return {
     id: nextId("goal"),
     status: "active",
+    direction: "cut",
+    targetLeanGainKg: null,
+    trainingLevel: null,
+    adjustments: [],
     targetBodyFatPct,
     profile,
     start: { dateKey: today, weightKg: start.weightKg, bodyFatPct: start.bodyFatPct, leanMassKg: start.leanMassKg, fatMassKg: start.fatMassKg, bodyEntryId: start.id },
