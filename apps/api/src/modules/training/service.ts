@@ -2,7 +2,9 @@ import type { QueryFilter } from "mongoose";
 import { Types } from "mongoose";
 import {
   buildCardioEntry,
-  normalizeIndex,
+  ensureDayIds,
+  exerciseNameKey,
+  pointerOf,
   trDateKey,
   weekKeyFor,
   type CardioEntryDTO,
@@ -22,27 +24,63 @@ import type { HydratedDocument } from "mongoose";
 
 export const PROGRAM_MISSING = "Program yok";
 
-/** The user's program as a hydrated document (for writes). */
+/**
+ * Brings a stored program up to 3.0 in place: every day gets an id (`d<order>` for legacy days,
+ * matching how legacy logs are read) and the pointer is held by id. Returns whether it changed.
+ */
+export function upgradeProgramDoc(program: HydratedDocument<ProgramDoc>): boolean {
+  const plain = program.days.map((d) => {
+    const raw = d as DayDTO & { toObject?: () => DayDTO };
+    return typeof raw.toObject === "function" ? raw.toObject() : raw;
+  });
+  const days = ensureDayIds(plain);
+  let changed = days.some((d, i) => d.id !== plain[i]?.id);
+  if (changed) {
+    program.days = days;
+    program.markModified("days");
+  }
+  const pointer = pointerOf({ days, currentDayId: program.currentDayId, currentIndex: program.currentIndex, cycleNumber: program.cycleNumber, weekNumber: program.weekNumber });
+  if (program.currentDayId !== pointer.currentDayId || program.currentIndex !== pointer.currentIndex || program.cycleNumber !== pointer.cycleNumber) {
+    setPointer(program, pointer);
+    changed = true;
+  }
+  if (!program.mode) {
+    program.mode = "cycle";
+    changed = true;
+  }
+  return changed;
+}
+
+/** Writes a pointer state, keeping the legacy mirrors (`currentIndex`, `weekNumber`) in sync. */
+export function setPointer(program: HydratedDocument<ProgramDoc>, p: { currentDayId: string | null; currentIndex: number; cycleNumber: number }): void {
+  program.currentDayId = p.currentDayId;
+  program.currentIndex = p.currentIndex;
+  program.cycleNumber = p.cycleNumber;
+  program.weekNumber = p.cycleNumber;
+}
+
+/** The user's program as a hydrated, 3.0-shaped document (for writes). */
 export async function loadProgram(userId: string): Promise<HydratedDocument<ProgramDoc>> {
   const program = await Program.findOne({ userId });
   if (!program) throw new AppError(404, "NOT_FOUND", PROGRAM_MISSING);
+  if (upgradeProgramDoc(program)) await program.save();
   return program;
 }
 
-/** Pointer + day the program currently sits on. Throws when the program has no days. */
-export function pointerDay(program: Pick<ProgramDoc, "days" | "currentIndex">): { index: number; day: DayDTO } {
-  const len = program.days?.length ?? 0;
-  if (len === 0) throw new AppError(409, "CONFLICT", "Program boş, önce günleri ekle");
-  const index = normalizeIndex(program.currentIndex, len);
-  return { index, day: program.days[index] };
+export function assertHasDays(program: Pick<ProgramDoc, "days">): void {
+  if ((program.days?.length ?? 0) === 0) throw new AppError(409, "CONFLICT", "Program boş, önce günleri ekle");
 }
 
-/** Exercise catalog rows for the given names, keyed exactly like `nameKey` (lowercase name). */
+/**
+ * Exercise catalog rows for the given names, keyed by `exerciseNameKey` (B8). Queries both the
+ * current key and the pre-3.0 one (`toLowerCase`) so rows not yet re-keyed are still found.
+ */
 export async function catalogFor(names: readonly string[]): Promise<Map<string, ExerciseDoc>> {
-  const wanted = [...new Set(names.map((n) => n.trim().toLowerCase()).filter(Boolean))];
+  const clean = names.map((n) => String(n ?? "").trim()).filter(Boolean);
+  const wanted = [...new Set(clean.flatMap((n) => [exerciseNameKey(n), n.toLowerCase()]))];
   if (wanted.length === 0) return new Map();
   const docs = (await Exercise.find({ nameKey: { $in: wanted }, active: true }).lean()) as ExerciseDoc[];
-  return new Map(docs.map((d) => [d.nameKey ?? d.name.toLowerCase(), d]));
+  return new Map(docs.map((d) => [exerciseNameKey(d.name), d]));
 }
 
 /** The whole active catalog (program editing needs to resolve every name the client sends). */
@@ -67,19 +105,32 @@ type StrengthInput = CompleteWorkoutInput["strength"][number];
  * Resolves a logged exercise into a self-contained entry:
  * muscles come from the payload → the catalog → the planned day, in that order, so an admin
  * catalog edit is picked up immediately while ad-hoc exercises keep what the client sent.
+ * Planned targets come from the payload → the entry being edited (`previous`, B6) → the
+ * planned day, so editing a log after the fact never loses what was planned.
  */
 export function buildStrengthEntries(
   inputs: readonly StrengthInput[],
   day: DayDTO | null,
-  catalog: Map<string, ExerciseDoc>
+  catalog: Map<string, ExerciseDoc>,
+  previous: readonly StrengthEntryDTO[] = []
 ): StrengthEntryDTO[] {
   const planned = new Map<string, DayDTO["exercises"][number]>();
-  for (const e of day?.exercises ?? []) planned.set(e.name.trim().toLowerCase(), e);
+  for (const e of day?.exercises ?? []) planned.set(exerciseNameKey(e.name), e);
+  const before = new Map<string, StrengthEntryDTO>();
+  for (const e of previous ?? []) if (e?.name && !before.has(exerciseNameKey(e.name))) before.set(exerciseNameKey(e.name), e);
 
   return (inputs ?? []).map((raw) => {
     const name = String(raw.name ?? "").trim().slice(0, 80) || "Hareket";
-    const key = name.toLowerCase();
-    const plan = planned.get(key) ?? null;
+    const key = exerciseNameKey(name);
+    const prev = before.get(key) ?? null;
+    const planEx = planned.get(key) ?? null;
+    // What was planned *when the session was logged* beats today's (possibly edited) day.
+    const plan =
+      prev && prev.source === "planned"
+        ? { targetSets: prev.plannedSets, targetReps: prev.plannedReps, targetRIR: prev.plannedRIR, muscles: prev.muscles, metric: prev.metric }
+        : planEx
+          ? { targetSets: planEx.targetSets, targetReps: planEx.targetReps, targetRIR: planEx.targetRIR, muscles: planEx.muscles, metric: planEx.metric }
+          : null;
     const cat = catalog.get(key) ?? null;
     const muscles =
       raw.muscles !== undefined
@@ -95,7 +146,7 @@ export function buildStrengthEntries(
       plannedSets: raw.plannedSets ?? plan?.targetSets ?? 0,
       plannedReps: raw.plannedReps ?? plan?.targetReps ?? 0,
       plannedRIR: raw.plannedRIR !== undefined ? raw.plannedRIR : (plan?.targetRIR ?? null),
-      source: raw.source ?? (plan ? "planned" : "extra"),
+      source: raw.source ?? prev?.source ?? (plan ? "planned" : "extra"),
       skipped,
       metric: raw.metric ?? cat?.metric ?? plan?.metric ?? "reps",
       sets,

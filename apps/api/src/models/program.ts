@@ -1,5 +1,5 @@
 import mongoose, { Schema, model, type Model, type Types } from "mongoose";
-import type { DayDTO, ProgramDTO, ProgramTemplateDTO } from "@fitfloow/core";
+import { ensureDayIds, pointerOf, programMode, type DayDTO, type ProgramDTO, type ProgramMode, type ProgramTemplateDTO } from "@fitfloow/core";
 
 const MuscleLoadSchema = new Schema({ key: { type: String, required: true }, load: { type: Number, default: 1 } }, { _id: false });
 
@@ -22,6 +22,8 @@ const CardioTargetSchema = new Schema(
 
 export const DaySchema = new Schema(
   {
+    /** Stable id (3.0+). Pre-3.0 days have none; `ensureDayIds` gives them `d<order>`. */
+    id: { type: String },
     order: { type: Number, required: true },
     title: { type: String, required: true },
     focus: { type: String, default: "" },
@@ -37,7 +39,12 @@ export interface ProgramDoc {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
   name: string;
+  mode?: ProgramMode;
   days: DayDTO[];
+  /** The pointer (3.0+). */
+  currentDayId?: string | null;
+  cycleNumber?: number;
+  /** Legacy pointer + counter, kept in sync for older readers. */
   currentIndex: number;
   weekNumber: number;
   startedAt: Date;
@@ -51,7 +58,11 @@ const ProgramSchema = new Schema<ProgramDoc>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     name: { type: String, default: "Haftalık Program" },
+    mode: { type: String, enum: ["cycle", "weekly"], default: "cycle" },
     days: { type: [DaySchema], default: [] },
+    currentDayId: { type: String, default: null },
+    // No default: a pre-3.0 document must fall back to its `weekNumber`, not read as cycle 1.
+    cycleNumber: { type: Number },
     currentIndex: { type: Number, default: 0 },
     weekNumber: { type: Number, default: 1 },
     startedAt: { type: Date, default: Date.now },
@@ -63,13 +74,27 @@ const ProgramSchema = new Schema<ProgramDoc>(
 
 export const Program: Model<ProgramDoc> = (mongoose.models.Program as Model<ProgramDoc>) || model<ProgramDoc>("Program", ProgramSchema);
 
+/** Plain days with ids — works on lean and hydrated documents alike. */
+export function plainDays(days: readonly DayDTO[] | null | undefined): DayDTO[] {
+  const list = (days ?? []).map((d) => {
+    const raw = d as DayDTO & { toObject?: () => DayDTO };
+    return typeof raw.toObject === "function" ? raw.toObject() : raw;
+  });
+  return ensureDayIds(list);
+}
+
 export function toProgramDTO(p: ProgramDoc): ProgramDTO {
+  const days = plainDays(p.days);
+  const pointer = pointerOf({ days, currentDayId: p.currentDayId, currentIndex: p.currentIndex, cycleNumber: p.cycleNumber, weekNumber: p.weekNumber });
   return {
     id: String(p._id),
     name: p.name,
-    days: p.days,
-    currentIndex: p.currentIndex,
-    weekNumber: p.weekNumber,
+    mode: programMode(p),
+    days,
+    currentDayId: pointer.currentDayId,
+    currentIndex: pointer.currentIndex,
+    cycleNumber: pointer.cycleNumber,
+    weekNumber: pointer.cycleNumber,
     startedAt: p.startedAt.toISOString(),
     lastActionAt: p.lastActionAt.toISOString(),
     sourceTemplateId: p.sourceTemplateId ? String(p.sourceTemplateId) : null,
@@ -104,7 +129,7 @@ export function toProgramTemplateDTO(t: ProgramTemplateDoc, weeklyVolume?: Recor
     id: String(t._id),
     name: t.name,
     description: t.description ?? "",
-    days: t.days,
+    days: plainDays(t.days),
     tags: t.tags ?? [],
     cycleLength: t.days.length,
     weeklyVolume,
