@@ -1,4 +1,5 @@
-import { EMPTY_QUEUE, MAX_PENDING, STALE_MS, advance, clear, enqueue, readingTime, remove, replay, type QueueState } from "../../src/mascot/voice/queue";
+import { MOODS, TRIGGERS } from "../../src/mascot/model/params";
+import { EMPTY_QUEUE, MAX_PENDING, STALE_MS, advance, clear, enqueue, readingTime, remove, replay, type FlooMessage, type QueueState } from "../../src/mascot/voice/queue";
 
 const T0 = 1_000_000;
 let n = 0;
@@ -62,9 +63,20 @@ describe("Floo voice queue", () => {
     expect(warn.mood).toBe("worried");
     expect(warn.tone).toBe("warning");
     const ok = say(EMPTY_QUEUE, "x", { tone: "success" }).current!;
-    expect(ok.mood).toBe("cheer");
-    expect(say(EMPTY_QUEUE, "x", { mood: "flex", priority: "high" }).current!.mood).toBe("flex");
+    expect(ok.mood).toBe("celebrate");
+    expect(say(EMPTY_QUEUE, "x", { mood: "energetic", priority: "high" }).current!.mood).toBe("energetic");
     expect(say(EMPTY_QUEUE, "x").current!.mood).toBe("happy");
+  });
+
+  it("speaks the Floo 3 model's moods and triggers, so the corner can draw them as they are", () => {
+    const msg: FlooMessage = { text: "Hedef tamam!", mood: "celebrate", trigger: "goalHit" };
+    const q = enqueue(EMPTY_QUEUE, msg, "typed", T0).current!;
+    expect(MOODS).toContain(q.mood);
+    expect(TRIGGERS).toContain(q.trigger);
+    // The v1/API vocabulary does not type-check here: map it with `toFlooMood` first.
+    // @ts-expect-error "cheer" is an API mood, not a model mood
+    const legacy: FlooMessage = { text: "x", mood: "cheer" };
+    expect(legacy.mood).toBe("cheer");
   });
 
   it("drops stale waiting messages but never stale urgent ones", () => {

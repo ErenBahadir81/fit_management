@@ -2,8 +2,7 @@
  * Floo's message queue: pure data, no React. One bubble shows at a time; the rest wait in priority
  * order. Everything here is deterministic given `now`, so the rules can be tested without timers.
  */
-import type { FlooMood as Mood } from "../moods";
-import type { Trigger } from "../model/params";
+import type { Mood as FlooMood, Trigger as FlooTrigger } from "../model";
 
 export type FlooPriority = "low" | "normal" | "high" | "urgent";
 
@@ -14,13 +13,19 @@ export interface FlooAction {
   onPress: () => void;
 }
 
-/** What a caller hands to `say()`. Only `text` is required. */
+/**
+ * What a caller hands to `say()`. Only `text` is required.
+ *
+ * Moods and triggers are the Floo 3 model's own (`model/params.ts`), because that is what the
+ * corner draws. A mood from the API (`@fitfloow/core`'s ten, e.g. `cheer`, `flex`) goes through
+ * `toFlooMood` first.
+ */
 export interface FlooMessage {
   text: string;
   /** Face while the bubble is up. Defaults by priority (warnings look worried, the rest happy). */
-  mood?: Mood;
+  mood?: FlooMood;
   /** One-shot animation fired when the bubble appears. Any name the model knows. */
-  trigger?: Trigger;
+  trigger?: FlooTrigger;
   priority?: FlooPriority;
   /** One button in the bubble. Pressing it runs `onPress` and dismisses the bubble. */
   action?: FlooAction;
@@ -37,8 +42,8 @@ export interface FlooMessage {
 
 export interface QueuedMessage extends Required<Pick<FlooMessage, "text" | "priority">> {
   id: string;
-  mood: Mood;
-  trigger?: Trigger;
+  mood: FlooMood;
+  trigger?: FlooTrigger;
   action?: FlooAction;
   dedupeKey?: string;
   ttlMs: number | null;
@@ -74,10 +79,10 @@ export function readingTime(text: string, hasAction: boolean): number {
   return hasAction ? base + 2500 : base;
 }
 
-function defaultMood(m: FlooMessage): Mood {
+function defaultMood(m: FlooMessage): FlooMood {
   if (m.mood) return m.mood;
   if (m.tone === "warning" || m.priority === "high" || m.priority === "urgent") return "worried";
-  if (m.tone === "success") return "cheer";
+  if (m.tone === "success") return "celebrate";
   return "happy";
 }
 

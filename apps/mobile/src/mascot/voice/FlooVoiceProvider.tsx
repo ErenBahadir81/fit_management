@@ -2,8 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState } from "react-native";
 import { haptic } from "../../lib/haptics";
 import { useToast } from "../../ui/Toast";
-import type { FlooMood } from "../moods";
-import type { Trigger } from "../model/params";
+import type { Mood as FlooMood, Trigger as FlooTrigger } from "../model";
 import { EMPTY_QUEUE, advance, clear, enqueue, remove, replay, type FlooMessage, type QueueState, type QueuedMessage } from "./queue";
 
 /**
@@ -21,7 +20,7 @@ export interface FlooVoice {
   /** Dismiss one message (default: the one on screen). */
   dismiss: (id?: string) => void;
   /** A one-shot animation with no bubble: a completed set, a logged glass of water. */
-  react: (trigger: Trigger) => void;
+  react: (trigger: FlooTrigger) => void;
   /** Tap on an idle Floo: bring back the last line, or just wave. */
   poke: () => void;
   /** Hold the auto-dismiss timer (finger on the bubble) and let it go again. */
@@ -32,7 +31,7 @@ export interface FlooVoice {
   enabled: boolean;
   presence: FlooPresence;
   /** Last fired one-shot, keyed so the same trigger twice still fires twice. */
-  reaction: { name: Trigger; key: number } | null;
+  reaction: { name: FlooTrigger; key: number } | null;
   /** Face at rest (no bubble). */
   restingMood: FlooMood;
 }
@@ -191,7 +190,7 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
     []
   );
 
-  const react = useCallback((trigger: Trigger) => {
+  const react = useCallback((trigger: FlooTrigger) => {
     setReaction({ name: trigger, key: ++reactKey.current });
   }, []);
 

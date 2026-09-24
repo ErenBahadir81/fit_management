@@ -2,6 +2,7 @@ import React from "react";
 import type { HomeDTO } from "@fitfloow/core";
 import { greetingFor, trHour } from "../../../lib/dates";
 import { fmtDate } from "../../../lib/format";
+import { toFlooMood } from "../../../mascot/moodMap";
 import { useFlooOnce } from "../../../mascot/voice";
 import { Header } from "../../../ui/Header";
 
@@ -15,7 +16,7 @@ export function HomeHeader({ data }: { data: HomeDTO }) {
   const { mascot, today } = data;
   useFlooOnce(data.user.mascotEnabled && mascot.text ? `home:${today.dateKey}:${mascot.key ?? mascot.text}` : null, {
     text: mascot.text,
-    mood: mascot.mood,
+    mood: toFlooMood(mascot.mood),
     priority: "low",
   });
   return <Header eyebrow={fmtDate(today.dateKey, "weekday")} title={greeting} testID="home-header" />;
