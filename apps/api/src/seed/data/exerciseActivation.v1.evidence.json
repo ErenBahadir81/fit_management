@@ -4,7 +4,8 @@
  "notes": {
   "upper": "Method: ExRx roles mapped per brief (Target 1, Synergist .5, Dynamic Stabilizer .3, Stabilizer .15; 'Back, General' target mapped to both lats and traps; Supraspinatus/serratus/pec minor/levator/coracobrachialis ignored). Contreras T-Nation data are n=1 %MVC (heaviest load tested) normalized to the study's highest mean for that muscle (chest composite = mean of upper/mid/lower pec, ref = 115 lb weighted dip 182; triceps ref = rope extension 135; shoulder refs UT 81.9, AD 274, LD 90.7, PD 144; back refs lat 108, biceps 109, mid/lower trap mean 111). Traps from Contreras are split: upper trap from the shoulder article, mid/lower from the back article (both recorded when available). Within-study normalization was used only for muscles where the study contains a direct exercise for that muscle (so e.g. Saeterbakken 2017 gives chest only, Campos 2020 gives front/side delt only; rear delt from Campos skipped since no rear-delt exercise). Volume-method: Pelland 2024 Table 1A classifications (direct 1 / indirect .5), SBS rows->biceps .5, RP Strength articles (front delts indirectly trained by chest exercises; rear delts, traps, biceps indirectly by back/delt work; dips and close-grip bench as compound triceps work), StrengthLog primary (1) / secondary (.5). Surprises/gaps: Contreras DB shrug (100 lb) gave only 0.36 upper-trap vs 315 lb barbell shrug (load-dependent, n=1); rear/side-delt signal during shrugs in Contreras (0.3) judged crosstalk and skipped. Contreras 'Elevated Push Up' assumed to be feet-elevated (decline). Proxies: HSPU uses ExRx Elevated Pike Press (HSPU page premium); Rack Pull uses ExRx Barbell Deadlift (Rack Pull page premium) so quads/hamstrings/adductors roles may be overstated for a rack pull; Pendlay Row uses bent-over-row EMG/ExRx; Low-to-High Cable Fly uses ExRx cable incline fly and Contreras low-pulley crossover; Face Pull uses ExRx rope rear-delt row. Weak exercises (few sources): Landmine Press (StrengthLog only), Pike Push-up (ExRx only), HSPU (ExRx proxy + StrengthLog), Handstand (Kochanowicz forearms 60% MVC; traps/front delt/triceps DERIVED from relative contribution shares - low confidence), Muscle-up (single EMG study normalized to manual muscle test, values >1 capped; chest 1.0 likely inflated), Arnold Press (ExRx, RP, StrengthLog only). Dropped as implausible for hypertrophy: ExRx 'Pectoralis Major, Sternal' synergist in rows/pulldowns/pull-ups (chest), and quads/calves from the deadlift proxy for Rack Pull. ExRx Stabilizer entries (0.15) such as quads/abs in push-ups and hamstrings/glutes in bent-over rows are single-source minor pairs. Youdas 2010 values are lower bounds from reported ranges.",
   "lower": "Method: ExRx roles T=1.0/Syn=0.5/DynStab=0.3/Stab=0.15 (antagonist stabilizers skipped); EMG = ratio to the same muscle's highest exercise in that study; when a study had no direct exercise for a muscle, cross-study references were used and are marked: glutes / Neto 2020 barbell hip thrust 82.4 %MVIC, hamstrings / Zebis 2013 leg curl upper value 87% MVC, quads / Stien 2021 leg press mean 89.3 %MVIC (cross-study %MVIC ratios are rough). Volume-method: RP articles classify exercises as direct (1.0) or indirect (0.5) per Pelland 2024 fractional convention; Kubo 2019 and Kinoshita 2023 are MRI hypertrophy studies used as volume-method evidence. PROXY estimates (ExRx page of a closely related exercise) are flagged in the note: Goblet Squat (DB front squat), Walking Lunge (DB lunge), Trap Bar Deadlift (ExRx 'Trap Bar Squat'), Romanian Deadlift (straight-back SLDL, ExRx itself calls it very similar), Sissy Squat (reverse Nordic), Cossack Squat (lunge), Jump Squat and Box Jump (bodyweight squat; ExRx plyometric pages list no muscle roles), Wall Sit (bodyweight squat), Glute Bridge / Single-Leg Glute Bridge (suspended hip bridge), Copenhagen Plank (side plank). ExRx pages that were forbidden/premium or had no role table: sumo deadlift, sissy squat, DB Bulgarian split squat, squat jump, kettlebell swing/goblet (kettlebell pages list only articulations), box jump, sled push. Surprising EMG results kept as-is: cable kickback shows the HIGHEST hamstring (BF) EMG in two studies (Lehecka 2022, Stien 2021) -> kickback hamstrings averages high; leg press glute EMG >= kickback (Stien); hip thrust VL EMG ~= squat (Contreras); hex/trap bar and step-ups exceed hip thrust glute EMG in Neto pooled data; glute-ham raise had the highest erector EMG in McAllister. Kubo 2019: squats produced essentially no hamstring hypertrophy (<1%), so squat hamstring values from ExRx/EMG likely overstate hypertrophy stimulus. Skipped (not plausible hypertrophy load / not listed by ExRx): leg-curl glutes, RDL gastrocnemius, Nordic upper-body 'synergists' of the self-assisted variant, side-plank lats/chest. Grip/forearms for deadlift variants not recorded (no source lists them). Values read from figures (Lehecka 2022) and from Martin-Fuentes 2020 tables are approximate (~). Jump Squat, Box Jump, Sled Push are power/conditioning exercises; their hypertrophy counting rests on proxies or a single conference abstract - consider down-weighting or treating as conditioning.",
-  "core": "Method: ExRx roles (T1/Syn0.5/DynStab0.3/Stab0.15); EMG = muscle EMG / max of same muscle in same study (obliques = mean of IO and EO ratios; abs = mean of upper/lower RA when both reported). Volume-method (PELLAND_2024) used only for the obvious prime mover (value 1.0) plus one indirect 0.5 (Russian twist abs).\nJudgment calls: (1) CONTRERAS_2010 normalized to max among trunk exercises, excluding chin-ups (LRA 249 looks like crosstalk/outlier) and excluding his 135 lb barbell curl (lowerBack 0.69) and 100 lb cable triceps extension (abs 0.57), which are not plausible hypertrophy loads for those muscles. (2) Low-intensity studies with no exercise targeting a muscle were not used for that muscle (Calatayud ES max 14% MVIC; Ellestad not used for Plank). (3) YUN_2017_DEADBUG has no abdominal reference exercise, so its %MVIC was divided by ESCAMILLA_2006 maxima (cross-study, approximate). (4) Escamilla 2006 latissimus/lumbar/RF columns were garbled in the PDF text, so only RA/EO/IO were used; the paper text says the roll-out also strongly activates lats, but no lats number was recorded for Ab Wheel Rollout (gap).\nProxies: EZ-Bar Curl uses the straight-bar ExRx page; Rope Pushdown uses the bar Cable Pushdown page (rope page is premium); Bicycle Crunch uses ExRx Twisting Crunch; Cable Woodchopper uses ExRx Cable Twist; Mountain Climber uses ExRx Suspended Mountain Climber; Superman lowerBack uses Maeo 'back extension on the floor'; Hollow Hold uses Park 2019 isometric bilateral leg raise; Hanging Knee Raise uses Escamilla 'hanging knee-up with straps' and ACE 'captain's chair'; Ab Wheel uses Escamilla Power Wheel roll-out (kneeling, hands on wheel) and Calatayud stable roll-out plank.\nExRx gaps: premium pages (Farmer's Walk, Ab Wheel Rollout, Rope Pushdown, V-up) and no page for Dead Hang, Dead Bug, Pallof, L-sit, Dragon Flag, Hollow Hold. ExRx rates abs only as a stabilizer (0.15) in leg raises, hanging raises and mountain climbers (target is iliopsoas, which has no key); EMG studies show high abs activity, so averaging will pull these up.\nSurprises/conflicts: Pallof press EMG is low (Contreras obliques ~0.18; a Spanish n=1 thesis found all core muscles <~21% MVC), far from the volume-method 1.0. Hammer curl biceps EMG equals the supinated curl (Boeckh-Behrens), while Coratella 2023 shows supinated > neutral > pronated for biceps. In Coratella 2023 brachioradialis was also highest with the supinated grip, which gives Cable Curl forearms 1.0 inside that curl-only study; this likely overstates forearm volume from supinated curls. Farmer's Walk McGill values are peaks that include the deadlift-style pick-up (lats/hamstrings peaked in the lift phase). Farmer's Walk has no traps source found (ExRx page premium, no EMG located), so traps is missing even though it is commonly cited. Sit-up quads 0.5 comes only from ExRx (rectus femoris synergist).\nWeak/low-confidence pairs (1 source, main muscle): Russian Twist obliques/abs (only volume-method; one 2026 EMG study had no absolute numbers), L-sit abs (only volume-method), Mountain Climber (all pairs from one ExRx suspended-variant page), Hollow Hold obliques, V-up obliques, Dragon Flag obliques, Dead Bug obliques, Bird Dog obliques/abs, Dead Hang lats/traps/biceps (fingerboard hang study).\nClassification: Burpee = kind cardio, muscles [] (ExRx lists it under Cardio exercises; the literature mostly treats burpees as HIIT conditioning, e.g. Bingley et al. JSAMS 2019 sprint vs burpee HIIT). It keeps metric reps 3x10 because burpees are counted in reps; switch to time 1x60 if the app needs all cardio to be time. Jump Rope equipment uses a new tag 'jump rope' so it does not mix with the cable 'rope' attachment. Stretch/Mobility and the cardio items have muscles [] on purpose."
+  "core": "Method: ExRx roles (T1/Syn0.5/DynStab0.3/Stab0.15); EMG = muscle EMG / max of same muscle in same study (obliques = mean of IO and EO ratios; abs = mean of upper/lower RA when both reported). Volume-method (PELLAND_2024) used only for the obvious prime mover (value 1.0) plus one indirect 0.5 (Russian twist abs).\nJudgment calls: (1) CONTRERAS_2010 normalized to max among trunk exercises, excluding chin-ups (LRA 249 looks like crosstalk/outlier) and excluding his 135 lb barbell curl (lowerBack 0.69) and 100 lb cable triceps extension (abs 0.57), which are not plausible hypertrophy loads for those muscles. (2) Low-intensity studies with no exercise targeting a muscle were not used for that muscle (Calatayud ES max 14% MVIC; Ellestad not used for Plank). (3) YUN_2017_DEADBUG has no abdominal reference exercise, so its %MVIC was divided by ESCAMILLA_2006 maxima (cross-study, approximate). (4) Escamilla 2006 latissimus/lumbar/RF columns were garbled in the PDF text, so only RA/EO/IO were used; the paper text says the roll-out also strongly activates lats, but no lats number was recorded for Ab Wheel Rollout (gap).\nProxies: EZ-Bar Curl uses the straight-bar ExRx page; Rope Pushdown uses the bar Cable Pushdown page (rope page is premium); Bicycle Crunch uses ExRx Twisting Crunch; Cable Woodchopper uses ExRx Cable Twist; Mountain Climber uses ExRx Suspended Mountain Climber; Superman lowerBack uses Maeo 'back extension on the floor'; Hollow Hold uses Park 2019 isometric bilateral leg raise; Hanging Knee Raise uses Escamilla 'hanging knee-up with straps' and ACE 'captain's chair'; Ab Wheel uses Escamilla Power Wheel roll-out (kneeling, hands on wheel) and Calatayud stable roll-out plank.\nExRx gaps: premium pages (Farmer's Walk, Ab Wheel Rollout, Rope Pushdown, V-up) and no page for Dead Hang, Dead Bug, Pallof, L-sit, Dragon Flag, Hollow Hold. ExRx rates abs only as a stabilizer (0.15) in leg raises, hanging raises and mountain climbers (target is iliopsoas, which has no key); EMG studies show high abs activity, so averaging will pull these up.\nSurprises/conflicts: Pallof press EMG is low (Contreras obliques ~0.18; a Spanish n=1 thesis found all core muscles <~21% MVC), far from the volume-method 1.0. Hammer curl biceps EMG equals the supinated curl (Boeckh-Behrens), while Coratella 2023 shows supinated > neutral > pronated for biceps. In Coratella 2023 brachioradialis was also highest with the supinated grip, which gives Cable Curl forearms 1.0 inside that curl-only study; this likely overstates forearm volume from supinated curls. Farmer's Walk McGill values are peaks that include the deadlift-style pick-up (lats/hamstrings peaked in the lift phase). Farmer's Walk has no traps source found (ExRx page premium, no EMG located), so traps is missing even though it is commonly cited. Sit-up quads 0.5 comes only from ExRx (rectus femoris synergist).\nWeak/low-confidence pairs (1 source, main muscle): Russian Twist obliques/abs (only volume-method; one 2026 EMG study had no absolute numbers), L-sit abs (only volume-method), Mountain Climber (all pairs from one ExRx suspended-variant page), Hollow Hold obliques, V-up obliques, Dragon Flag obliques, Dead Bug obliques, Bird Dog obliques/abs, Dead Hang lats/traps/biceps (fingerboard hang study).\nClassification: Burpee = kind cardio, muscles [] (ExRx lists it under Cardio exercises; the literature mostly treats burpees as HIIT conditioning, e.g. Bingley et al. JSAMS 2019 sprint vs burpee HIIT). It keeps metric reps 3x10 because burpees are counted in reps; switch to time 1x60 if the app needs all cardio to be time. Jump Rope equipment uses a new tag 'jump rope' so it does not mix with the cable 'rope' attachment. Stretch/Mobility and the cardio items have muscles [] on purpose.",
+  "review": "Verification review 2026-09-24 (T3/T4 seed sync) of the pairs flagged in docs/plan/12 section 4.4: muscle-up chest, cable kickback hamstrings, jump squat / box jump / sled push (conditioning?), Pallof press obliques, cable curl forearms; Burpee, cardio and Stretch/Mobility stay muscles []. Rules: the plain average is unchanged; an original estimate is only excluded (field `exclude`, kept for traceability) when it breaks this file's own method; new estimates carry `review: 2026-09-24` and come from the source kinds already in use (ExRx roles incl. proxies, EMG ratios, StrengthLog primary 1 / secondary 0.5, fractional convention direct 1 / indirect 0.5, training studies with MRI/ultrasound outcomes). Each reviewed exercise has a `review` entry with the verdict and its sources. Non-strength exercises (cardio, mobility) must end with no counted muscles; the build script enforces it."
  },
  "sources": {
   "CONTRERAS_CHEST_2010": {
@@ -1271,6 +1272,66 @@
    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10623130/",
    "kind": "emg",
    "year": 2023
+  },
+  "SL_CABLE_GLUTE_KICKBACK": {
+   "title": "StrengthLog: Cable Glute Kickback (primary/secondary muscles worked)",
+   "url": "https://www.strengthlog.com/cable-glute-kickback/",
+   "kind": "volume-method",
+   "year": 2025
+  },
+  "SL_CABLE_CURL": {
+   "title": "StrengthLog: Cable Curl (primary/secondary muscles worked)",
+   "url": "https://www.strengthlog.com/cable-curl/",
+   "kind": "volume-method",
+   "year": 2025
+  },
+  "SL_PALLOF_PRESS": {
+   "title": "StrengthLog: Pallof Press (primary/secondary muscles worked)",
+   "url": "https://www.strengthlog.com/pallof-press/",
+   "kind": "volume-method",
+   "year": 2025
+  },
+  "SL_BAR_MUSCLE_UP": {
+   "title": "StrengthLog: Bar Muscle-Up (progression guide: whoever can do the pull and transition can usually already do the final dip)",
+   "url": "https://www.strengthlog.com/bar-muscle-up/",
+   "kind": "volume-method",
+   "year": 2024
+  },
+  "EARP_2015": {
+   "title": "Earp JE, Newton RU, Cormie P, Blazevich AJ. Inhomogeneous quadriceps femoris hypertrophy in response to strength and power training. Med Sci Sports Exerc 47(11):2389-97 (8 wk, untrained men; set counts as tabulated in Grgic 2021 Table 1)",
+   "url": "https://pubmed.ncbi.nlm.nih.gov/25811947/",
+   "kind": "volume-method",
+   "year": 2015
+  },
+  "GRGIC_2021": {
+   "title": "Grgic J, Schoenfeld BJ, Mikulic P. Effects of plyometric vs. resistance training on skeletal muscle hypertrophy: A review. J Sport Health Sci 10(5):530-536",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8500805/",
+   "kind": "review",
+   "year": 2021
+  },
+  "VIGOTSKY_2022": {
+   "title": "Vigotsky AD, Halperin I, Trajano GS, Vieira TM. Longing for a Longitudinal Proxy: Acutely Measured Surface EMG Amplitude is not a Validated Predictor of Muscle Hypertrophy. Sports Med 52:193-199",
+   "url": "https://pubmed.ncbi.nlm.nih.gov/35006527/",
+   "kind": "review",
+   "year": 2022
+  },
+  "PLOTKIN_2023": {
+   "title": "Plotkin DL et al. Hip thrust and back squat training elicit similar gluteus muscle hypertrophy and transfer similarly to the deadlift. Front Physiol 14:1279170 (MRI; hamstrings showed little to no growth with either)",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10593473/",
+   "kind": "volume-method",
+   "year": 2023
+  },
+  "REFALO_2023": {
+   "title": "Refalo MC, Helms ER, Trexler ET, Hamilton DL, Fyfe JJ. Influence of Resistance Training Proximity-to-Failure on Skeletal Muscle Hypertrophy: A Systematic Review with Meta-analysis. Sports Med 53:649-665",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9935748/",
+   "kind": "review",
+   "year": 2023
+  },
+  "ALCARAZ_2018": {
+   "title": "Alcaraz PE, Carlos-Vivas J, Oponjuru BO, Martinez-Rodriguez A. The Effectiveness of Resisted Sled Training (RST) for Sprint Performance: A Systematic Review and Meta-analysis. Sports Med 48:2143-2165",
+   "url": "https://pubmed.ncbi.nlm.nih.gov/29926369/",
+   "kind": "review",
+   "year": 2018
   }
  },
  "exercises": [
@@ -6964,7 +7025,20 @@
       {
        "source": "WALKER_2023",
        "value": 1.0,
-       "note": "bar MU PM 3.72 x MMT (capped; MMT normalization inflates)"
+       "note": "bar MU PM 3.72 x MMT (capped; MMT normalization inflates)",
+       "exclude": "review 2026-09-24: ratio to the study's manual-muscle-test reference is >2 (the reference was not a maximal contraction, which the authors could not verify), so it carries no relative-load information (pec major 3.72 x MMT)"
+      },
+      {
+       "source": "EXRX_BW_CHEST_DIP",
+       "value": 1.0,
+       "note": "Target: Pectoralis Major, Sternal (PROXY: ExRx BW Chest Dip roles for the press-out (no straight-bar-dip or muscle-up page))",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CORE_PELLAND_2024",
+       "value": 0.5,
+       "note": "indirect (press-out): fractional convention: the pull limits a muscle-up set (SL_BAR_MUSCLE_UP), so the pull's prime mover counts 1.0; the press-out never reaches failure, so its muscles count as indirect 0.5 (REFALO_2023: stimulus falls with distance from failure)",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -6974,7 +7048,26 @@
       {
        "source": "WALKER_2023",
        "value": 0.72,
-       "note": "mean of UT 0.45 and LT 4.32 (capped 1.0) x MMT"
+       "note": "mean of UT 0.45 and LT 4.32 (capped 1.0) x MMT",
+       "exclude": "review 2026-09-24: ratio to the study's manual-muscle-test reference is >2 (the reference was not a maximal contraction, which the authors could not verify), so it carries no relative-load information (lower trapezius 4.32 x MMT inside this mean; replaced by the upper-trapezius value alone)"
+      },
+      {
+       "source": "WALKER_2023",
+       "value": 0.45,
+       "note": "upper trapezius alone, bar MU 0.45 x MMT (lower-trapezius ratio excluded, see above)",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "EXRX_BW_PULLUP",
+       "value": 0.5,
+       "note": "Synergists: Rhomboids, Trapezius middle/lower (PROXY: ExRx BW Pull-up roles for the pull phase)",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CORE_PELLAND_2024",
+       "value": 0.5,
+       "note": "indirect (pull synergist): fractional convention: the pull limits a muscle-up set (SL_BAR_MUSCLE_UP), so the pull's prime mover counts 1.0; the press-out never reaches failure, so its muscles count as indirect 0.5 (REFALO_2023: stimulus falls with distance from failure)",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -6985,6 +7078,18 @@
        "source": "WALKER_2023",
        "value": 1.0,
        "note": "bar MU pull phase LD 1.33 x MMT (capped)"
+      },
+      {
+       "source": "EXRX_BW_PULLUP",
+       "value": 1.0,
+       "note": "Target: Latissimus Dorsi (PROXY: ExRx BW Pull-up roles for the pull phase)",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CORE_PELLAND_2024",
+       "value": 1.0,
+       "note": "direct: fractional convention: the pull limits a muscle-up set (SL_BAR_MUSCLE_UP), so the pull's prime mover counts 1.0; the press-out never reaches failure, so its muscles count as indirect 0.5 (REFALO_2023: stimulus falls with distance from failure)",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -6995,6 +7100,18 @@
        "source": "WALKER_2023",
        "value": 0.3,
        "note": "bar MU pull BB 0.30 x MMT"
+      },
+      {
+       "source": "EXRX_BW_PULLUP",
+       "value": 0.5,
+       "note": "Synergists: Brachialis, Biceps (PROXY: ExRx BW Pull-up roles for the pull phase)",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CORE_PELLAND_2024",
+       "value": 0.5,
+       "note": "indirect (pull synergist): fractional convention: the pull limits a muscle-up set (SL_BAR_MUSCLE_UP), so the pull's prime mover counts 1.0; the press-out never reaches failure, so its muscles count as indirect 0.5 (REFALO_2023: stimulus falls with distance from failure)",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -7005,6 +7122,18 @@
        "source": "WALKER_2023",
        "value": 1.0,
        "note": "bar MU push phase TB 1.12 x MMT (capped)"
+      },
+      {
+       "source": "EXRX_BW_CHEST_DIP",
+       "value": 0.5,
+       "note": "Synergists: Triceps Brachii (PROXY: ExRx BW Chest Dip roles for the press-out (no straight-bar-dip or muscle-up page))",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CORE_PELLAND_2024",
+       "value": 0.5,
+       "note": "indirect (press-out): fractional convention: the pull limits a muscle-up set (SL_BAR_MUSCLE_UP), so the pull's prime mover counts 1.0; the press-out never reaches failure, so its muscles count as indirect 0.5 (REFALO_2023: stimulus falls with distance from failure)",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -7015,11 +7144,66 @@
        "source": "WALKER_2023",
        "value": 0.77,
        "note": "bar MU pull forearm flexors 0.77 x MMT"
+      },
+      {
+       "source": "EXRX_BW_PULLUP",
+       "value": 0.5,
+       "note": "Synergists: Brachioradialis (PROXY: ExRx BW Pull-up roles for the pull phase)",
+       "review": "2026-09-24"
+      }
+     ]
+    },
+    {
+     "key": "rearDelt",
+     "estimates": [
+      {
+       "source": "EXRX_BW_PULLUP",
+       "value": 0.5,
+       "note": "Synergists: Deltoid, Posterior (PROXY: ExRx BW Pull-up roles for the pull phase)",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CORE_PELLAND_2024",
+       "value": 0.5,
+       "note": "indirect (pull synergist): fractional convention: the pull limits a muscle-up set (SL_BAR_MUSCLE_UP), so the pull's prime mover counts 1.0; the press-out never reaches failure, so its muscles count as indirect 0.5 (REFALO_2023: stimulus falls with distance from failure)",
+       "review": "2026-09-24"
+      }
+     ]
+    },
+    {
+     "key": "frontDelt",
+     "estimates": [
+      {
+       "source": "EXRX_BW_CHEST_DIP",
+       "value": 0.5,
+       "note": "Synergists: Deltoid, Anterior (PROXY: ExRx BW Chest Dip roles for the press-out (no straight-bar-dip or muscle-up page))",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CORE_PELLAND_2024",
+       "value": 0.5,
+       "note": "indirect (press-out): fractional convention: the pull limits a muscle-up set (SL_BAR_MUSCLE_UP), so the pull's prime mover counts 1.0; the press-out never reaches failure, so its muscles count as indirect 0.5 (REFALO_2023: stimulus falls with distance from failure)",
+       "review": "2026-09-24"
       }
      ]
     }
    ],
-   "group": "upper"
+   "group": "upper",
+   "review": [
+    {
+     "date": "2026-09-24",
+     "verdict": "changed",
+     "summary": "chest 1.0 rested on one capped EMG ratio (3.72 x an unverified manual-muscle-test reference, kipping muscle-ups) and is excluded; so is the lower-trapezius ratio (4.32 x). Added the ExRx roles of the two phases (pull-up, chest dip) and the fractional convention: the pull limits the set, the press-out muscles count as indirect. chest 1.0 -> 0.75, triceps 1.0 -> 0.65, traps 0.7 -> 0.5, biceps 0.3 -> 0.45, forearms 0.75 -> 0.65; new rearDelt 0.5, frontDelt 0.5; lats stays 1.0.",
+     "sources": [
+      "WALKER_2023",
+      "EXRX_BW_PULLUP",
+      "EXRX_BW_CHEST_DIP",
+      "CORE_PELLAND_2024",
+      "SL_BAR_MUSCLE_UP",
+      "REFALO_2023"
+     ]
+    }
+   ]
   },
   {
    "name": "Squat",
@@ -8561,6 +8745,12 @@
        "source": "EXRX_BW_SQUAT",
        "value": 1.0,
        "note": "Target (Quadriceps) (PROXY: ballistic bodyweight squat; ExRx plyometric page lists no roles)"
+      },
+      {
+       "source": "EARP_2015",
+       "value": 0.5,
+       "note": "untrained men, 8 wk: jump squats 5-7 sets x 5-6 reps (0-30% 1RM) grew mid-thigh quadriceps CSA as much as 3 sets of heavy squats (75-90% 1RM), i.e. about half a squat set per jump-squat set",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -8605,7 +8795,19 @@
      ]
     }
    ],
-   "group": "lower"
+   "group": "lower",
+   "review": [
+    {
+     "date": "2026-09-24",
+     "verdict": "changed",
+     "summary": "Kept as strength, not conditioning: plyometric training grows the lower-limb muscles about as much as resistance training in untrained and recreational lifters over <= 12 weeks (Grgic 2021), but a jump set is not a hard set: Earp 2015 needed roughly twice the jump-squat sets for the same quadriceps growth as heavy squats. quads 1.0 -> 0.75; the other pairs keep the bodyweight-squat proxy (low confidence).",
+     "sources": [
+      "GRGIC_2021",
+      "EARP_2015",
+      "EXRX_BW_SQUAT"
+     ]
+    }
+   ]
   },
   {
    "name": "Box Jump",
@@ -8627,6 +8829,12 @@
        "source": "EXRX_BW_SQUAT",
        "value": 1.0,
        "note": "Target (Quadriceps) (PROXY: jump from squat; ExRx box-jump page lists no roles)"
+      },
+      {
+       "source": "EARP_2015",
+       "value": 0.5,
+       "note": "PROXY (jump squat training): untrained men, 8 wk: jump squats 5-7 sets x 5-6 reps (0-30% 1RM) grew mid-thigh quadriceps CSA as much as 3 sets of heavy squats (75-90% 1RM), i.e. about half a squat set per jump-squat set",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -8671,7 +8879,19 @@
      ]
     }
    ],
-   "group": "lower"
+   "group": "lower",
+   "review": [
+    {
+     "date": "2026-09-24",
+     "verdict": "changed",
+     "summary": "Kept as strength, not conditioning: plyometric training grows the lower-limb muscles about as much as resistance training in untrained and recreational lifters over <= 12 weeks (Grgic 2021), but a jump set is not a hard set: Earp 2015 needed roughly twice the jump-squat sets for the same quadriceps growth as heavy squats. quads 1.0 -> 0.75; the other pairs keep the bodyweight-squat proxy (low confidence).",
+     "sources": [
+      "GRGIC_2021",
+      "EARP_2015",
+      "EXRX_BW_SQUAT"
+     ]
+    }
+   ]
   },
   {
    "name": "Conventional Deadlift",
@@ -10104,6 +10324,12 @@
        "source": "RP_GLUTE",
        "value": 1.0,
        "note": "RP lists machine kickbacks as direct glute training -> 1.0"
+      },
+      {
+       "source": "SL_CABLE_GLUTE_KICKBACK",
+       "value": 1.0,
+       "note": "primary",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -10114,6 +10340,12 @@
        "source": "EXRX_CB_KICKBACK",
        "value": 0.5,
        "note": "Synergist"
+      },
+      {
+       "source": "SL_CABLE_GLUTE_KICKBACK",
+       "value": 0.5,
+       "note": "secondary",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -10134,6 +10366,18 @@
        "source": "STIEN2021",
        "value": 1.0,
        "note": "BF 106.5 %MVIC, highest in study"
+      },
+      {
+       "source": "SL_CABLE_GLUTE_KICKBACK",
+       "value": 0.5,
+       "note": "secondary",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CORE_PELLAND_2024",
+       "value": 0.5,
+       "note": "indirect: hip-extension synergist of a glute isolation exercise (fractional convention)",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -10158,7 +10402,23 @@
      ]
     }
    ],
-   "group": "lower"
+   "group": "lower",
+   "review": [
+    {
+     "date": "2026-09-24",
+     "verdict": "changed",
+     "summary": "hamstrings 0.75 -> 0.65. Both EMG estimates are kept: biceps femoris amplitude really is high because the knee is held near extension (Lehecka 2022, Stien 2021). But EMG amplitude is not a validated predictor of hypertrophy (Vigotsky 2022) and glute-targeted hip-extension training grew the hamstrings little or not at all on MRI (Plotkin 2023, hip thrust), so the two role-based sources (StrengthLog secondary, fractional convention indirect) are added. Confidence stays low (spread 0.7); a gym revision is expected. glutes 0.95 and adductors 0.5 unchanged.",
+     "sources": [
+      "LEHECKA_WOMEN2022",
+      "STIEN2021",
+      "EXRX_CB_KICKBACK",
+      "SL_CABLE_GLUTE_KICKBACK",
+      "CORE_PELLAND_2024",
+      "VIGOTSKY_2022",
+      "PLOTKIN_2023"
+     ]
+    }
+   ]
   },
   {
    "name": "Hip Abduction Machine",
@@ -10455,7 +10715,7 @@
     "sled"
    ],
    "metric": "time",
-   "kind": "strength",
+   "kind": "cardio",
    "defaultSets": 4,
    "defaultReps": 20,
    "instructions": "Gövdeyi öne eğ, kolları kilitle ve kısa güçlü adımlarla kızağı it.",
@@ -10466,12 +10726,25 @@
       {
        "source": "SLED_FASEB2020",
        "value": 0.83,
-       "note": "walk-and-push quad EMG 74.4 %MVIC / leg-press quad ref 89.3 (cross-study)"
+       "note": "walk-and-push quad EMG 74.4 %MVIC / leg-press quad ref 89.3 (cross-study)",
+       "exclude": "review 2026-09-24: sled push reclassified as conditioning; EMG amplitude alone does not establish a hypertrophy set (VIGOTSKY_2022)"
       }
      ]
     }
    ],
-   "group": "lower"
+   "group": "lower",
+   "review": [
+    {
+     "date": "2026-09-24",
+     "verdict": "changed",
+     "summary": "Reclassified as conditioning (kind cardio, muscles []). The only estimate was one EMG conference abstract (walk-and-push quadriceps vs a leg-press reference from another study); no training study measuring hypertrophy was found, the resisted-sled literature studies it as sprint/acceleration training (Alcaraz 2018), and the catalog prescribes it as timed intervals (4 x 20 s). quads 0.85 -> none.",
+     "sources": [
+      "SLED_FASEB2020",
+      "ALCARAZ_2018",
+      "VIGOTSKY_2022"
+     ]
+    }
+   ]
   },
   {
    "name": "Leg Raises",
@@ -11206,6 +11479,12 @@
        "source": "CORE_PELLAND_2024",
        "value": 1.0,
        "note": "direct/prime-mover set (fractional convention)"
+      },
+      {
+       "source": "SL_CABLE_CURL",
+       "value": 1.0,
+       "note": "primary",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -11221,6 +11500,12 @@
        "source": "CORATELLA_2023",
        "value": 1.0,
        "note": "brachioradialis highest with supinated grip in this study (only curls tested)"
+      },
+      {
+       "source": "SL_CABLE_CURL",
+       "value": 0.5,
+       "note": "secondary (forearm flexors)",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -11245,7 +11530,19 @@
      ]
     }
    ],
-   "group": "core"
+   "group": "core",
+   "review": [
+    {
+     "date": "2026-09-24",
+     "verdict": "changed",
+     "summary": "forearms 0.75 -> 0.65. The 1.0 estimate is valid (Coratella 2023 used a cable tower, and its pronated-bar and rope-neutral curls are the brachioradialis-target variants, so the ratio compares against direct forearm work; brachioradialis excitation differed by only 5-6 % between grips). Adding StrengthLog (forearm flexors secondary) moves the average to 0.65 with medium confidence. Other supinated curls stay at 0.5 (ExRx synergist only).",
+     "sources": [
+      "EXRX_CB_CURL",
+      "CORATELLA_2023",
+      "SL_CABLE_CURL"
+     ]
+    }
+   ]
   },
   {
    "name": "Reverse Curl",
@@ -12890,6 +13187,12 @@
        "source": "CORE_PELLAND_2024",
        "value": 1.0,
        "note": "direct/prime-mover set (fractional convention)"
+      },
+      {
+       "source": "SL_PALLOF_PRESS",
+       "value": 1.0,
+       "note": "primary",
+       "review": "2026-09-24"
       }
      ]
     },
@@ -12902,9 +13205,38 @@
        "note": "erector 10.9/103"
       }
      ]
+    },
+    {
+     "key": "abs",
+     "estimates": [
+      {
+       "source": "SL_PALLOF_PRESS",
+       "value": 1.0,
+       "note": "primary",
+       "review": "2026-09-24"
+      },
+      {
+       "source": "CONTRERAS_2010",
+       "value": 0.08,
+       "note": "120 lb Pallof press lower rectus 9.9/124 (same trial as the obliques estimate)",
+       "review": "2026-09-24"
+      }
+     ]
     }
    ],
-   "group": "core"
+   "group": "core",
+   "review": [
+    {
+     "date": "2026-09-24",
+     "verdict": "changed",
+     "summary": "obliques 0.6 -> 0.75, new abs 0.55. EMG in the one available trial is low (obliques 0.18, lower rectus 0.08 of their study maxima) while both classification sources call obliques and abs primary movers (StrengthLog) / direct work (fractional convention). No other peer-reviewed Pallof EMG with usable normalisation was found. The plain average puts it at plank level (abs 0.6, obliques 0.5); confidence is low and the gym revision should settle it.",
+     "sources": [
+      "CONTRERAS_2010",
+      "CORE_PELLAND_2024",
+      "SL_PALLOF_PRESS"
+     ]
+    }
+   ]
   },
   {
    "name": "Cable Woodchopper",
