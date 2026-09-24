@@ -8,6 +8,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestApp, type TestApp } from "./harness";
 import { runSeed } from "../src/seed/index";
 
+const DEV_SEED = { adminPassword: "Asd*123", userPassword: "Asd*123" };
+
 let t: TestApp;
 let headers: Record<string, string>;
 let userId: string;
@@ -23,7 +25,7 @@ function multipart(bytes: Buffer, boundaryTag = "e2e") {
 beforeAll(async () => {
   t = await createTestApp();
   await t.reset();
-  await runSeed();
+  await runSeed(DEV_SEED);
   const login = await t.app.inject({ method: "POST", url: `${api}/auth/login`, payload: { username: "eren", password: "Asd*123" } });
   expect(login.statusCode).toBe(200);
   headers = { authorization: `Bearer ${login.json().accessToken}` };

@@ -9,6 +9,8 @@ import { BodyEntry } from "../models/body";
 import { DietTarget } from "../models/nutrition";
 import { MascotMessage } from "../models/mascot";
 import { Settings } from "../models/settings";
+import bcrypt from "bcryptjs";
+import type { AppConfig } from "../config";
 import { hashPassword } from "../modules/platform/auth.service";
 import { EREN_DAYS, INCI_DAYS, SEED_EXERCISES, SEED_MUSCLES, SEED_TEMPLATES } from "./data/index";
 
@@ -32,6 +34,32 @@ export interface SeedReport {
     bodyEntryDateKeys: number;
     dietTargetModes: number;
   };
+  /** Seed accounts not created because no password was provided (production without SEED_*_PASSWORD). */
+  skippedUsers: string[];
+  /** Problems an operator must act on, e.g. a production account still using the dev default password. */
+  warnings: string[];
+}
+
+export interface SeedOptions {
+  /** Password for the `eren` admin account. Undefined → the account is not created. */
+  adminPassword?: string;
+  /** Password for the `inci` user account. Undefined → the account is not created. */
+  userPassword?: string;
+  /** Production mode: flags existing accounts that still accept the dev default password. */
+  production?: boolean;
+}
+
+/** Dev/test-only default for the seed accounts. Never used when NODE_ENV=production. */
+const DEV_SEED_PASSWORD = "Asd*123";
+
+/** Resolves seed options from config: explicit SEED_*_PASSWORD wins; the dev default applies outside production only. */
+export function seedOptionsFromConfig(config: Pick<AppConfig, "isProd" | "SEED_ADMIN_PASSWORD" | "SEED_USER_PASSWORD">): SeedOptions {
+  const fallback = config.isProd ? undefined : DEV_SEED_PASSWORD;
+  return {
+    adminPassword: config.SEED_ADMIN_PASSWORD ?? fallback,
+    userPassword: config.SEED_USER_PASSWORD ?? fallback,
+    production: config.isProd,
+  };
 }
 
 function emptyReport(): SeedReport {
@@ -46,14 +74,15 @@ function emptyReport(): SeedReport {
       bodyEntryDateKeys: 0,
       dietTargetModes: 0,
     },
+    skippedUsers: [],
+    warnings: [],
   };
 }
 
-/** The two legacy accounts. Passwords are the v1 seed defaults; users change them from the app. */
-const SEED_PASSWORD = "Asd*123";
+/** The two legacy accounts. Passwords come from SeedOptions (see seedOptionsFromConfig); users change them from the app. */
 const SEED_USERS = [
-  { username: "eren", displayName: "Eren", role: "admin" as const, gender: "male" as const, heightCm: 178, days: EREN_DAYS, templateName: SEED_TEMPLATES[0].name },
-  { username: "inci", displayName: "İnci", role: "user" as const, gender: "female" as const, heightCm: null, days: INCI_DAYS, templateName: SEED_TEMPLATES[1].name },
+  { username: "eren", displayName: "Eren", role: "admin" as const, gender: "male" as const, heightCm: 178, days: EREN_DAYS, templateName: SEED_TEMPLATES[0].name, password: "adminPassword" as const },
+  { username: "inci", displayName: "İnci", role: "user" as const, gender: "female" as const, heightCm: null, days: INCI_DAYS, templateName: SEED_TEMPLATES[1].name, password: "userPassword" as const },
 ];
 
 /** Raw (schema-less) access to a model's collection — legacy documents do not fit the v2 schemas. */
@@ -101,14 +130,25 @@ async function migrateUsers(report: SeedReport): Promise<void> {
   }
 }
 
-async function ensureUsers(report: SeedReport): Promise<void> {
+async function ensureUsers(report: SeedReport, opts: SeedOptions): Promise<void> {
   for (const seed of SEED_USERS) {
-    if (await User.exists({ username: seed.username })) continue;
+    const existing = await User.findOne({ username: seed.username }).select({ passwordHash: 1 }).lean();
+    if (existing) {
+      if (opts.production && existing.passwordHash && (await bcrypt.compare(DEV_SEED_PASSWORD, existing.passwordHash))) {
+        report.warnings.push(`"${seed.username}" still uses the dev default seed password; change it now`);
+      }
+      continue;
+    }
+    const password = opts[seed.password];
+    if (!password) {
+      report.skippedUsers.push(seed.username);
+      continue;
+    }
     try {
       await User.create({
         username: seed.username,
         displayName: seed.displayName,
-        passwordHash: await hashPassword(SEED_PASSWORD),
+        passwordHash: await hashPassword(password),
         role: seed.role,
         gender: seed.gender,
         heightCm: seed.heightCm,
@@ -232,12 +272,13 @@ async function seedFoodsIfAvailable(report: SeedReport): Promise<void> {
 
 /**
  * Idempotent, layered seed + migration (owner: B1). Called at boot (SEED_ON_BOOT) and by `pnpm seed`.
+ * Seed accounts are created only for the passwords in `opts` — callers pass `seedOptionsFromConfig(config)`.
  * Each step is isolated and never destroys existing data — see docs/plan/01-data-model.md §Migration.
  */
-export async function runSeed(): Promise<SeedReport> {
+export async function runSeed(opts: SeedOptions = {}): Promise<SeedReport> {
   const report = emptyReport();
   await migrateUsers(report);
-  await ensureUsers(report);
+  await ensureUsers(report, opts);
   await ensureCatalogs(report);
   await ensurePrograms(report);
   await migrateLegacy(report);
