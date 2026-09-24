@@ -96,6 +96,40 @@ export const DEFAULT_ADAPTIVE_SETTINGS = {
   /** Bulk: observed gain above this × plan → too fast (extra is fat); below `bulkSlowRatio` × plan → too slow. */
   bulkFastRatio: 1.5,
   bulkSlowRatio: 0.5,
+  /*
+   * Recomp: judged on tape measurements (body fat and the lean mass derived from it), never on weight.
+   * Sources in docs/research/muscle-gain-science.md §8.
+   */
+  /**
+   * Noise floor of one body-fat reading, points (1 SD). Navy tape: trained observers agree within
+   * ±1 point (Hodgdon & Friedl, via Potter 2022 / Foulis 2023); self-measured tape errors (Barrios
+   * 2016: waist 1.9 cm, neck 0.6 cm) carry through the Navy equation as ≈ 1.5 points for a man and
+   * ≈ 1.1 for a woman. The person's own scatter is used instead when it is larger.
+   */
+  bfNoisePts: 1.5,
+  /** Smallest body-fat gap to the plan that counts, points: below the tape's own reproducibility it is noise. */
+  bfTolerancePts: 1,
+  /** Smallest lean-mass gap to the plan that counts, kg (≈ 1 point of body fat at 85–100 kg). */
+  leanToleranceKg: 1,
+  /**
+   * A gap must also exceed this many standard errors (a two-scan LSC uses 2.77 × the precision
+   * error, Slart 2024). 2.25 ≈ 98.8 % one-sided per look: simulated over a whole 18-week recomp with
+   * weekly readings, ≤ 5 % of people on plan ever get a proposal (tape noise 1–1.6 points) while a
+   * full stall is always flagged, typically by week 9–10 (research doc §8).
+   */
+  bfConfidenceZ: 2.25,
+  /** A verdict needs this many readings (one per day) … */
+  bfMinMeasurements: 3,
+  /** … spanning at least this many days (Helms / MacroFactor: judge after ≥ 3 weeks) … */
+  bfMinSpanDays: 21,
+  /** … the latest no older than this (a weekly or fortnightly tape habit keeps it fresh). */
+  bfMaxAgeDays: 14,
+  /** Readings older than this before today are left out, so the verdict follows the recent trend. */
+  bfWindowDays: 56,
+  /** Body fat falling slower than this (points a week) is "stalled" rather than just "behind". */
+  bfStallPtsPerWeek: 0.05,
+  /** Day-to-day scale noise, % of bodyweight (Orsama 2014), added to the lean-mass noise. */
+  weighInNoisePctBw: 0.5,
 } as const;
 
 export const zAdaptiveSettings = z.object({
@@ -105,6 +139,18 @@ export const zAdaptiveSettings = z.object({
   kcalStep: z.number().min(25).max(500),
   bulkFastRatio: z.number().min(1).max(4),
   bulkSlowRatio: z.number().min(0).max(1),
+  /* Recomp body-fat judgement — defaulted one by one so adaptive blocks stored before them still parse. */
+  bfNoisePts: z.number().min(0.2).max(5).default(DEFAULT_ADAPTIVE_SETTINGS.bfNoisePts),
+  bfTolerancePts: z.number().min(0).max(5).default(DEFAULT_ADAPTIVE_SETTINGS.bfTolerancePts),
+  leanToleranceKg: z.number().min(0).max(5).default(DEFAULT_ADAPTIVE_SETTINGS.leanToleranceKg),
+  bfConfidenceZ: z.number().min(1).max(4).default(DEFAULT_ADAPTIVE_SETTINGS.bfConfidenceZ),
+  /** A line through fewer than three readings has no scatter left to judge the noise by. */
+  bfMinMeasurements: z.number().int().min(3).max(20).default(DEFAULT_ADAPTIVE_SETTINGS.bfMinMeasurements),
+  bfMinSpanDays: z.number().int().min(7).max(112).default(DEFAULT_ADAPTIVE_SETTINGS.bfMinSpanDays),
+  bfMaxAgeDays: z.number().int().min(1).max(56).default(DEFAULT_ADAPTIVE_SETTINGS.bfMaxAgeDays),
+  bfWindowDays: z.number().int().min(21).max(365).default(DEFAULT_ADAPTIVE_SETTINGS.bfWindowDays),
+  bfStallPtsPerWeek: z.number().min(0).max(1).default(DEFAULT_ADAPTIVE_SETTINGS.bfStallPtsPerWeek),
+  weighInNoisePctBw: z.number().min(0).max(3).default(DEFAULT_ADAPTIVE_SETTINGS.weighInNoisePctBw),
 });
 export type AdaptiveSettings = z.infer<typeof zAdaptiveSettings>;
 

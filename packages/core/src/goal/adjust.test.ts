@@ -341,21 +341,16 @@ describe("proposeGoalAdjustment — bulk", () => {
 });
 
 describe("proposeGoalAdjustment — recomp", () => {
-  it("losing weight much faster than planned → raiseCalories (protect muscle)", () => {
+  // A recomp is judged on body-fat measurements (recomp.test.ts); the scale alone never proposes.
+  it("losing weight much faster than planned proposes nothing without body-fat data", () => {
     const pts = weighIns(recompGoal, 35, (d) => -0.05 * d);
-    const p = propose(recompGoal, pts, 35)!;
-    expect(p.kind).toBe("ahead");
-    expect(p.options[0].action).toBe("raiseCalories");
-    expect(p.options[0].after!.dailyCalorieTarget).toBeGreaterThan(p.before.dailyCalorieTarget);
-    expect(p.options[1].action).toBe("replan");
+    expect(computeGoalProgress(recompGoal, pts, [], [], day(35), S).onTrack).toBe("onTrack");
+    expect(propose(recompGoal, pts, 35)).toBeNull();
   });
 
-  it("flat weight is not a stall on a recomp: it reads as 'behind' the slow planned drift", () => {
-    const p = propose(recompGoal, flat(85, 35), 35)!;
-    expect(p.kind).toBe("behind");
-    expect(p.options[0].action).toBe("lowerCalories");
-    expect(p.options[1].labelTr).toContain("güncelle");
-    expect(p.messageTr).toContain("üstünde");
+  it("flat weight is neither a stall nor 'behind' on a recomp", () => {
+    expect(computeGoalProgress(recompGoal, flat(85, 35), [], [], day(35), S).onTrack).toBe("onTrack");
+    expect(propose(recompGoal, flat(85, 35), 35)).toBeNull();
   });
 
   it("reached on body fat, not weight", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeGoalPlan } from "../goal/plan";
-import { goalDirectionOf, zGoal, zGoalInput, zGoalPlan, zGoalUpdate, zGoalView } from "./goal";
+import { goalDirectionOf, zGoal, zGoalAdjustmentProposal, zGoalFeedback, zGoalInput, zGoalPlan, zGoalUpdate, zGoalView } from "./goal";
 import { DEFAULT_GOAL_SETTINGS, zGoalSettings } from "./settings";
 
 describe("zGoalInput (T7)", () => {
@@ -126,6 +126,27 @@ describe("zGoalPlan / zGoal — legacy data", () => {
     expect(v.feedback).toBeNull();
     expect(v.adjustment).toBeNull();
   });
+
+  it("feedback and proposals from before the body-fat fields get null deviations", () => {
+    const bars = { goal: 10, time: 20, lean: null, fat: null };
+    const fb = zGoalFeedback.parse({ tone: "positive", mood: "happy", trigger: "goal.feedback.onTrack", textTr: "x", status: "onTrack", deviationKg: 0.1, weeksSaved: null, bars });
+    expect(fb.deviationBfPts).toBeNull();
+    const snap = { dailyCalorieTarget: 2000, estimatedWeeks: 10, targetDate: "2026-12-01", targetWeightKg: 80, targetBodyFatPct: 15, targetLeanGainKg: null };
+    const p = zGoalAdjustmentProposal.parse({
+      id: "adj_1",
+      kind: "ahead",
+      direction: "cut",
+      deviationKg: -0.6,
+      mood: "cheer",
+      trigger: "goal.adjust.ahead",
+      titleTr: "t",
+      messageTr: "m",
+      before: snap,
+      options: [{ action: "replan", labelTr: "l", recommended: true, after: snap, change: {} }],
+    });
+    expect(p.deviationBfPts).toBeNull();
+    expect(p.deviationLeanKg).toBeNull();
+  });
 });
 
 describe("zGoalSettings — legacy settings", () => {
@@ -136,6 +157,22 @@ describe("zGoalSettings — legacy settings", () => {
     expect(parsed.muscle).toEqual(DEFAULT_GOAL_SETTINGS.muscle);
     expect(parsed.adaptive).toEqual(DEFAULT_GOAL_SETTINGS.adaptive);
     expect(parsed).toEqual(DEFAULT_GOAL_SETTINGS);
+  });
+
+  it("fills the body-fat judgement constants into an adaptive block stored before they existed", () => {
+    const { toleranceKg, sustainDays, cooldownDays, kcalStep, bulkFastRatio, bulkSlowRatio } = DEFAULT_GOAL_SETTINGS.adaptive;
+    const stored = { ...DEFAULT_GOAL_SETTINGS, adaptive: { toleranceKg, sustainDays, cooldownDays: cooldownDays + 7, kcalStep, bulkFastRatio, bulkSlowRatio } };
+    const parsed = zGoalSettings.parse(stored);
+    expect(parsed.adaptive).toEqual({ ...DEFAULT_GOAL_SETTINGS.adaptive, cooldownDays: cooldownDays + 7 });
+    expect(parsed.adaptive.bfNoisePts).toBe(1.5);
+    expect(parsed.adaptive.bfMinMeasurements).toBe(3);
+  });
+
+  it("rejects body-fat judgement constants that cannot work", () => {
+    const tooFew = { ...DEFAULT_GOAL_SETTINGS, adaptive: { ...DEFAULT_GOAL_SETTINGS.adaptive, bfMinMeasurements: 2 } };
+    expect(zGoalSettings.safeParse(tooFew).success).toBe(false);
+    const noNoise = { ...DEFAULT_GOAL_SETTINGS, adaptive: { ...DEFAULT_GOAL_SETTINGS.adaptive, bfNoisePts: 0 } };
+    expect(zGoalSettings.safeParse(noNoise).success).toBe(false);
   });
 
   it("the defaults themselves parse unchanged", () => {
