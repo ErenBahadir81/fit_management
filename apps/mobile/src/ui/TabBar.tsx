@@ -122,7 +122,7 @@ export function TabBar({ activeIndex, onChange, items = TAB_ITEMS, width, insetB
  */
 function TabIcon({ name, active }: { name: IconName; active: boolean }) {
   const reduce = useReducedMotion();
-  const s = useSharedValue(active ? 1.04 : 1);
+  const s = useSharedValue(active && !reduce ? 1.04 : 1);
   useEffect(() => {
     s.set(reduce ? withTiming(1, timing.reduced) : withSpring(active ? 1.04 : 1, springs.snappy));
   }, [active, reduce, s]);

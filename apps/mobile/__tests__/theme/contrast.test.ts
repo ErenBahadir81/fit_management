@@ -52,7 +52,8 @@ describe.each([
   ["dark", dark],
 ])("%s palette contrast", (_name, c) => {
   test.each(TEXT)("%s text on %s is AA (≥ 4.5:1)", (fg, bg) => {
-    expect(contrast(c[fg] as string, c[bg] as string)).toBeGreaterThanOrEqual(4.5);
+    // Composited, so a translucent text token is scored as it is seen.
+    expect(contrast(over(c[fg] as string, c[bg] as string), c[bg] as string)).toBeGreaterThanOrEqual(4.5);
   });
 
   test("secondary text on a primary card (onPrimaryMuted) is AA", () => {

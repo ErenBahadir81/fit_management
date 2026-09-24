@@ -1,7 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Platform, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type ViewStyle } from "react-native";
 import { FlashList, type FlashListProps, type ListRenderItem as FlashListRenderItem } from "@shopify/flash-list";
-import { useScreenScroll } from "./Screen";
+import { InListContext, useScreenOffset } from "./Screen";
 
 export type ListRenderItem<T> = FlashListRenderItem<T>;
 export type ListProps<T> = Omit<FlashListProps<T>, "renderItem"> & {
@@ -28,20 +28,27 @@ function renderSlot(slot: React.ComponentType | React.ReactElement | null | unde
 
 function ListInner<T>(rawProps: ListProps<T>, ref: React.Ref<unknown>) {
   // Inside a tab `Screen` the list's offset drives the top bar that keeps rows from sliding under
-  // the corner Floo. Horizontal lists never do; the caller's own `onScroll` still runs.
-  const screenScroll = useScreenScroll();
+  // the corner Floo. Horizontal lists never do; the caller's own `onScroll` still runs. A list
+  // that goes away takes its offset with it, so the bar is never left up over content at rest.
+  const offset = useScreenOffset();
+  const report = rawProps.horizontal ? null : offset;
+  useEffect(() => (report ? () => report(0) : undefined), [report]);
   const own = rawProps.onScroll;
   const onScroll = useMemo(
     () =>
-      screenScroll && !rawProps.horizontal
+      report
         ? (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-            screenScroll(e);
+            report(e.nativeEvent.contentOffset.y);
             own?.(e);
           }
         : own,
-    [own, rawProps.horizontal, screenScroll]
+    [own, report]
   );
   const props = onScroll === own ? rawProps : { ...rawProps, onScroll, scrollEventThrottle: rawProps.scrollEventThrottle ?? 16 };
+  return <InListContext.Provider value>{renderList(props, ref)}</InListContext.Provider>;
+}
+
+function renderList<T>(props: ListProps<T>, ref: React.Ref<unknown>) {
   if (Platform.OS !== "web") return <FlashList<T> ref={ref as never} {...(props as FlashListProps<T>)} />;
 
   const {

@@ -27,8 +27,9 @@ const STATIC = process.env.NODE_ENV === "test";
 /**
  * The number to show for a value that counts to its new value instead of jumping.
  *
- * The count itself is an animated value: a Reanimated timing (ease-out) on the UI thread, whose
- * frames reach the JS side as plain numbers to format. It always starts from the number on screen,
+ * The count itself is an animated value: a Reanimated timing (ease-out) keeps the clock on the UI
+ * thread, and each frame reaches JS as a plain number to format (the text itself is rendered by
+ * React, one small Text per frame, as before). It always starts from the number on screen,
  * so a value that changes mid-count carries on from there instead of jumping back. Everything that
  * is not a count is derived during render: with animation off, or for a value that is not a finite
  * number, the value itself is shown.

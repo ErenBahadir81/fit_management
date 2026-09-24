@@ -7,6 +7,7 @@ import { radii, spacing } from "../theme/tokens";
 import { Icon } from "./Icon";
 import { resolveGlyph, type IconGlyph } from "./icons";
 import { Pressable } from "./Pressable";
+import { useStaticHead } from "./Screen";
 import { Text } from "./Text";
 
 export interface HeaderAction {
@@ -50,6 +51,8 @@ function IconButton({ action }: { action: HeaderAction }) {
 export function Header({ title, subtitle, eyebrow, left, right, compact, trailing, style, ...rest }: HeaderProps) {
   const floo = useFloo();
   const reserve = !compact && floo.enabled && floo.presence === "idle";
+  // Above a list (not inside it) this header holds the top of the screen: no top bar needed.
+  useStaticHead(!compact);
   return (
     <View {...rest} style={[styles.wrap, reserve && { paddingRight: FLOO_CORNER_INSET }, style]}>
       {left && <IconButton action={left} />}
