@@ -315,8 +315,13 @@ describe("OnboardingScreen", () => {
     expect(screen.getByTestId("done-program-name").props.children).toBe(PROGRAM.name);
     expect(String(screen.getByTestId("done-kcal").props.children)).toMatch(/kcal/);
     expect(screen.getByTestId("onboarding-back").props.accessibilityState).toMatchObject({ disabled: true });
+    // Committed: nothing left to resume, but the session still says "not set up" so the route
+    // guard does not swap this screen for the tabs before it is read.
+    expect(loadDraft()).toBeNull();
+    expect(useSession.getState().user?.onboardingCompleted).toBe(false);
 
     await fireEvent.press(screen.getByTestId("done-start"));
+    expect(useSession.getState().user?.onboardingCompleted).toBe(true);
     expect(mockRouter.replace).toHaveBeenCalledWith("/(tabs)");
     expect(loadDraft()).toBeNull();
   });
@@ -395,6 +400,32 @@ describe("OnboardingScreen", () => {
     );
     await render();
     expect(screen.getByTestId("ob-activity-active").props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByTestId("onboarding-step-count").props.children).toEqual([4, "/", 7]);
+  });
+});
+
+describe("OnboardingScreen resume without a session", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearDraft();
+    useSession.setState({ status: "signedOut", user: null, signedOutReason: null });
+  });
+
+  test("a draft whose account was lost asks for the account again, then picks up where it was", async () => {
+    makeApi();
+    saveDraft({
+      ...emptyDraft(),
+      step: "training",
+      account: { displayName: "Eren", username: "eren" },
+      profile: { gender: "male", birthDate: "1994-04-12", heightCm: 180 },
+      measurement: { weightKg: 92, neckCm: 40, waistCm: 96, hipCm: null },
+      training: { activityLevel: "moderate", daysPerWeek: null, experience: null },
+    });
+    await render();
+    expect(screen.getByTestId("ob-username").props.value).toBe("eren");
+    await fireEvent.changeText(screen.getByTestId("ob-password"), "cokgizli1");
+    await next();
+    await waitFor(() => expect(screen.getByTestId("ob-activity-moderate").props.accessibilityState).toMatchObject({ selected: true }));
     expect(screen.getByTestId("onboarding-step-count").props.children).toEqual([4, "/", 7]);
   });
 });

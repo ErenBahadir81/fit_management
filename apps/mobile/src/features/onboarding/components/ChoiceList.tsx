@@ -10,7 +10,7 @@ export interface ChoiceOption<T extends string> {
   value: T;
   label: string;
   hint?: string;
-  /** A short tag on the right, e.g. "Floo önerisi". */
+  /** A short tag next to the label, e.g. "Floo önerisi". */
   badge?: string;
 }
 
@@ -20,62 +20,76 @@ export interface ChoiceListProps<T extends string> {
   onChange: (v: T) => void;
   /** The question, read out as the group's name. */
   label: string;
-  /** Two columns for short labels (sex), one row each otherwise. */
+  /**
+   * Two columns for short labels: the grid shows labels only and the chosen answer's hint is
+   * written underneath, so four answers take two rows instead of four tall cards.
+   */
   columns?: 1 | 2;
   testID: string;
 }
 
 /**
- * One question, a few big answers. Each answer is a full-width card (a 44 pt target and then some)
- * that reads as a radio button; the selected one gets the primary edge and a check, so the state
- * never rests on colour alone.
+ * One question, a few big answers. Each answer is a card (a 44 pt target and then some) that reads
+ * as a radio button; the selected one gets the primary edge and a check, so the state never rests
+ * on colour alone.
  */
 export function ChoiceList<T extends string>({ options, value, onChange, label, columns = 1, testID }: ChoiceListProps<T>) {
   const { colors } = useTheme();
+  const grid = columns === 2;
+  const chosenHint = grid ? options.find((o) => o.value === value)?.hint : undefined;
+  const hasHints = grid && options.some((o) => o.hint);
+
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={label} testID={testID} style={[styles.list, columns === 2 && styles.grid]}>
-      {options.map((o) => {
-        const selected = o.value === value;
-        return (
-          <Pressable
-            key={o.value}
-            onPress={() => onChange(o.value)}
-            haptic="select"
-            accessibilityRole="radio"
-            accessibilityState={{ selected, checked: selected }}
-            accessibilityLabel={o.hint ? `${o.label}. ${o.hint}` : o.label}
-            testID={`${testID}-${o.value}`}
-            style={[
-              styles.card,
-              columns === 2 && styles.half,
-              { backgroundColor: selected ? colors.primarySoft : colors.surface, borderColor: selected ? colors.primary : colors.border },
-            ]}
-          >
-            <View style={styles.texts}>
-              <View style={styles.titleRow}>
-                <Text variant="title" style={styles.title}>
-                  {o.label}
-                </Text>
-                {o.badge ? (
-                  <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                    <Text variant="caption" style={{ color: colors.onPrimary }}>
-                      {o.badge}
-                    </Text>
-                  </View>
+    <View style={styles.list}>
+      <View accessibilityRole="radiogroup" accessibilityLabel={label} testID={testID} style={[styles.list, grid && styles.grid]}>
+        {options.map((o) => {
+          const selected = o.value === value;
+          return (
+            <Pressable
+              key={o.value}
+              onPress={() => onChange(o.value)}
+              haptic="select"
+              accessibilityRole="radio"
+              accessibilityState={{ selected, checked: selected }}
+              accessibilityLabel={o.hint ? `${o.label}. ${o.hint}` : o.label}
+              testID={`${testID}-${o.value}`}
+              style={[
+                styles.card,
+                grid && styles.half,
+                { backgroundColor: selected ? colors.primarySoft : colors.surface, borderColor: selected ? colors.primary : colors.border },
+              ]}
+            >
+              <View style={styles.texts}>
+                <View style={styles.titleRow}>
+                  <Text variant="title" style={styles.title}>
+                    {o.label}
+                  </Text>
+                  {o.badge ? (
+                    <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                      <Text variant="caption" style={{ color: colors.onPrimary }}>
+                        {o.badge}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                {o.hint && !grid ? (
+                  <Text variant="caption" color="inkMuted">
+                    {o.hint}
+                  </Text>
                 ) : null}
               </View>
-              {o.hint ? (
-                <Text variant="caption" color="inkMuted">
-                  {o.hint}
-                </Text>
-              ) : null}
-            </View>
-            <View style={[styles.check, { borderColor: selected ? colors.primary : colors.controlBorder, backgroundColor: selected ? colors.primary : "transparent" }]}>
-              {selected ? <Icon icon="check" size={14} color="onPrimary" /> : null}
-            </View>
-          </Pressable>
-        );
-      })}
+              <View style={[styles.check, { borderColor: selected ? colors.primary : colors.controlBorder, backgroundColor: selected ? colors.primary : "transparent" }]}>
+                {selected ? <Icon icon="check" size={14} color="onPrimary" /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+      {hasHints ? (
+        <Text variant="caption" color="inkMuted" accessibilityLiveRegion="polite" style={styles.chosenHint} testID={`${testID}-hint`}>
+          {chosenHint ?? "Birini seç; ne anlama geldiği burada yazacak."}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -93,7 +107,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1.5,
   },
-  half: { flexGrow: 1, flexBasis: "40%" },
+  half: { flexGrow: 1, flexBasis: "40%", minHeight: 52, paddingVertical: spacing.sm },
+  chosenHint: { minHeight: 32 },
   texts: { flex: 1, gap: 2 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   title: { flexShrink: 1 },

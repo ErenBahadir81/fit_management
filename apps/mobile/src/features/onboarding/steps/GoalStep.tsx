@@ -112,19 +112,21 @@ function Outcome({ plan, direction }: { plan: GoalPlan | null; direction: GoalDi
     );
   }
   const sign = direction === "bulk" ? "+" : "−";
+  // The last roadmap day, the same date core's summary sentence names (targetDate is the day after).
+  const arrive = plan.roadmap.at(-1)?.endKey ?? plan.targetDate;
   return (
     <View
       style={[styles.outcome, { backgroundColor: colors.surfaceMuted }]}
       testID="goal-outcome"
       accessible
-      accessibilityLabel={`Tahmini ${plan.estimatedWeeks} hafta, ${fmtDate(plan.targetDate)}. Haftada ${fmtNumber(plan.initialRateKgPerWeek, 2)} kilo. Günde ${fmtInt(plan.initialDailyCalorieTarget)} kalori.`}
+      accessibilityLabel={`Tahmini ${plan.estimatedWeeks} hafta, ${fmtDate(arrive)}. Haftada ${fmtNumber(plan.initialRateKgPerWeek, 2)} kilo. Günde ${fmtInt(plan.initialDailyCalorieTarget)} kalori.`}
       accessibilityLiveRegion="polite"
     >
       <View style={styles.outcomeRow}>
         <View style={styles.big}>
           <CountUp variant="hero" value={plan.estimatedWeeks} format={(n) => fmtInt(n)} duration={320} testID="goal-weeks" />
           <Text variant="label" color="inkMuted">
-            hafta · {fmtDate(plan.targetDate)}
+            hafta · {fmtDate(arrive)}
           </Text>
         </View>
         <View style={styles.facts}>

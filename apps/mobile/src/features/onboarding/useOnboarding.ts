@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiClientError } from "@fitfloow/api-client";
-import type { BodyAssessment, GoalDTO, GoalDirection, ProgramDTO, Weekday } from "@fitfloow/core";
+import type { BodyAssessment, GoalDTO, GoalDirection, ProgramDTO, UserDTO, Weekday } from "@fitfloow/core";
 import { getApi } from "../../lib/api";
 import { describeError } from "../../lib/errors";
 import { todayKey } from "../../lib/dates";
@@ -28,6 +28,7 @@ function registerMessage(e: unknown): string {
 
 /** What `POST /onboarding` set up, for the finish screen. Lives in memory only. */
 export interface OnboardingResult {
+  user: UserDTO;
   goal: GoalDTO | null;
   program: ProgramDTO | null;
 }
@@ -82,10 +83,9 @@ export function useOnboarding(onDone: () => void): Onboarding {
   const signIn = useSession((s) => s.signIn);
   const setUser = useSession((s) => s.setUser);
 
-  const [draft, setDraft] = useState<OnboardingDraft>(() => {
-    const restored = loadDraft() ?? emptyDraft();
-    return { ...restored, step: resumeStep(restored, useSession.getState().status === "signedIn") };
-  });
+  // The step a restored draft had reached, kept for after the account exists again.
+  const [restored] = useState<OnboardingDraft>(() => loadDraft() ?? emptyDraft());
+  const [draft, setDraft] = useState<OnboardingDraft>(() => ({ ...restored, step: resumeStep(restored, useSession.getState().status === "signedIn") }));
   const [password, setPassword] = useState("");
   const [direction, setNavDirection] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -97,7 +97,9 @@ export function useOnboarding(onDone: () => void): Onboarding {
   const commit = useCallback((updater: (d: OnboardingDraft) => OnboardingDraft) => {
     setDraft((prev) => {
       const next = updater(prev);
-      saveDraft(next);
+      // Once committed, the server holds every answer: nothing is left to resume.
+      if (next.step === "done") clearDraft();
+      else saveDraft(next);
       return next;
     });
   }, []);
@@ -163,14 +165,15 @@ export function useOnboarding(onDone: () => void): Onboarding {
       setError(null);
       completeOnboarding(onboardingPayload(d, measurementDay))
         .then(async ({ user, goal, program }) => {
-          setUser(user);
+          // The session learns the account is set up only on "Ana sayfaya geç": the route guard
+          // would otherwise swap the finish screen for the tabs before anyone saw it.
           if (!goal) {
             // No goal: make sure the diet tab follows maintenance. Not worth blocking the finish for.
             await getApi()
               .nutrition.setTarget({ mode: "auto" })
               .catch(() => undefined);
           }
-          setResult({ goal, program: program ?? null });
+          setResult({ user, goal, program: program ?? null });
           void haptic.success();
           await qc.invalidateQueries();
           goTo("done", 1);
@@ -181,7 +184,7 @@ export function useOnboarding(onDone: () => void): Onboarding {
         })
         .finally(() => setBusy(false));
     },
-    [goTo, measurementDay, qc, setUser]
+    [goTo, measurementDay, qc]
   );
 
   const next = useCallback(() => {
@@ -196,7 +199,9 @@ export function useOnboarding(onDone: () => void): Onboarding {
           setPassword(""); // done with it — it never needs to exist again
           signIn(res.user);
           void haptic.success();
-          goTo("body", 1);
+          // Normally "body"; a draft that already got further (the account was lost, say, to a
+          // reload in demo mode) picks up at its first unanswered question instead.
+          goTo(resumeStep({ ...draft, step: restored.step }, true), 1);
         })
         .catch((e: unknown) => {
           void haptic.error();
@@ -212,7 +217,7 @@ export function useOnboarding(onDone: () => void): Onboarding {
     }
 
     goTo(nextStep(step), 1);
-  }, [busy, commitSession, draft, goTo, password, ready, signIn]);
+  }, [busy, commitSession, draft, goTo, password, ready, restored.step, signIn]);
 
   const skipGoal = useCallback(() => {
     if (busy || draft.step !== "goal") return;
@@ -231,8 +236,9 @@ export function useOnboarding(onDone: () => void): Onboarding {
 
   const finish = useCallback(() => {
     clearDraft();
+    if (result) setUser(result.user);
     onDone();
-  }, [onDone]);
+  }, [onDone, result, setUser]);
 
   return {
     step: draft.step,
