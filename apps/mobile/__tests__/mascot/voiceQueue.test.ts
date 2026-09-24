@@ -1,4 +1,5 @@
-import { EMPTY_QUEUE, MAX_PENDING, STALE_MS, advance, clear, enqueue, readingTime, remove, replay, type QueueState } from "../../src/mascot/voice/queue";
+import { MOODS, TRIGGERS } from "../../src/mascot/model/params";
+import { EMPTY_QUEUE, MAX_PENDING, STALE_MS, advance, clear, enqueue, readingTime, remove, replay, type FlooMessage, type QueueState } from "../../src/mascot/voice/queue";
 
 const T0 = 1_000_000;
 let n = 0;
@@ -53,6 +54,27 @@ describe("Floo voice queue", () => {
     expect(s.pending.map((p) => p.text)).toEqual(["water again"]);
   });
 
+  it("a waiting line said again keeps its place in line and its age", () => {
+    let s = say(EMPTY_QUEUE, "showing", {}, T0);
+    s = say(s, "greeting", { dedupeKey: "g", priority: "low" }, T0);
+    s = say(s, "other", { priority: "low" }, T0 + 1000);
+    // A screen remounts and says its line again: it must not jump behind "other" or look new.
+    s = say(s, "greeting (again)", { dedupeKey: "g", priority: "low" }, T0 + STALE_MS - 1000);
+    expect(s.pending.map((p) => p.text)).toEqual(["greeting (again)", "other"]);
+    // ...so it still goes stale on its original clock.
+    s = advance(s, T0 + STALE_MS + 1);
+    expect(s.current?.text).toBe("other");
+  });
+
+  it("but a waiting line that already went stale is replaced by a fresh one, not dropped with it", () => {
+    let s = say(EMPTY_QUEUE, "showing", { ttlMs: null }, T0);
+    s = say(s, "failed", { dedupeKey: "toast:failed", priority: "high" }, T0);
+    s = say(s, "failed", { dedupeKey: "toast:failed", priority: "high" }, T0 + STALE_MS + 60_000);
+    expect(s.pending.map((p) => p.text)).toEqual(["failed"]);
+    s = advance(s, T0 + STALE_MS + 61_000);
+    expect(s.current?.text).toBe("failed");
+  });
+
   it("ignores empty text", () => {
     expect(say(EMPTY_QUEUE, "   ")).toBe(EMPTY_QUEUE);
   });
@@ -62,9 +84,20 @@ describe("Floo voice queue", () => {
     expect(warn.mood).toBe("worried");
     expect(warn.tone).toBe("warning");
     const ok = say(EMPTY_QUEUE, "x", { tone: "success" }).current!;
-    expect(ok.mood).toBe("cheer");
-    expect(say(EMPTY_QUEUE, "x", { mood: "flex", priority: "high" }).current!.mood).toBe("flex");
+    expect(ok.mood).toBe("celebrate");
+    expect(say(EMPTY_QUEUE, "x", { mood: "energetic", priority: "high" }).current!.mood).toBe("energetic");
     expect(say(EMPTY_QUEUE, "x").current!.mood).toBe("happy");
+  });
+
+  it("speaks the Floo 3 model's moods and triggers, so the corner can draw them as they are", () => {
+    const msg: FlooMessage = { text: "Hedef tamam!", mood: "celebrate", trigger: "goalHit" };
+    const q = enqueue(EMPTY_QUEUE, msg, "typed", T0).current!;
+    expect(MOODS).toContain(q.mood);
+    expect(TRIGGERS).toContain(q.trigger);
+    // The v1/API vocabulary does not type-check here: map it with `toFlooMood` first.
+    // @ts-expect-error "cheer" is an API mood, not a model mood
+    const legacy: FlooMessage = { text: "x", mood: "cheer" };
+    expect(legacy.mood).toBe("cheer");
   });
 
   it("drops stale waiting messages but never stale urgent ones", () => {

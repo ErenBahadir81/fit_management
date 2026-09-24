@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { HomeDTO } from "@fitfloow/core";
-import { Floo, useFlooOnce } from "../../mascot";
+import { Floo, overTargetKey, useFlooOnce } from "../../mascot";
 import { fmtInt } from "../../lib/format";
 import { spacing } from "../../theme/tokens";
 import { EmptyState } from "../../ui/EmptyState";
@@ -69,11 +69,13 @@ interface HomeContentProps {
 function HomeContent({ data, onProgram, onNutrition, onBody, onRoadmap, onSetGoal }: HomeContentProps) {
   const targetBf = data.goal?.actualBodyFatPct != null ? data.goal.actualBodyFatPct - data.goal.bfToGo : null;
   const over = data.today.calories.remaining < 0 ? -data.today.calories.remaining : 0;
-  // Going over the day's target is a warning, so it is Floo's to say, once per day.
-  useFlooOnce(over > 0 ? `home:over:${data.today.dateKey}` : null, {
+  // Going over the day's target is a warning, so it is Floo's to say, once per day. The key is the
+  // one the meal that crossed the target already used, so Floo never tells the same day twice.
+  useFlooOnce(over > 0 ? overTargetKey(data.today.dateKey) : null, {
     text: `Bugün hedefini ${fmtInt(over)} kcal aştın. Sorun değil, yarın biraz dengeleriz.`,
     priority: "high",
     mood: "worried",
+    trigger: "overTarget",
     action: { label: "Beslenmeye git", onPress: onNutrition },
   });
   return (
