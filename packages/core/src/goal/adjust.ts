@@ -8,10 +8,13 @@
  *  - reached: the trend (cut/bulk) or the latest body fat (recomp) is at the target → "complete".
  *  - otherwise only after `adaptive.cooldownDays` since the plan (re)started or the last answer,
  *    so the first weeks (water, glycogen) and a fresh re-plan are never second-guessed.
- *  - cut / recomp: trend is ≥ `toleranceKg` ahead of / behind the plan today AND `sustainDays` ago;
- *    or the trend is stalled for two weeks.
+ *  - cut: trend is ≥ `toleranceKg` ahead of / behind the plan today AND `sustainDays` ago; or the
+ *    trend is stalled for two weeks.
  *  - bulk: the observed 4-week gain rate is above `bulkFastRatio` × plan (extra is fat) or below
  *    `bulkSlowRatio` × plan (kg deviations are too small on a bulk to be read reliably).
+ *  - recomp: never from weight. The body-fat trend of the tape measurements (`bodyFatTrend`) is
+ *    ahead / behind / stalled against the plan — or lean mass is falling — and the same verdict
+ *    already held at the previous measurement.
  */
 import { MIN_SAFE_BODY_FAT } from "../navy/index";
 import type {
@@ -34,7 +37,18 @@ import { clamp, hash32, round } from "../utils/index";
 import { ewmaSlopePerWeek, ewmaTrend, type WeightPoint } from "./ewma";
 import { formatTrNumber } from "./milestones";
 import { computeGoalPlan, type GoalEngineInput } from "./plan";
-import { directionOf, roadmapWeekAt, tdeeAtDay, trendDeviationAt, weightSign, type GoalLike } from "./progress";
+import {
+  bodyFatTrend,
+  smoothedBodyFat,
+  directionOf,
+  roadmapWeekAt,
+  tdeeAtDay,
+  trendDeviationAt,
+  weightSign,
+  type BodyFatTrend,
+  type BodyPoint,
+  type GoalLike,
+} from "./progress";
 
 /** The goal fields the adaptive logic reads (a `GoalDTO` satisfies it). */
 export type AdaptiveGoal = GoalLike & {
@@ -57,6 +71,10 @@ export interface AdjustmentInput {
   goal: AdaptiveGoal;
   progress: GoalProgress;
   weighIns: WeightPoint[];
+  /** Tape measurements. A recomp is judged on these alone (besides "reached"); without them it proposes nothing. */
+  bodyEntries?: BodyPoint[];
+  /** Recomp: `bodyFatTrend` of those measurements for `todayKey`, when the caller already has it. */
+  bodyFat?: BodyFatTrend | null;
   todayKey: string;
   replanBase: ReplanBase;
   /** Result of `recalibrateTdee` for today, when available: its measured TDEE sizes calorie changes. */
@@ -147,8 +165,8 @@ export function estimateCurrentBody(
 }
 
 /** Deterministic proposal id: stable until the plan changes or the user answers. */
-export function adjustmentId(goal: AdaptiveGoal, kind: GoalAdjustmentKind, sinceKey: string): string {
-  return `adj_${hash32(`${goal.id}|${kind}|${goal.plan.startKey}|${sinceKey}`).toString(36)}`;
+export function adjustmentId(goal: AdaptiveGoal, kind: GoalAdjustmentKind, sinceKey: string, variant?: string): string {
+  return `adj_${hash32(`${goal.id}|${kind}|${goal.plan.startKey}|${sinceKey}${variant ? `|${variant}` : ""}`).toString(36)}`;
 }
 
 /** Latest of: goal start, plan (re)start, last answered proposal. */
@@ -160,11 +178,55 @@ export function adjustmentSinceKey(goal: AdaptiveGoal): string {
 }
 
 const kg = (v: number) => formatTrNumber(round(Math.abs(v), 1));
+/** Body-fat points, formatted like kg (one decimal, Turkish comma). */
+const pts = kg;
 const cap = (s: string) => s.charAt(0).toLocaleUpperCase("tr") + s.slice(1);
 
 interface Situation {
   kind: GoalAdjustmentKind;
   deviationKg: number;
+  /** Recomp: the body-fat trend the verdict came from. */
+  bodyFat?: BodyFatTrend;
+  /** Recomp: lean mass is falling below the plan (held at the previous measurement too). */
+  leanLoss?: boolean;
+}
+
+const behindLike = (s: BodyFatTrend["status"]) => s === "behind" || s === "stalled";
+
+/**
+ * Recomp target reached: the latest reading is at the target and so is the smoothed body fat
+ * (`smoothedBodyFat`: ≥ 3 weeks of readings, not reset by a re-plan) — one low tape reading
+ * (±1.5 points) is not the finish line. A plan with nothing to do (target not below the start) is
+ * reached on the reading alone.
+ */
+function recompReached(input: AdjustmentInput): boolean {
+  const { goal, progress, todayKey, settings } = input;
+  if (progress.actualBodyFatPct === null || progress.actualBodyFatPct > goal.targetBodyFatPct) return false;
+  if (goal.plan.roadmap.length === 0) return true;
+  const smoothed = input.bodyFat ? input.bodyFat.smoothedPct : smoothedBodyFat(goal, input.bodyEntries ?? [], todayKey, settings);
+  return smoothed !== null && smoothed <= goal.targetBodyFatPct;
+}
+
+/**
+ * Recomp: the body-fat verdict, only when it already held at the previous measurement — a single
+ * slipped tape reading must not decide (the cut's "today and a week ago" rule, per measurement) —
+ * and only on a reading taken after the last answer, so a dismissed proposal is never re-made from
+ * the same evidence.
+ */
+function recompSituation(input: AdjustmentInput, deviationKg: number, sinceKey: string): Situation | null {
+  const { goal, todayKey, settings } = input;
+  const entries = input.bodyEntries ?? [];
+  const now = input.bodyFat ?? bodyFatTrend(goal, entries, todayKey, settings);
+  if (!now.enough || now.previousKey === null || now.latestKey === null || now.latestKey <= sinceKey) return null;
+  const prev = bodyFatTrend(goal, entries, now.previousKey, settings);
+  if (!prev.enough) return null;
+  const leanLoss = now.leanLoss && prev.leanLoss;
+  let kind: GoalAdjustmentKind | null = null;
+  if (now.status === "ahead" && prev.status === "ahead") kind = "ahead";
+  else if (behindLike(now.status) && behindLike(prev.status)) kind = now.status === "stalled" ? "stalled" : "behind";
+  // Fat on plan (or ahead) while lean mass falls: the deficit is too big for the muscle.
+  else if (leanLoss && (now.status === "onTrack" || now.status === "ahead")) kind = "ahead";
+  return kind ? { kind, deviationKg, bodyFat: now, leanLoss } : null;
 }
 
 function situation(input: AdjustmentInput, direction: GoalDirection, sinceKey: string): Situation | null {
@@ -176,12 +238,14 @@ function situation(input: AdjustmentInput, direction: GoalDirection, sinceKey: s
 
   /* reached — never held back by the cool-down */
   if (direction === "recomp") {
-    if (progress.actualBodyFatPct !== null && progress.actualBodyFatPct <= goal.targetBodyFatPct) return { kind: "reached", deviationKg };
+    if (recompReached(input)) return { kind: "reached", deviationKg };
   } else if (progress.actualWeightKg !== null && progress.kgToGo <= 0.1 && goal.plan.roadmap.length > 0) {
     return { kind: "reached", deviationKg };
   }
 
   if (daysBetween(sinceKey, todayKey) < a.cooldownDays) return null;
+  // Weight is flat on a recomp by design: only body fat and lean mass count, never the scale.
+  if (direction === "recomp") return recompSituation(input, deviationKg, sinceKey);
   if (dev === null) return null;
 
   if (direction === "bulk") {
@@ -270,16 +334,15 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
   const sinceKey = adjustmentSinceKey(goal);
   const sit = situation(input, direction, sinceKey);
   if (!sit) return null;
-  const id = adjustmentId(goal, sit.kind, sinceKey);
-  if ((goal.adjustments ?? []).some((a) => a.id === id)) return null;
-
   const before = currentSnapshot(goal, todayKey);
   const d = kg(sit.deviationKg);
   const options: GoalAdjustmentOption[] = [];
   let copy: Copy;
 
   const lowerStep = tdeeStep(input, -1);
-  const lower = () => option(input, "lowerCalories", "", true, { tdeeOverride: lowerStep.tdee });
+  const lower = (recommended = true) => option(input, "lowerCalories", "", recommended, { tdeeOverride: lowerStep.tdee });
+  /** At the calorie floor a lower TDEE cannot lower the target: such an option would change nothing. */
+  const atCalorieFloor = (o: GoalAdjustmentOption) => Math.abs((o.after?.dailyCalorieTarget ?? before.dailyCalorieTarget) - before.dailyCalorieTarget) < 25;
   const raise = () => option(input, "raiseCalories", "", true, { tdeeOverride: tdeeStep(input, 1).tdee });
   const replan = (label: string, recommended = false) => option(input, "replan", label, recommended, {});
 
@@ -308,13 +371,9 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
           : { mood: "curious", trigger: "goal.adjust.behind", titleTr: "Artış planın gerisinde", messageTr: `Kilo artışı planın yarısından az. ${cap(kcalLet(before, o))}, kas kazanımı hızlansın.` };
     }
     options.push(replan("Kaloriyi koru, tarihi güncelle"));
-  } else if (sit.kind === "ahead") {
-    if (direction === "recomp") {
-      const o = raise();
-      o.labelTr = kcalLabel(before, o);
-      options.push(o, replan("Aynen devam, tarihi güncelle"));
-      copy = { mood: "think", trigger: "goal.adjust.ahead", titleTr: "Kilo hızlı düşüyor", messageTr: `Beklenenden ${d} kg hızlı gidiyorsun; rekompta kası korumak için ${kcalLet(before, o)} mi?` };
-    } else {
+  } else {
+    /** Recommended re-plan from today (an earlier date when ahead) plus a one-point tighter target when safe. */
+    const earlier = () => {
       const o = replan("Tarihi öne çek", true);
       options.push(o);
       const tightened = round(goal.targetBodyFatPct - 1, 1);
@@ -322,40 +381,102 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
         options.push(option(input, "tighten", `Hedefi %${formatTrNumber(tightened)} yap`, false, { targetBodyFatPct: tightened }));
       }
       const saved = before.estimatedWeeks - (o.after?.estimatedWeeks ?? before.estimatedWeeks);
-      copy = {
-        mood: "cheer",
-        trigger: "goal.adjust.ahead",
-        titleTr: "Plandan öndesin!",
-        messageTr:
-          saved > 0
-            ? `Beklenenden ${d} kg öndesin! Bu tempoyla ${before.estimatedWeeks} yerine ${o.after?.estimatedWeeks} haftada bitebilir; tarihi öne çekelim mi?`
-            : `Beklenenden ${d} kg öndesin! Planı bugünden yeniden çizelim mi?`,
-      };
-    }
-  } else {
-    const o = lower();
-    o.labelTr = kcalLabel(before, o);
-    const lateLabel = direction === "recomp" ? "Kaloriyi koru, tarihi güncelle" : "Kaloriyi koru, tarihi ötele";
-    // At the calorie floor a lower TDEE cannot lower the target: offer only the later date.
-    const atFloor = Math.abs((o.after?.dailyCalorieTarget ?? before.dailyCalorieTarget) - before.dailyCalorieTarget) < 25;
-    if (atFloor) options.push(replan(lateLabel, true));
-    else options.push(o, replan(lateLabel));
-    const measured = lowerStep.measured ? "Ölçülen harcaman plandakinden düşük çıktı. " : "";
-    const why =
-      direction === "recomp"
-        ? `Kilo planın ${d} kg üstünde gidiyor.`
-        : sit.kind === "stalled"
-          ? "İki haftadır kilo düşmüyor."
-          : `Trend planın ${d} kg gerisinde.`;
-    copy = {
+      return saved > 0
+        ? ` Bu tempoyla ${before.estimatedWeeks} yerine ${o.after?.estimatedWeeks} haftada bitebilir; tarihi öne çekelim mi?`
+        : " Planı bugünden yeniden çizelim mi?";
+    };
+    /** Recommended calorie cut and a later date; at the calorie floor only the later date. Returns the sentence. */
+    const cutOrLater = (lateLabel: string, later: string) => {
+      const o = lower();
+      o.labelTr = kcalLabel(before, o);
+      // At the calorie floor offer only the later date.
+      const atFloor = atCalorieFloor(o);
+      if (atFloor) options.push(replan(lateLabel, true));
+      else options.push(o, replan(lateLabel));
+      const measured = lowerStep.measured ? "Ölçülen harcaman plandakinden düşük çıktı. " : "";
+      return (why: string) => (atFloor ? `${why} Kalori zaten güvenli tabanda; ${later}.` : `${measured}${why} ${cap(kcalLet(before, o))} ya da ${later}.`);
+    };
+    const slowCopy = (titleTr: string, messageTr: string): Copy => ({
       mood: sit.kind === "stalled" ? "worried" : "think",
       trigger: sit.kind === "stalled" ? "goal.adjust.stalled" : "goal.adjust.behind",
-      titleTr: sit.kind === "stalled" ? "Trend yerinde sayıyor" : "Biraz geride kaldık",
-      messageTr: atFloor
-        ? `${why} Kalori zaten güvenli tabanda; ${direction === "recomp" ? "planı bugünden güncelleyelim" : "tarihi öteleyelim"}.`
-        : `${measured}${why} ${cap(kcalLet(before, o))} ya da ${direction === "recomp" ? "planı bugünden güncelleyelim" : "tarihi öteleyelim"}.`,
-    };
+      titleTr,
+      messageTr,
+    });
+
+    if (direction === "recomp") {
+      const bf = sit.bodyFat!; // always set by recompSituation
+      const p = pts(bf.deviationPts ?? 0);
+      const l = kg(bf.deviationLeanKg ?? 0);
+      if (sit.kind === "ahead" && sit.leanLoss) {
+        // Fat on or ahead of plan, lean mass falling: the deficit is too big for the muscle.
+        const o = raise();
+        o.labelTr = kcalLabel(before, o);
+        options.push(o, replan("Aynen devam, tarihi güncelle"));
+        const fat = bf.status === "ahead" ? "Yağ oranın hızlı düşüyor" : "Yağ oranın planda";
+        copy = {
+          mood: "think",
+          trigger: "goal.adjust.ahead",
+          titleTr: "Kasını koruyalım",
+          messageTr: `${fat} ama yağsız kütlen planın ${l} kg altında. Kası korumak için ${kcalLet(before, o)} mi?`,
+        };
+      } else if (sit.kind === "ahead") {
+        copy = { mood: "cheer", trigger: "goal.adjust.ahead", titleTr: "Plandan öndesin!", messageTr: `Yağ oranında plandan ${p} puan öndesin!${earlier()}` };
+      } else {
+        const why = sit.kind === "stalled" ? "Son haftalarda yağ oranın düşmüyor" : `Yağ oranında planın ${p} puan gerisindesin`;
+        if (sit.leanLoss) {
+          // Behind on fat while losing lean: fewer calories would cost more muscle, so keep them.
+          options.push(replan("Kaloriyi koru, planı güncelle", true));
+          copy = slowCopy(
+            "Kasını koruyalım",
+            `${why}, yağsız kütlen de planın ${l} kg altında. Kaloriyi kısmak kası daha çok zorlar; proteini ve antrenman yükünü koruyup planı bugünden güncelleyelim.`
+          );
+        } else if (!bf.paceSlow) {
+          // Past the plan's end without a pace shown to be slow: the plan ran out of time (or started
+          // from a reading that was off). A fresh plan sets a new pace; fewer calories only as the alternative.
+          options.push(replan("Kaloriyi koru, planı güncelle", true));
+          const o = lower(false);
+          if (!atCalorieFloor(o)) {
+            o.labelTr = kcalLabel(before, o);
+            options.push(o);
+          }
+          copy = slowCopy(
+            "Plan süresi doldu",
+            `Planın süresi doldu, hedefe ${pts(input.progress.bfToGo)} puan kaldı. Planı bugünden güncelleyip yeni bir tempo çizelim mi?`
+          );
+        } else {
+          const say = cutOrLater("Kaloriyi koru, tarihi güncelle", "planı bugünden güncelleyelim");
+          copy = slowCopy(sit.kind === "stalled" ? "Yağ oranı yerinde sayıyor" : "Biraz geride kaldık", say(`${why}.`));
+        }
+      }
+    } else if (sit.kind === "ahead") {
+      copy = { mood: "cheer", trigger: "goal.adjust.ahead", titleTr: "Plandan öndesin!", messageTr: `Beklenenden ${d} kg öndesin!${earlier()}` };
+    } else {
+      const say = cutOrLater("Kaloriyi koru, tarihi ötele", "tarihi öteleyelim");
+      copy = slowCopy(
+        sit.kind === "stalled" ? "Trend yerinde sayıyor" : "Biraz geride kaldık",
+        say(sit.kind === "stalled" ? "İki haftadır kilo düşmüyor." : `Trend planın ${d} kg gerisinde.`)
+      );
+    }
   }
 
-  return { id, kind: sit.kind, direction, deviationKg: sit.deviationKg, ...copy, before, options };
+  // Recomp: tape noise can flip "behind" and "stalled" from one reading to the next; that is the same
+  // situation and keeps one id as long as the advice is the same. Different advice is a new proposal,
+  // so accepting what was shown earlier gets ADJUSTMENT_STALE rather than another option.
+  const id =
+    direction === "recomp"
+      ? adjustmentId(goal, sit.kind === "stalled" ? "behind" : sit.kind, sinceKey, options.find((o) => o.recommended)?.action)
+      : adjustmentId(goal, sit.kind, sinceKey);
+  if ((goal.adjustments ?? []).some((a) => a.id === id)) return null;
+
+  return {
+    id,
+    kind: sit.kind,
+    direction,
+    deviationKg: sit.deviationKg,
+    deviationBfPts: sit.bodyFat?.deviationPts ?? null,
+    deviationLeanKg: sit.bodyFat?.deviationLeanKg ?? null,
+    ...copy,
+    before,
+    options,
+  };
 }

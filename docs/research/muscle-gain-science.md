@@ -143,6 +143,119 @@ Ideal bulk end point: men about 18–20%, women about 26–28% (then cut).
 
 ---
 
+## 8. Judging a recomp from body-fat measurements (added 2026-09-24)
+
+**Why weight cannot be used.** A recomp targets a change of 0 to −0.5 %BW a week (§4). The engine
+plans about −0.2 kg a week, which is inside the weekly scale noise (§7). What a recomp changes is
+composition. The engine's recomp plans move body fat about 0.25–0.3 points a week and lean mass
+about +0.05–0.1 kg a week. Controlled studies report roughly +0.5–1.5 kg lean and −1–3 kg fat over
+8–12 weeks (Barakat 2020, §4). So progress has to come from body fat and the lean mass derived from
+it, and these have to be judged against their own noise.
+
+**How precise the app's body fat is.** The app measures body fat with the Navy tape method.
+- Trained observers reproduce the circumference estimate within **±1 %BF**. Sources: Hodgdon &
+  Friedl 1999, *Development of the DoD Body Composition Estimation Equations*, NHRC; cited by
+  Potter, Tharion, Holden et al. 2022, *Front Physiol* 13:868627, "Circumference-Based Predictions
+  of Body Fat Revisited", https://pmc.ncbi.nlm.nih.gov/articles/PMC9008774/. Confidence: medium-high.
+- Self-measured circumferences are noisier. Barrios, Martin-Biggers, Quick & Byrd-Bredbenner 2016,
+  *BMC Med Res Methodol* 16:49, "Reliability and criterion validity of self-measured waist, hip, and
+  neck circumferences", https://pmc.ncbi.nlm.nih.gov/articles/PMC4855335/, reports the technical error
+  of duplicate self-measurements:
+  - waist 0.76 in (1.9 cm)
+  - hip 0.38 in (1.0 cm)
+  - neck 0.24 in (0.6 cm)
+  - trained technicians: 0.22 / 0.20 / 0.08 in
+
+  In the Navy equation, one cm of (waist − neck) is about 0.75–0.8 body-fat points for a man, and
+  one cm of (waist + hip − neck) is about 0.5 points for a woman. So one self-measured reading
+  carries **≈ 1.5 points (men) / ≈ 1.1 points (women)** of noise (1 SD). Confidence: medium (my own
+  propagation of a peer-reviewed technical error of measurement).
+- Tape tracks *change* poorly. Foulis, Friedl, Spiering et al. 2023, *Front Physiol* 14:1183836,
+  "Body composition changes during 8 weeks of military training are not accurately captured by
+  circumference-based assessments", https://www.frontiersin.org/journals/physiology/articles/10.3389/fphys.2023.1183836/full,
+  followed n = 1,407 recruits over 8 weeks of training:
+  - DXA: −3.3 %BF (men), −4.0 %BF (women)
+  - tape: −2.2 %BF (men), 0.0 %BF (women)
+  - a change of ≥ 1 point was classified correctly for 83 % of men and 56 % of women
+
+  So one or two readings cannot judge a recomp; a trend over several weeks can. Confidence: high.
+- For comparison, the least significant change between two DXA scans is 2.77 × the precision error
+  (95 %) (Slart et al. 2024, *Eur J Nucl Med Mol Imaging*, "Updated practice guideline for DXA",
+  https://pmc.ncbi.nlm.nih.gov/articles/PMC11732917/).
+
+**Rule in code (`bodyFatTrend`, docs/plan/11 §Recomp on body fat).**
+- **Readings.** Take the readings since the plan (re)started, from the last 112 days: one per day,
+  then one per week (the week's mean). Several tapings in one week share technique and bloating,
+  so they are not independent; treating them as independent would inflate the evidence about
+  twofold for someone who tapes daily.
+- **Residuals.** For each weekly reading, the residual is the measured value minus the plan's
+  expected body fat (and lean mass) on that day. A least-squares line goes through the residuals.
+- **Pace and level.** The line's slope is the *pace gap* (observed minus planned change a week).
+  Its value at the latest reading is the *level gap*. The plan is drawn from one start reading,
+  which is itself off by up to ±σ. That error shifts every residual equally, so it moves the level
+  gap but cannot bias the pace gap.
+- **Why the verdict rests on pace.** A simulation that made the start reading as noisy as the
+  others showed what happens when the level gap alone decides (at z = 2.25 × its SE): 17 % (σ 1)
+  to 44 % (σ 1.6) of people who were exactly on plan got a wrong calorie proposal.
+- **When it counts.** The pace gap must exceed 2.25 standard errors. The noise is max(1.5 points,
+  the person's own scatter); for lean mass it is weight/100 × √(1.5² + 0.5²) kg, where 0.5 is
+  scale noise in %BW (Orsama 2014, §7). The level gap must also be at least 1 point the same way:
+  the tape's reproducibility and Foulis's ≥ 1-point criterion. For lean mass that floor is 1 kg.
+- **Past the plan's end.** The plan now expects the target itself, and the target is absolute, so
+  no start reading can bias the comparison. The level still above the target counts with the same
+  z and tolerance. The estimate is the mean of the readings since the end (SE σ/√n); until there
+  are 3 of them it is the smoothed line, else this plan's own fitted line. Only a pace shown to be
+  slow recommends fewer calories. Otherwise the recommendation is a fresh plan with a new pace:
+  the plan ran out of time, or started from a low reading.
+- **Minimum data.** At least 3 weeks with readings spanning ≥ 21 days (§7's "≥ 3 weeks"), the
+  latest ≤ 14 days old. In practice the pace test needs about 10 or more weekly readings: at ±1.5
+  points, a pace gap of 0.28 points a week only clears 2.25 SE once Σ(t − t̄)² ≳ 150 week².
+- **Stalled.** "Stalled" means body fat falls < 0.05 points a week, the body-fat counterpart of
+  the cut's 0.1 kg / 14 days. Tape noise can flip a verdict between "stalled" and "behind", so
+  they share one proposal id.
+- **Proposals.** A proposal needs the same verdict at the previous weekly reading, the counterpart
+  of the cut's "today and 7 days ago" rule. It also needs a reading newer than the last answer, and
+  the 21-day cool-down still applies.
+- **Reached.** "Reached" needs the latest reading at the target and the smoothed body fat at the
+  target too. The smoothed value is the line through the goal's weekly readings in the window
+  (counted from the goal start, so a re-plan does not reset it), read at the latest one, from at
+  least 3 weeks of readings. With 1.5 points of noise, someone 1 point above target reads at or below it
+  on about 25 % of single readings. The smoothed value also drives the goal bar and the projection,
+  as the weight trend does on a cut.
+- Confidence: medium-low. The structure is standard regression; the calibration is mine (below).
+
+**Calibration (simulation, own work, low-medium confidence).** The setup:
+- a man, 85 kg, 20 → 15 %, over an 18-week plan (≈ 0.28 points a week)
+- the start reading as noisy as the others (the plan is drawn from it)
+- Gaussian tape noise σ on each reading, 0.4 kg scale noise
+- proposals checked at every reading from week 3 to the end of the plan
+
+The columns show the share of people on plan who ever got a wrong proposal, and the share of full
+stalls (body fat flat) and of lean loss (−0.35 kg a week, body fat on plan) that were caught.
+
+| noise floor / pace z / window | on plan σ 1.0 weekly | on plan σ 1.6 weekly | on plan σ 1.0 fortnightly | stall caught σ 1.0 weekly (median week) | stall caught σ 1.6 weekly | stall caught σ 1.0 fortnightly | lean loss caught |
+|---|---|---|---|---|---|---|---|
+| 1.5 / 2.0 / 112 d | 0 % | 10 % | 0.3 % | 100 % (12) | 91 % | 75 % | 100 % (9) |
+| **1.5 / 2.25 / 112 d (chosen)** | **0 %** | **4.7 %** | **0 %** | **99 % (13)** | **85 %** | **64 %** | **99 % (10)** |
+| 1.5 / 2.25 / 56 d | 0 % | 4 % | 0 % | 31 % (13) | 50 % | 3 % | 91 % (12) |
+| 1.0 / 2.25 / 112 d | 4.7 % | 9.7 % | 1.3 % | 100 % (11) | 90 % | 87 % | 100 % (9) |
+
+The simulation was run again for 12 weeks past the plan's end. There, people whose pace was on plan
+but whose plan started from a low reading sit above the target, and 19 % (σ 1) to 33 % (σ 1.6) of
+them get a proposal. Almost all of these recommend a re-plan (more time), not a calorie change.
+Over the whole period, calorie changes recommended to people on pace stay at 0 % (σ 1) and ≈ 5 %
+(σ 1.6). Full stalls get a calorie cut in 97–100 % of cases. A stall that starts at week 12 of 18
+is caught about 4 weeks after the end.
+
+A proposal is never applied silently (§2 of the sprint hand-off), but a wrong calorie proposal still
+costs trust. That is why the chosen row keeps false alarms at ≤ 5 % even for noisy self-measurers.
+For a slow recomp, catching a stall a week or two later costs little. The limit is the method, not
+the rule: with ±1.5-point readings a recomp's pace cannot be read in fewer than about ten weeks.
+Two things would shorten that: a better start (for example, the plan drawn from the mean of two
+readings) or a more precise measurement.
+
+---
+
 ## Recommended constants
 
 | Constant | Value | Source | Confidence |
@@ -183,3 +296,11 @@ Ideal bulk end point: men about 18–20%, women about 26–28% (then cut).
 | MIN_WEEKS_BEFORE_ADJUST | 3 (evaluable) | Helms Pyramid, MacroFactor, RippedBody (5) | medium |
 | ON_TRACK_TOLERANCE | max(0.1 %BW/wk, 0.1 kg/wk) | heuristic | low |
 | CALORIE_ADJUST_STEP | 5% (≈100–200 kcal/day) | RippedBody | medium |
+| RECOMP_BF_NOISE_PTS (`adaptive.bfNoisePts`) | 1.5 (floor; own scatter wins when larger) | Hodgdon & Friedl 1999 (±1 trained); Barrios 2016 TEM through the Navy equation | medium |
+| RECOMP_BF_TOLERANCE_PTS (`bfTolerancePts`) | 1.0 | tape reproducibility; Foulis 2023 ≥ 1-point criterion | medium |
+| RECOMP_LEAN_TOLERANCE_KG (`leanToleranceKg`) | 1.0 | ≈ 1 point of body fat at 85–100 kg | low-medium |
+| RECOMP_PACE_Z (`bfConfidenceZ`) | 2.25 standard errors of the pace gap | §8 simulation; LSC = 2.77 × precision (Slart 2024) | low-medium |
+| RECOMP_MIN_READINGS / SPAN / MAX_AGE | 3 readings / 21 days / 14 days | §7 "≥ 3 weeks"; 3 = fewest with scatter left | medium |
+| RECOMP_WINDOW_DAYS (`bfWindowDays`) | 112 | pace needs 10+ readings at ±1.5 points (§8); recomp studies run 8–12+ weeks (Barakat 2020) | low-medium |
+| RECOMP_STALL_PTS_PER_WEEK (`bfStallPtsPerWeek`) | 0.05 | counterpart of the cut's 0.1 kg / 14 days | low |
+| WEIGH_IN_NOISE_PCT_BW (`weighInNoisePctBw`) | 0.5 | Orsama 2014 (§7) | medium |

@@ -88,10 +88,68 @@ for settings stored before T7).
 
 ## Progress in three directions (`core/goal/progress.ts`)
 
-`onTrack: "ahead"` always means *further along the plan than planned*: lighter on a cut/recomp,
-heavier on a bulk. `percentComplete` is weight-based for cut and bulk, body-fat-based for recomp.
-A recomp is never "stalled" (flat weight is its point). `trendDeviationAt(goal, weighIns, key)`
-gives the trend-vs-plan kg difference for any day.
+`onTrack: "ahead"` always means *further along the plan than planned*: lighter on a cut, heavier
+on a bulk, leaner on a recomp. `percentComplete` is weight-based for cut and bulk, body-fat-based
+for recomp (latest reading). `trendDeviationAt(goal, weighIns, key)` gives the trend-vs-plan kg
+difference for any day. `expectedAtDay` also returns the planned `leanMassKg`.
+
+### Recomp on body fat (`bodyFatTrend`)
+
+A recomp's weight is flat by design, so its `onTrack`, goal bar and projected end never come from the
+scale. They come from the tape readings (body fat and the lean mass derived from it) against the
+roadmap's expected per-day values. Sources and calibration are in the research doc, §8.
+
+- **Readings:** since the plan (re)started, at most `bfWindowDays` (112) before today. One per day
+  (the last of a day wins), then one per week (the mean of the week's readings): readings in the
+  same week share technique and bloating, so they are not independent evidence.
+- **Residuals:** each weekly reading minus the plan's expected body fat / lean mass on its day. A
+  least-squares line goes through these residuals.
+  - Its **slope** is the pace gap (`paceGapPtsPerWeek`, `paceZ` in standard errors). The plan is
+    drawn from one start reading that is itself ±1.5 points off. That error shifts every residual
+    by the same amount, so it cannot bias the slope.
+  - Its **value at the latest reading** is the gap to the plan's level (`deviationPts`,
+    `deviationLeanKg`), and that gap *does* carry the start reading's error.
+  - Noise per reading is the larger of the literature floor (`bfNoisePts` 1.5 points; for lean
+    mass that noise scaled by weight, plus scale noise) and the person's own scatter.
+- **Enough data:** at least `bfMinMeasurements` (3) weeks with a reading, spanning at least
+  `bfMinSpanDays` (21) days, the latest no older than `bfMaxAgeDays` (14) days. Until then `onTrack`
+  stays `onTrack`, whatever the scale does.
+- **Verdict within the plan:** the pace gap must exceed `bfConfidenceZ` (2.25) standard errors
+  (`paceSlow` when slower), and the level must be off by at least `bfTolerancePts` (1) the same way.
+  Slower than planned is `behind`, or `stalled` when body fat falls slower than
+  `bfStallPtsPerWeek` (0.05). Faster is `ahead`. `leanLoss` means the lean pace is significantly
+  below plan (`leanPaceZ`), lean mass is at least `leanToleranceKg` (1) below plan, and it is
+  falling.
+- **Verdict past the plan's end** (`planEnded`): the plan now expects the target itself, which no
+  start reading can bias. The body fat still above it is judged with the same z and tolerance. The
+  estimate is the first of these that is available:
+  1. the mean of the readings since the end (≥ 3 weeks)
+  2. the smoothed line
+  3. this plan's own fitted line
+
+  Without a pace shown to be slow (`paceSlow`), the recommendation is a fresh plan, not fewer
+  calories.
+- **Smoothed body fat now** (`smoothedPct`, `smoothedBodyFat(goal, …)`): the line through the
+  goal's weekly readings in the window, counted from the goal start (whichever plan they belong
+  to), read at the latest one (≥ 3 weeks of readings). A re-plan does not reset it. Every caller
+  gets the same value, whatever older history it loads. Like the weight trend on a cut, it drives
+  the goal bar (`percentComplete`, and the fat bar, which is the same figure), the
+  projection's distance and `reached`. `actualBodyFatPct` stays the latest reading as measured.
+- **Projection:** the smoothed distance to the target ÷ pace (a stall projects no date). `bfToGo` stays the latest reading's distance, as measured. The pace is the plan's rate until a verdict shows the observed
+  pace differs; then it is the observed one.
+- **A re-plan starts a new series.** Accepting a proposal, a recalibration or a PATCH re-plans
+  from today, and the verdict only reads readings since then. This is intended: the calories
+  changed, so readings from the old regime would bias the new verdict. A dismissal changes
+  nothing. `smoothedPct` is not reset.
+
+In simulation over a whole 18-week plan, with the start reading as noisy as the others:
+- weekly readings at 1-point tape noise: no one on plan gets a proposal
+- at 1.6 points: ≈ 5 % of people on plan get one
+- a full stall is caught in ≈ 99 % of cases, typically around week 13
+- a stall that starts at week 12 is caught about 4 weeks after the plan's end
+
+Tape noise does not allow a faster call. A faster call would need a better start reading (for
+example, the mean of two) or a more precise method. See research doc §8.
 
 ## Adaptive goal (`core/goal/adjust.ts`)
 
@@ -100,30 +158,64 @@ option with one tap (or dismisses it).
 
 | situation | when | options (first = recommended) |
 |---|---|---|
-| `reached` | cut/bulk: trend within 0.1 kg of the target weight; recomp: latest body fat ≤ target. No cool-down. | complete · continue with a tighter target |
+| `reached` | cut/bulk: trend within 0.1 kg of the target weight; recomp: latest body fat ≤ target **and** the smoothed body fat ≤ target (≥ 3 weeks of readings; a plan with nothing to do is reached on the reading alone). No cool-down. | complete · continue with a tighter target (cut/bulk) |
 | cut `ahead` | trend ≥ 0.4 kg ahead today **and** 7 days ago | re-plan from today (earlier date) · target −1 point |
 | cut `behind` / `stalled` | ≥ 0.4 kg behind today and 7 days ago / trend flat 14 days | lower calories · keep calories, move the date |
-| recomp `ahead` / `behind` | weight ≥ 0.4 kg below / above plan, sustained | raise / lower calories · re-plan |
+| recomp `ahead` | body-fat verdict `ahead` now **and** at the previous reading, lean mass held | re-plan from today (earlier date) · target −1 point |
+| recomp `ahead` (muscle) | lean loss now and at the previous reading, while body fat is on plan or ahead | raise calories · re-plan |
+| recomp `behind` / `stalled` | body-fat verdict behind/stalled now and at the previous reading | lower calories · keep calories, re-plan (only the re-plan at the calorie floor) |
+| recomp `behind` past the plan's end, pace not slow | smoothed body fat still clearly above the target after the end date, the pace itself on plan | keep calories, re-plan (more time) · lower calories |
+| recomp `behind` / `stalled` + lean loss | as above while lean mass falls | re-plan only (fewer calories would cost more muscle; Floo points at protein and training) |
 | bulk `ahead` | 4-week gain > 1.5 × plan (extra is fat) | lower calories · re-plan |
 | bulk `behind` / `stalled` | gain < 0.5 × plan / ≤ 0.02 kg a week | raise calories · re-plan |
 
+A recomp never gets a proposal from weight alone. Without enough tape readings it only ever gets
+`reached`; the feedback line asks for a measurement instead. A new recomp proposal also needs a
+reading taken after the last answer, so a dismissed proposal is never re-made from the same evidence. `behind` and
+`stalled` share one id on a recomp (tape noise can flip between them), so an open proposal stays
+answerable and a dismissal holds. Proposals carry `deviationBfPts` and
+`deviationLeanKg` for a recomp (null otherwise). `deviationKg` stays the weight-trend deviation.
+
 Only after a **21-day cool-down** from the plan (re)start or the last answer (first weeks are water
-and glycogen; the literature waits ≥ 3 weeks). Calorie steps: the measured TDEE when
+and glycogen; the literature waits ≥ 3 weeks). All thresholds live in `settings.goal.adaptive`,
+which is admin-editable. The recomp body-fat constants are defaulted one by one, so adaptive blocks
+stored before them still parse. Calorie steps: the measured TDEE when
 recalibration has one pointing the same way, else ± 150 kcal. Each option carries `after`, a
 preview built by the real engine; accepting re-runs exactly that re-plan from the same state
 (weight = EWMA trend, lean mass carried forward from the last tape measurement using the plan's own
-lean-per-kg ratio). The proposal id is deterministic (`goal | kind | plan start | since`), so the
+lean-per-kg ratio; a recomp with enough readings starts from the fitted body fat at its latest
+reading instead of that one reading). The proposal id is deterministic (`goal | kind | plan start | since`), so the
 same situation keeps the same id until it is answered. Answers are stored on the goal as
 `adjustments[]` (chart markers; `before`/`after` snapshots).
 
 ## Instant feedback (`core/goal/feedback.ts`)
 
 `evaluateGoal(...)` → `{ progress, feedback, adjustment }` — one call after every entry.
-`feedback` = `{ status, tone, mood, trigger, textTr, deviationKg, weeksSaved, bars }`:
+`feedback` = `{ status, tone, mood, trigger, textTr, deviationKg, deviationBfPts, weeksSaved, bars }`:
 e.g. `"Plandan 0,6 kg öndesin! Bu tempoyla 8 yerine 7 haftada bitebilir."`
-`bars` are 0–100: `goal`, `time`, `lean` (bulk/recomp, needs a measurement), `fat` (cut/recomp).
+`bars` are 0–100: `goal`, `time`, `lean` (bulk/recomp, needs a measurement; progress from the goal
+start toward the lean target counted from the goal start), `fat` (cut/recomp).
 `mood` is a Floo mood; `trigger` is a key for the mascot queue (`goal.feedback.*`,
 `goal.adjust.*`, `goal.completed`).
+
+A recomp speaks in body fat. Typical lines: `"Yağ oranında plandan 1,2 puan öndesin!"`, `"Yağ oranın
+planda, %40 tamamlandı."`, or a lean-mass warning.
+- **Past the plan's end:** "Planın süresi doldu, hedefe 1,4 puan kaldı…". If the pace is not shown
+  to be slow it continues "planı güncelleyip yeni bir tempo çizebiliriz".
+- **Lean mass falling while body fat lags:** the line says "kaloriyi kısmadan protein ve antrenmana
+  odaklanalım".
+- **While a proposal is pending,** the line states the verdict and points at the proposal ("Sana
+  bir öneri hazırladım."), with no remedy of its own. The proposal gives the advice, and the two
+  never contradict each other.
+- **`deviationBfPts`** is the trend-vs-plan gap in points. It is null on cut/bulk and until there
+  are enough readings.
+- **Not enough readings yet:** the line invites a measurement (trigger `goal.feedback.measure`, tone
+  `neutral`, status as `progress.onTrack`).
+  - If there has been no reading for 7 days: "Rekompta kilo pek değişmez; ilerlemeyi yağ oranın
+    gösterir. Yeni bir mezura ölçümü ekle…".
+  - Otherwise: "Ölçümün kaydedildi… haftada bir yeterli."
+- Tape readings count as data even without separate weigh-ins, so "İlk tartını gir" is not shown to
+  someone who has them.
 
 ## API
 
