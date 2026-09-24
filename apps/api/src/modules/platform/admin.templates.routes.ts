@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  ensureDayIds,
   templateVolume,
   zDayInput,
   zId,
@@ -25,7 +26,8 @@ type DayInput = z.infer<typeof zProgramTemplateInput>["days"][number];
 
 /** Fill the optional exercise fields and renumber days 1..N in the submitted order. */
 export function normalizeDays(days: DayInput[]): DayDTO[] {
-  return days.map((day, i) => ({
+  return ensureDayIds(days).map((day, i) => ({
+    id: day.id,
     order: i + 1,
     title: day.title,
     focus: day.focus ?? "",

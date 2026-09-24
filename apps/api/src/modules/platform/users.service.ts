@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 import type { AdminUserDTO, DayDTO, ProgramDTO } from "@fitfloow/core";
 import { User, toUserDTO, type UserDoc } from "../../models/user";
-import { Program, ProgramTemplate, toProgramDTO } from "../../models/program";
+import { Program, ProgramTemplate, plainDays, toProgramDTO } from "../../models/program";
 import { WorkoutLog } from "../../models/workoutLog";
 import { BodyEntry, WeighIn } from "../../models/body";
 import { Goal, WeeklyReportCache, invalidateAllWeeklyReports } from "../../models/goal";
@@ -89,13 +89,16 @@ export async function assignTemplate(userId: Types.ObjectId, templateId: string,
   const template = await ProgramTemplate.findById(tid).lean();
   if (!template) throw AppError.notFound("Program şablonu");
 
-  const days = (template.days ?? []) as DayDTO[];
+  const days = plainDays((template.days ?? []) as DayDTO[]);
   const program = await Program.findOneAndUpdate(
     { userId },
     {
       $set: {
         name: template.name,
+        mode: "cycle",
         days,
+        currentDayId: days[0]?.id ?? null,
+        cycleNumber: 1,
         currentIndex: 0,
         weekNumber: 1,
         startedAt: now,

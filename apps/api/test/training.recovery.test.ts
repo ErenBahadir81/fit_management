@@ -21,6 +21,7 @@ beforeEach(async () => {
 const HOUR = 3_600_000;
 const sets = (n: number) => Array.from({ length: n }, () => ({ reps: 10, rir: 2 }));
 
+let sessionSeq = 0;
 async function givenSession(
   userId: Types.ObjectId,
   hoursAgo: number,
@@ -28,7 +29,11 @@ async function givenSession(
   extra: Record<string, unknown> = {}
 ) {
   const date = new Date(t.clock.now.getTime() - hoursAgo * HOUR);
-  const dateKey = new Date(date.getTime() + 3 * HOUR).toISOString().slice(0, 10);
+  // Recovery reads the timestamp, not the day. Some fixtures put several sessions inside one
+  // Türkiye day, which the one-log-per-day index forbids, so a repeat gets a synthetic day.
+  const realKey = new Date(date.getTime() + 3 * HOUR).toISOString().slice(0, 10);
+  const taken = await WorkoutLog.exists({ userId, dateKey: realKey });
+  const dateKey = taken ? `2000-01-${String(++sessionSeq).padStart(2, "0")}` : realKey;
   return WorkoutLog.create({
     userId,
     date,

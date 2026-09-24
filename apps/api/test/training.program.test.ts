@@ -67,7 +67,9 @@ describe("GET /program", () => {
     expect(body.schedule[0]).toMatchObject({ dateKey: TODAY, isToday: true, status: "today" });
     expect(body.schedule.map((s: { day: DayDTO }) => s.day.order)).toEqual([3, 4, 5, 6, 7, 1, 2]);
     expect(body.weeklyVolume.map((v: { key: string }) => v.key)).toEqual(["chest", "frontDelt", "sideDelt", "traps", "lats", "legs", "abs"]);
-    expect(body.weeklyVolume[0]).toMatchObject({ key: "chest", done: 0, status: "none", target: { min: 15, max: 20 } });
+    expect(body.weeklyVolume[0]).toMatchObject({ key: "chest", done: 0, status: "none", zone: "none", target: { min: 10, max: 15 } });
+    expect(body.plannedVolume.cycleLength).toBe(7);
+    expect(body.plannedVolume.muscles.find((m: { key: string }) => m.key === "chest")).toMatchObject({ weekly: 17, zone: "optimal" });
     expect(() => zProgramView.parse(body)).not.toThrow(); // the DTO contract frontends compile against
   });
 
@@ -288,12 +290,12 @@ describe("POST /program/complete", () => {
 });
 
 describe("POST /program/skip", () => {
-  it("writes an off-day log and leaves the pointer alone", async () => {
+  it("on a training day: writes a break log and leaves the pointer alone", async () => {
     const { user, headers } = await asUser(t);
     await givenProgram(user._id, { currentIndex: 3 });
     const res = await t.app.inject({ method: "POST", url: "/api/v1/program/skip", headers, payload: { reason: "Hastayım" } });
     expect(res.statusCode).toBe(200);
-    expect(res.json().log).toMatchObject({ isOffDay: true, title: "Dinlenme", dayOrder: 4, dateKey: TODAY, notes: "Hastayım" });
+    expect(res.json().log).toMatchObject({ isOffDay: true, isBreak: true, dayId: null, title: "Ara", dayOrder: 4, dateKey: TODAY, notes: "Hastayım" });
     expect(res.json().program.currentIndex).toBe(3);
   });
 

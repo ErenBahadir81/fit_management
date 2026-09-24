@@ -23,6 +23,7 @@ import type {
   GoalView,
   HomeDTO,
   LastPerformance,
+  LogDayInput,
   LoginResponse,
   MascotMessage,
   MascotTemplateDTO,
@@ -57,6 +58,9 @@ import type {
 import { createTransport, type ApiClientOptions, type RequestOptions, type Transport } from "./http";
 
 export * from "./http";
+
+/** `LogDayInput` with its defaulted fields optional, as a caller writes it. */
+export type LogDayRequest = Pick<LogDayInput, "dayId"> & Partial<Omit<LogDayInput, "dayId">>;
 
 export type ScanImage =
   | { uri: string; name?: string; type?: string } // React Native file object
@@ -130,7 +134,11 @@ export function createApiClient(options: ApiClientOptions) {
     training: {
       program: () => r<ProgramView>("/program"),
       updateProgram: (input: ProgramInput) => r<{ program: ProgramDTO }>("/program", { method: "PUT", body: input }),
-      jump: (index: number) => r<{ program: ProgramDTO }>("/program/jump", { body: { index } }),
+      /** "Continue from here" — by day id (3.0), or by position for older callers. */
+      jump: (day: string | number) =>
+        r<{ program: ProgramDTO }>("/program/jump", { body: typeof day === "string" ? { dayId: day } : { index: day } }),
+      /** "Today I did this day" — the single pointer-moving write (see `zLogDayInput`). */
+      logDay: (input: LogDayRequest) => r<{ log: WorkoutLogDTO; program: ProgramDTO }>("/program/log-day", { body: input }),
       complete: (input: CompleteWorkoutInput) =>
         r<{ log: WorkoutLogDTO; program: ProgramDTO }>("/program/complete", { body: input }),
       skip: (reason?: string) => r<{ log: WorkoutLogDTO; program: ProgramDTO }>("/program/skip", { body: { reason } }),
