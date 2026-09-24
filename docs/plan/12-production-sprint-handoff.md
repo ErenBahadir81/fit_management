@@ -4,7 +4,7 @@ Bu belge, Claude Projects içinde yürütülen production sprint'ini **doğrudan
 Claude Code oturumuna** devretmek için yazıldı. Yeni oturum önce bu dosyayı, sonra `handoff/` altındaki
 hazırlık notlarını okur. Kalan işlerin kaynağı budur; Projects'teki thread'lere erişim yoktur.
 
-Kod tabanı: `main` @ `ec0f44d` (PR #3 merge'ü). Ürün dili Türkçe, mühendislik dili İngilizce (kod, test, doküman).
+Kod tabanı: `main` @ `e853cbb` (PR #5 merge'ü). Sprint PR'larının hepsi main'de: #1, #2, #3, #4, #5, #6. Ürün dili Türkçe, mühendislik dili İngilizce (kod, test, doküman).
 
 ---
 
@@ -14,7 +14,7 @@ Kod tabanı: `main` @ `ec0f44d` (PR #3 merge'ü). Ürün dili Türkçe, mühendi
 |---|---|---|---|
 | T0 Prod güvenlik (Risk 1+3) + tasarım skill'leri | **bitti** | #1 merged | — |
 | T1 Tasarım sistemi (Floo-mavi, flat), Floo bildirim kuyruğu, yeni ana ekran | merged, açık uçlar var | #3 merged | bkz. §4.1 (≈2,5–3,5 s) |
-| T2 Floo 3 karakteri (iskelet, eller, poz kütüphanesi, event bus) | **draft, merge bekliyor** | #5 draft, dal `claude/t2-floo-character-holrr1` | bkz. §4.2 (≈3–4 s) |
+| T2 Floo 3 karakteri (iskelet, eller, poz kütüphanesi, event bus) | merged, **T1 entegrasyonu yapılmadı** | #5 merged | bkz. §4.2 (≈3–4 s) |
 | T3 Antrenman mantığı core+API (id tabanlı döngü, B1–B9, hacim bantları) | merged | #2 merged | bkz. §4.3 (≈2 s) |
 | T4 Hareket→kas aktivasyon verisi v1 (143 hareket, 689 çift, kaynaklı) | merged (veri seed'e bağlı değil) | #6 merged | bkz. §4.4 (≈1–1,5 s) |
 | T7 Kas kazanma motoru, FFMI, uyarlanan hedef (core+API) | merged | #4 merged | bkz. §4.5 (≈1 s) |
@@ -26,8 +26,8 @@ Kod tabanı: `main` @ `ec0f44d` (PR #3 merge'ü). Ürün dili Türkçe, mühendi
 Kalan toplam ≈ **20–27 saat** (agent-saati; alt agent'lar paralel çalışırsa duvar saati ≈ 6–8 s).
 Süreler tahmindir.
 
-Bağımlılık sırası: **T2 merge → (T1 açık uçları ‖ T3/T4 seed sync ‖ T7 küçük iş) → T5 ‖ T6 → T8 → entegrasyon QA.**
-T5/T6/T8 tasarım temeli (T1) ve karakter (T2) main'de olmadan başlamaz; T8 ayrıca T7 sözleşmesini kullanır (main'de).
+Bağımlılık sırası: **T2↔T1 entegrasyonu (§4.2 madde 1) → (T1 açık uçları ‖ T3/T4 seed sync ‖ T7 küçük iş) → T5 ‖ T6 → T8 → entegrasyon QA.**
+Tasarım temeli (T1), karakter (T2) ve hedef motoru (T7) main'de; T5/T6/T8 doğrudan main'den dallanır. Sağ üst köşedeki Floo henüz eski `FlooV2`'yi çiziyor, önce entegrasyon.
 
 ---
 
@@ -62,10 +62,10 @@ Kalan:
 - `CountUp` eslint hatası (effect içinde setState); `onScrim` token'ı ekle (scan ekranı `ON_SCRIM = dark.ink` geçici); Program ekranında sticky header kaydırınca Floo'nun üstüne biniyor; beslenme FAB'ı "−514" değerini kapatıyor (T6 ile çözülür).
 - Sağ üst Floo'yu T2'nin küçük karakterine bağla (§4.2 entegrasyon adımları; T2 PR'ında yapılır).
 
-### 4.2 T2 Floo 3 karakteri (draft PR #5) — ≈3–4 s
-Yapıldı (dalda): `rig.ts` (IK, rubber-hose uzuvlar, eller, botlar, spring'ler), `poses.ts` (9 mood pozu, 23 jest), `behaviour.ts` (tetikleyici planları, LOD/`flooBox`, ambientMood), `FlooLimbs.tsx`, `events.ts` (`flooBus`, nutrition/workout/body/goal mutasyonlarına bağlı), film şeridi aracı `scripts/floo-filmstrip`, parity aracı yolları düzeltildi. 646 mobil test geçiyor.
+### 4.2 T2 Floo 3 karakteri (merged, PR #5) — ≈3–4 s
+Yapıldı: `rig.ts` (IK, rubber-hose uzuvlar, eller, botlar, spring'ler), `poses.ts` (9 mood pozu, 23 jest), `behaviour.ts` (tetikleyici planları, LOD/`flooBox`, ambientMood), `FlooLimbs.tsx`, `events.ts` (`flooBus`, nutrition/workout/body/goal mutasyonlarına bağlı), film şeridi aracı `scripts/floo-filmstrip`, parity aracı yolları düzeltildi. 646 mobil test geçiyor.
 Kalan:
-1. **Önce merge:** main'i dala al, typecheck + tüm testler, T1 entegrasyonu: `<FlooEventBridge/>` T1'in `FlooVoice` sarmalayıcısına (`app/_layout.tsx`); `FlooCorner` `<FlooModel lod="badge" trigger={voice.reaction} size={40}>` kullanır; `voice/queue.ts` tip importları `FlooMood`/`FlooTrigger`; `FlooV2` trigger/pointAt geçirir; `FLOO_COLORS` mavi. Sonra PR ready + merge.
+1. **T1 entegrasyonu (merge'de yapılmadı, ilk iş):** `<FlooEventBridge/>` T1'in `FlooVoiceProvider` sarmalayıcısına (`app/_layout.tsx`); `src/mascot/voice/FlooCorner.tsx` hâlâ `FlooV2` import ediyor, `<FlooModel lod="badge" trigger={voice.reaction} size={40}>` olmalı; `voice/queue.ts` tip importları `FlooMood`/`FlooTrigger` (`model/`'dan); `FlooV2` trigger/pointAt geçirir; `FLOO_COLORS` mavi. Doğrulama: Expo web'de sağ üst Floo'nun bir mutasyon sonrası jest yaptığı görülmeli.
 2. Film şeridi bulguları (`node scripts/floo-filmstrip/filmstrip.mjs` ile yeniden üret): idle fazla hareketli (fidget'lar seyrek ve küçük olsun); `point@864ms` gövde 6 px düşüyor; wipeBrow, bellyPat, whoa, shrug, cheer, flex tek adımlı zıplıyor; reduced motion ilk karede snap, tap'te hiçbir şey olmuyor; mealLogged ve goalHit sonrası kollar yukarıda kalıyor; fallRecover'da T-poz ve sonda pop; walk gerçek yürüme değil; clap'te kol düzleşiyor ve eller ağzı kapatıyor; wave kolu düz düşüyor; point ≈800 ms geç başlıyor.
 3. Parity 96,63 → hedef ≥97 (yüz bölgesi 88,1).
 4. T8 için `onGestureEnd` callback'i ekle (şimdilik `gestureDuration(name)` ile sıralanıyor).
