@@ -118,8 +118,11 @@ export function goalCue(choice: GoalChoice, a: BodyAssessment, plan: GoalPlan | 
 
 /** One step's walk: long enough for two strides of the in-place cycle, short enough not to block. */
 export const WALK_MS = 560;
-/** How far Floo walks per step, px — enough to read as "on we go", not a trip across the screen. */
+/** How far Floo drifts forward mid-stride, px: the world slides past, he walks on the spot. */
 export const WALK_PX = 28;
+/** Walking into the scene from off-stage (the first question). */
+export const ENTER_MS = 900;
+export const ENTER_PX = 160;
 /** How long a reach toward the ring / card / slider is held before the arm comes back. */
 export const POINT_HOLD_MS = 1400;
 /** Beat between arriving and gesturing, so the two read as separate actions. */
@@ -136,13 +139,16 @@ export interface TimelineEvent {
  * body: walk → gesture (its own length, `gestureDuration`) → reach → let go. Under reduced motion
  * none of it happens; the mood cross-fade the model does on its own is the whole reaction.
  */
-export function cueTimeline(cue: { walk: -1 | 0 | 1; gesture: Gesture | null; point: PointTarget | null | undefined }, reduce: boolean): TimelineEvent[] {
+export type Walk = -1 | 0 | 1 | "enter";
+
+export function cueTimeline(cue: { walk: Walk; gesture: Gesture | null; point: PointTarget | null | undefined }, reduce: boolean): TimelineEvent[] {
   if (reduce) return [];
   const out: TimelineEvent[] = [];
   let t = 0;
   if (cue.walk !== 0) {
-    out.push({ at: 0, kind: "walkStart" }, { at: WALK_MS, kind: "walkEnd" });
-    t = WALK_MS + SETTLE_MS;
+    const ms = cue.walk === "enter" ? ENTER_MS : WALK_MS;
+    out.push({ at: 0, kind: "walkStart" }, { at: ms, kind: "walkEnd" });
+    t = ms + SETTLE_MS;
   }
   if (cue.gesture) {
     out.push({ at: t, kind: "gesture" });

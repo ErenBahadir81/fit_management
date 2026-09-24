@@ -29,7 +29,7 @@ const lean = () => draft({ measurement: { weightKg: 72, neckCm: 38, waistCm: 78,
 describe("assessment", () => {
   test("is core's assessBody with the stated training level", () => {
     const bf = navyBodyFat({ gender: "male", heightCm: 180, neckCm: 40, waistCm: 96 });
-    expect(assessmentFor(draft())).toEqual(assessBody({ sex: "male", weightKg: 92, heightCm: 180, bodyFatPct: bf, trainingLevel: "beginner", settings: DEFAULT_GOAL_SETTINGS }));
+    expect(assessmentFor(draft())).toEqual(assessBody({ sex: "male", weightKg: 92, heightCm: 180, bodyFatPct: bf!, trainingLevel: "beginner", settings: DEFAULT_GOAL_SETTINGS }));
   });
 
   test("is null until every input exists", () => {

@@ -1,5 +1,6 @@
 import { gestureDuration } from "../../../src/mascot/model";
 import {
+  ENTER_MS,
   POINT_HOLD_MS,
   WALK_MS,
   cueTimeline,
@@ -127,6 +128,12 @@ describe("cue timeline", () => {
     expect(at("point")).toBe(at("gesture")! + gestureDuration("wave"));
     expect(at("unpoint")).toBe(at("point")! + POINT_HOLD_MS);
     expect(t.map((e) => e.at)).toEqual([...t.map((e) => e.at)].sort((x, y) => x - y));
+  });
+
+  test("entering the scene is a longer walk, and the greeting waits for it", () => {
+    const t = cueTimeline({ walk: "enter", gesture: "wave", point: null }, false);
+    expect(t.find((e) => e.kind === "walkEnd")?.at).toBe(ENTER_MS);
+    expect(t.find((e) => e.kind === "gesture")!.at).toBeGreaterThan(ENTER_MS);
   });
 
   test("no walk: the gesture starts at once", () => {

@@ -1,98 +1,112 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
-import { MIN_SAFE_BODY_FAT } from "@fitfloow/core";
+import { DEFAULT_GOAL_SETTINGS, macrosFor, type Macros } from "@fitfloow/core";
 import { todayKey } from "../../../lib/dates";
-import { fmtInt } from "../../../lib/format";
-import { Floo } from "../../../mascot";
-import { spacing } from "../../../theme/tokens";
-import { Button } from "../../../ui/Button";
-import { Screen } from "../../../ui/Screen";
-import { SuccessCheck } from "../../../ui/SuccessCheck";
+import { fmtGrams, fmtInt } from "../../../lib/format";
+import { useTheme } from "../../../theme/ThemeProvider";
+import { radii, spacing } from "../../../theme/tokens";
+import { Icon } from "../../../ui/Icon";
 import { Text } from "../../../ui/Text";
-import { gainCalories, maintenanceEnergy, summaryOf } from "../../goals/goalIntent";
-import { instantPlan } from "../../goals/goalMath";
+import { maintenanceEnergy } from "../../goals/goalIntent";
 import type { OnboardingDraft } from "../model";
+import type { OnboardingResult } from "../useOnboarding";
+import { DIRECTION_TR } from "./GoalStep";
 
 /**
- * The plan in one sentence, then the door into the app.
- *
- * The sentence is C4's `summaryTr` shape, composed locally from the same engine the server ran, so
- * what someone reads here is exactly what the home screen will keep telling them.
+ * Stage 7 — what is now set up, in three cards: the goal in one sentence, the daily nutrition
+ * target it implies, and the first program. Everything shown is what the server stored (or, with no
+ * goal, the maintenance target the diet tab will follow), so the home screen says the same thing.
  */
-export function DoneStep({ draft, bodyFatPct, onFinish }: { draft: OnboardingDraft; bodyFatPct: number | null; onFinish: () => void }) {
-  const reduce = useReducedMotion();
-  const sentence = useMemo(() => summarise(draft, bodyFatPct), [draft, bodyFatPct]);
+export function DoneStep({ draft, bodyFatPct, result }: { draft: OnboardingDraft; bodyFatPct: number | null; result: OnboardingResult | null }) {
+  const goal = result?.goal ?? null;
+  const program = result?.program ?? null;
+  const nutrition = useMemo(() => nutritionFor(draft, bodyFatPct, goal?.plan.macros ?? null), [draft, bodyFatPct, goal]);
+  const trainingDays = program?.days.filter((d) => d.kind !== "rest") ?? [];
 
   return (
-    <Screen tabBar={false} edges={["top", "bottom"]} contentStyle={styles.content} testID="onboarding-done">
-      <View style={styles.hero}>
-        <SuccessCheck size={80} />
-        <Text variant="display" align="center">
-          Planın hazır
+    <View style={styles.stack} testID="onboarding-done">
+      <Card icon="goal" title={goal ? DIRECTION_TR[goal.direction].label : "Hedef"} testID="done-goal">
+        <Text variant="body" color="inkMuted" testID="done-summary">
+          {goal?.plan.summaryTr || "Şimdilik hedef yok; kilonu koruyan kaloriyle başlıyoruz. Hedefini istediğin an Vücut sekmesinden koyabilirsin."}
         </Text>
-        <Text variant="title" color="inkMuted" align="center" tabular testID="done-summary">
-          {sentence}
-        </Text>
-      </View>
-      <View style={styles.footer}>
-        <View style={styles.flooRow}>
-          <Floo mood="cheer" size="m" animate={!reduce} testID="done-floo" />
-          <Text variant="body" color="inkMuted" style={styles.flooText}>
-            Her gün ne yaptığını buradan takip edeceğim. Ana sayfa hedefini hep önünde tutacak.
+      </Card>
+
+      <Card icon="nutrition" title="Beslenme hedefin" testID="done-nutrition">
+        {nutrition ? (
+          <>
+            <Text variant="display" tabular testID="done-kcal">
+              {fmtInt(nutrition.calories)} kcal
+            </Text>
+            <Text variant="label" color="inkMuted" tabular>
+              Protein {fmtGrams(nutrition.protein)} · Karbonhidrat {fmtGrams(nutrition.carbs)} · Yağ {fmtGrams(nutrition.fat)}
+            </Text>
+          </>
+        ) : (
+          <Text variant="body" color="inkMuted">
+            Günlük hedefin Beslenme sekmesinde.
           </Text>
-        </View>
-        <Button label="Başlayalım" onPress={onFinish} full size="lg" iconRight="next" testID="done-start" />
-      </View>
-    </Screen>
+        )}
+      </Card>
+
+      <Card icon="program" title="İlk programın" testID="done-program">
+        {program ? (
+          <>
+            <Text variant="title" testID="done-program-name">
+              {program.name}
+            </Text>
+            <View style={styles.days}>
+              {trainingDays.map((d) => (
+                <Text key={d.id} variant="label" color="inkMuted">
+                  {d.title}
+                </Text>
+              ))}
+            </View>
+            <Text variant="caption" color="inkSubtle">
+              Günleri ve hareketleri Program sekmesinden dilediğin gibi değiştirebilirsin.
+            </Text>
+          </>
+        ) : (
+          <Text variant="body" color="inkMuted">
+            Programın Program sekmesinde seni bekliyor.
+          </Text>
+        )}
+      </Card>
+    </View>
   );
 }
 
-function summarise(draft: OnboardingDraft, bodyFatPct: number | null): string {
-  const { intent, targetBodyFatPct, profile } = draft.goal;
-  const p = draft.profile;
+/** The goal's first-week target, or maintenance macros when there is no goal. */
+function nutritionFor(draft: OnboardingDraft, bf: number | null, planMacros: Macros | null): Macros | null {
+  if (planMacros) return planMacros;
+  const { gender, heightCm, birthDate } = draft.profile;
   const weightKg = draft.measurement.weightKg;
-  if (bodyFatPct === null || weightKg === null || !p.gender || p.heightCm === null) {
-    return "Ölçümün kaydedildi. Hedefini istediğin an Vücut sekmesinden koyabilirsin.";
-  }
-  if (intent === "lose" && targetBodyFatPct !== null && targetBodyFatPct >= MIN_SAFE_BODY_FAT[p.gender]) {
-    try {
-      return summaryOf(
-        instantPlan({
-          sex: p.gender,
-          weightKg,
-          bodyFatPct,
-          heightCm: p.heightCm,
-          birthDate: p.birthDate,
-          activityLevel: p.activityLevel ?? "moderate",
-          targetBodyFatPct,
-          profile,
-          todayKey: todayKey(),
-        })
-      );
-    } catch {
-      return "Planın kaydedildi. Ayrıntıları yol haritasında bulacaksın.";
-    }
-  }
-  const energy = maintenanceEnergy({
-    sex: p.gender,
-    weightKg,
-    bodyFatPct,
-    heightCm: p.heightCm,
-    birthDate: p.birthDate,
-    activityLevel: p.activityLevel ?? "moderate",
-    todayKey: todayKey(),
-  });
-  const maintenance = Math.round(energy.maintenance / 10) * 10;
-  return intent === "gain"
-    ? `Günde ${fmtInt(gainCalories(maintenance))} kcal ile kas yapmaya başlıyoruz. Kilonu koruyan seviye ${fmtInt(maintenance)} kcal.`
-    : `Günde ${fmtInt(maintenance)} kcal ile formunu koruyoruz. Hedef koymak istersen Vücut sekmesinde seni bekliyor.`;
+  if (bf === null || !gender || heightCm === null || weightKg === null) return null;
+  const e = maintenanceEnergy({ sex: gender, weightKg, bodyFatPct: bf, heightCm, birthDate, activityLevel: draft.training.activityLevel ?? "moderate", todayKey: todayKey() });
+  const calories = Math.round(e.maintenance / 10) * 10;
+  return macrosFor({ sex: gender, weightKg, leanMassKg: e.leanMassKg, bodyFatPct: bf, dailyCalories: calories, settings: DEFAULT_GOAL_SETTINGS });
+}
+
+function Card({ icon, title, children, testID }: { icon: "goal" | "nutrition" | "program"; title: string; children: React.ReactNode; testID: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} testID={testID}>
+      <View style={styles.head}>
+        <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
+          <Icon icon={icon} size={18} color="primary" />
+        </View>
+        <Text variant="label" color="inkMuted" accessibilityRole="header">
+          {title}
+        </Text>
+      </View>
+      {children}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, justifyContent: "space-between", paddingVertical: spacing.xxl },
-  hero: { flex: 1, justifyContent: "center", alignItems: "center", gap: spacing.lg },
-  footer: { gap: spacing.xl },
-  flooRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  flooText: { flex: 1 },
+  stack: { gap: spacing.md },
+  card: { borderRadius: radii.card, borderWidth: 1, padding: spacing.lg, gap: spacing.xs },
+  head: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.xs },
+  icon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  days: { flexDirection: "row", flexWrap: "wrap", columnGap: spacing.md, rowGap: 2 },
 });
