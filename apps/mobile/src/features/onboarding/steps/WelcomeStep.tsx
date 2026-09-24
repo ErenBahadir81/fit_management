@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { Screen } from "../../../ui/Screen";

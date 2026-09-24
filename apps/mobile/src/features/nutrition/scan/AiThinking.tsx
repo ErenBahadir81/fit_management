@@ -15,7 +15,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { absoluteFill, radii, spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";

@@ -8,6 +8,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useSession } from "../src/features/auth/session";
+import { useSkiaReady } from "../src/lib/skiaWeb";
 import { needsOnboarding } from "../src/features/onboarding/api";
 import { AppQueryProvider } from "../src/lib/queryClient";
 import { ThemeProvider, useTheme } from "../src/theme";
@@ -40,6 +41,9 @@ function RootNavigator() {
   const status = useSession((s) => s.status);
   const user = useSession((s) => s.user);
   const { colors, isDark } = useTheme();
+  // The mascot is drawn in Skia, which on web only exists once CanvasKit's wasm has landed. Hold
+  // the navigator behind the splash until then (a no-op on native) so no screen mounts a dead canvas.
+  const skiaReady = useSkiaReady();
   // A brand-new account owes us the first-run flow before it may see the tabs. Only an explicit
   // `false` counts, so an account from a server that predates the field is never sent back through it.
   const inOnboarding = status === "signedIn" && needsOnboarding(user);
@@ -48,10 +52,11 @@ function RootNavigator() {
     void useSession.getState().boot();
   }, []);
   useEffect(() => {
-    if (status !== "booting") void SplashScreen.hideAsync().catch(() => {});
-  }, [status]);
+    if (status !== "booting" && skiaReady) void SplashScreen.hideAsync().catch(() => {});
+  }, [status, skiaReady]);
 
-  if (status === "booting") return null; // splash stays up (< 1 frame with a cached session)
+  // splash stays up (< 1 frame with a cached session; on web also until CanvasKit resolves)
+  if (status === "booting" || !skiaReady) return null;
 
   return (
     <>

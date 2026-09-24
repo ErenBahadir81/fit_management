@@ -2,7 +2,7 @@ import React, { memo, useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { MuscleReadiness } from "@fitfloow/core";
 import { fmtNumber } from "../../../lib/format";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Card } from "../../../ui/Card";

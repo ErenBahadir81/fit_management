@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { HomeDTO } from "@fitfloow/core";
-import { Floo } from "../../mascot/Floo";
+import { Floo } from "../../mascot";
 import { spacing } from "../../theme/tokens";
 import { EmptyState } from "../../ui/EmptyState";
 import { Entry } from "../../ui/Entry";

@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import type { Meal } from "@fitfloow/core";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { fmtInt, fmtPct } from "../../../lib/format";
 import { spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";

@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import type { MuscleDTO, ScheduleEntry, Weekday, WorkoutLogDTO } from "@fitfloow/core";
 import { todayKey } from "../../../lib/dates";
 import { useUndoWindow } from "../../../lib/useUndoWindow";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { spacing } from "../../../theme/tokens";
 import { EmptyState } from "../../../ui/EmptyState";
 import { Entry } from "../../../ui/Entry";

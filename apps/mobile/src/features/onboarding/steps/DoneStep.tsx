@@ -4,7 +4,7 @@ import { useReducedMotion } from "react-native-reanimated";
 import { MIN_SAFE_BODY_FAT } from "@fitfloow/core";
 import { todayKey } from "../../../lib/dates";
 import { fmtInt } from "../../../lib/format";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { Screen } from "../../../ui/Screen";

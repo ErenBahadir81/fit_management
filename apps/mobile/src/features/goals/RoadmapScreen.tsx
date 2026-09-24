@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { GoalDTO, GoalProgress, Recalibration } from "@fitfloow/core";
 import { todayKey } from "../../lib/dates";
 import { fmtDate, fmtDelta, fmtInt, fmtKg, fmtNumber, fmtPct } from "../../lib/format";
-import { Floo } from "../../mascot/Floo";
+import { Floo } from "../../mascot";
 import { useTheme } from "../../theme/ThemeProvider";
 import { radii, spacing } from "../../theme/tokens";
 import { Button } from "../../ui/Button";

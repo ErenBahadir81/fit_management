@@ -4,7 +4,7 @@ import { List, type ListRenderItem } from "../../ui/List";
 import { useRouter } from "expo-router";
 import type { BodyEntryDTO, BodySummary, GoalView, WeeklyReportDTO } from "@fitfloow/core";
 import { useUndoWindow } from "../../lib/useUndoWindow";
-import { Floo } from "../../mascot/Floo";
+import { Floo } from "../../mascot";
 import { spacing } from "../../theme/tokens";
 import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";

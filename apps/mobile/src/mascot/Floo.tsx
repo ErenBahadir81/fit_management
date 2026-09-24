@@ -13,11 +13,10 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import Svg, { ClipPath, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Rect, Stop } from "react-native-svg";
+import Svg, { ClipPath, Defs, Ellipse, G, Image as SvgImage, LinearGradient, Path, RadialGradient, Stop } from "react-native-svg";
 import { springs, timing } from "../theme/motion";
 import {
   ARM_PATH,
-  BOOT,
   BROW_Y,
   CHEEK,
   DROPLET_PATH,
@@ -31,6 +30,12 @@ import {
   volumePreservingScale,
 } from "./flooGeometry";
 import { FLOO_COLORS as C, MOOD_LABEL_TR, MOOD_POSE, type FlooMood, type Pose } from "./moods";
+
+/**
+ * The rendered body. Built by `assets/mascot/floo_build.py` with an orthographic camera framed on
+ * Floo's 200 × 250 viewBox, so it drops in under the vector face without moving a face constant.
+ */
+const BODY_SPRITE = require("../../assets/mascot/floo-body.png");
 
 const AEllipse = Animated.createAnimatedComponent(Ellipse);
 const APath = Animated.createAnimatedComponent(Path);
@@ -86,13 +91,22 @@ function glanceDelay() {
 }
 
 /**
- * Floo — FitFloow's droplet. One SVG, no images: the body is a gradient-shaded droplet with a
- * specular highlight and a rim light, the face is driven entirely by `MOOD_POSE`, and every mood
- * change is a spring between poses.
+ * Floo — FitFloow's droplet. A Blender-rendered body under a live vector face.
  *
- * The life comes from three things the previous version did not have: area-preserving squash and
- * stretch on the breath (a blob that only scales reads as a scaling blob), a slow whole-body lean
- * underneath the pose, and eyes that blink and glance on a schedule of their own.
+ * The split is deliberate. The body, knit collar, legs and boots never change shape per mood, so
+ * they are one Cycles render and get real subsurface scattering, a clearcoat sheen and a geometric
+ * rim light — none of which a stack of SVG gradients was ever going to fake. Everything that
+ * *animates* stays vector and stays on the UI thread: eyes, brows, mouth, blush, arms, and the
+ * ground shadow. So all ten moods still spring between poses, Floo still blinks and glances on its
+ * own schedule, and nothing became a flipbook of pre-baked frames.
+ *
+ * The load-bearing detail is that the render's camera is orthographic and framed on this exact
+ * viewBox, so the sprite and `flooGeometry`'s constants describe the same character. See the note
+ * at the body below.
+ *
+ * The life comes from area-preserving squash and stretch on the breath (a blob that only scales
+ * reads as a scaling blob), a slow whole-body lean underneath the pose, and eyes with a schedule of
+ * their own.
  */
 export function Floo({ mood = "happy", size = "m", animate = true, detail, style, testID }: FlooProps) {
   const px = typeof size === "number" ? size : FLOO_SIZES[size];
@@ -286,20 +300,20 @@ export function Floo({ mood = "happy", size = "m", animate = true, detail, style
           <Animated.View style={[StyleSheet.absoluteFill, squashStyle]}>
           <Svg width={px} height={height} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}>
             <Defs>
-              {/* userSpaceOnUse so the lids can reuse the body's gradient and disappear into it. */}
+              {/* Fallback body only — the sprite covers this. */}
               <LinearGradient id={id("fBody")} gradientUnits="userSpaceOnUse" x1="46" y1="24" x2="164" y2="214">
                 <Stop offset="0" stopColor={C.bodyLight} />
                 <Stop offset="0.45" stopColor={C.bodyMid} />
                 <Stop offset="1" stopColor={C.bodyDeep} />
               </LinearGradient>
-              <RadialGradient id={id("fGlow")} cx="0.32" cy="0.24" r="0.6">
-                <Stop offset="0" stopColor={C.highlight} stopOpacity="0.42" />
-                <Stop offset="1" stopColor={C.highlight} stopOpacity="0" />
-              </RadialGradient>
-              <RadialGradient id={id("fBounce")} cx="0.68" cy="0.86" r="0.42">
-                <Stop offset="0" stopColor={C.bounce} stopOpacity="0.75" />
-                <Stop offset="1" stopColor={C.bounce} stopOpacity="0" />
-              </RadialGradient>
+              {/* Eyelids have to vanish into the RENDER, not into the fallback gradient. These two
+                  stops are sampled straight out of floo-body.png across the eye band, where the key
+                  light leaves the body far lighter than `bodyMid` — filling a lid with the body
+                  gradient would flash a dark patch on every blink. */}
+              <LinearGradient id={id("fLid")} gradientUnits="userSpaceOnUse" x1="58" y1="100" x2="142" y2="146">
+                <Stop offset="0" stopColor={C.lidLight} />
+                <Stop offset="1" stopColor={C.lidDeep} />
+              </LinearGradient>
               <LinearGradient id={id("fIris")} x1="0" y1="0" x2="0" y2="1">
                 <Stop offset="0" stopColor="#0A0E16" />
                 <Stop offset="0.62" stopColor={C.eye} />
@@ -320,38 +334,26 @@ export function Floo({ mood = "happy", size = "m", animate = true, detail, style
               <ClipPath id={id("fEyeR")}>
                 <Ellipse cx={EYE.right} cy={EYE.y} rx={EYE.rx} ry={EYE.ry} />
               </ClipPath>
-              <ClipPath id={id("fBodyClip")}>
-                <Path d={DROPLET_PATH} />
-              </ClipPath>
             </Defs>
 
             {/* ground shadow — drawn first, sits under everything the boots stand on */}
             {full ? <AEllipse cx={100} cy={244} ry={7} fill={`url(#${id("fShadow")})`} animatedProps={shadowProps} /> : null}
 
-            {full ? (
-              <>
-                {/* boots, tucked under the base arc so they read as feet rather than props */}
-                <Path d={`M${BOOT.left + 7} ${BOOT.y}q10 0 10 8v4q0 10 -10 10h-9q-8 0 -8 -8v-6q0 -8 8 -8Z`} fill={C.boot} />
-                <Rect x={BOOT.left - 1} y={BOOT.y + BOOT.height - 6} width={BOOT.width} height={6} rx={3} fill={C.bootDark} />
-                <Path d={`M${BOOT.right + 12} ${BOOT.y}q-10 0 -10 8v4q0 10 10 10h9q8 0 8 -8v-6q0 -8 -8 -8Z`} fill={C.boot} />
-                <Rect x={BOOT.right + 1} y={BOOT.y + BOOT.height - 6} width={BOOT.width} height={6} rx={3} fill={C.bootDark} />
-              </>
-            ) : null}
+            {/* ── body ──
+                The droplet, its knit collar, legs and boots are a single Cycles render
+                (`assets/mascot/floo_build.py`, reproducible with Blender). An ORTHOGRAPHIC camera
+                framed on this exact 200 × 250 viewBox is what makes the swap safe: the sprite's
+                silhouette matches `DROPLET_PATH` to within a third of a viewBox unit, so every face
+                constant below still lands where it was laid out, and the `simple` viewBox crops the
+                boots away by itself.
 
-            {/* ── body ── */}
+                Real shading replaces the stack of gradient and highlight overlays this used to
+                carry — a rim light on geometry beats a stroked arc guessing where the edge is.
+
+                The vector droplet stays underneath: if the bitmap ever fails to decode, Floo is
+                still a shaded droplet rather than a hole. */}
             <Path d={DROPLET_PATH} fill={`url(#${id("fBody")})`} />
-            {/* Every surface treatment is clipped to the silhouette: an unclipped highlight floats
-                off the edge as a grey smudge the moment the pose squashes. */}
-            <G clipPath={`url(#${id("fBodyClip")})`}>
-              <Path d={DROPLET_PATH} fill={`url(#${id("fGlow")})`} />
-              <Path d={DROPLET_PATH} fill={`url(#${id("fBounce")})`} />
-              {/* rim light along the shaded edge — the cheapest thing that reads as three-dimensional */}
-              <Path d="M164 168A66.5 66.5 0 0 1 86 214" fill="none" stroke={C.rim} strokeWidth={7} strokeOpacity={0.75} strokeLinecap="round" />
-              <Ellipse cx={74} cy={106} rx={12} ry={22} fill={C.highlight} opacity={0.38} transform="rotate(-20 74 106)" />
-              <Ellipse cx={60} cy={140} rx={5} ry={9} fill={C.highlight} opacity={0.28} transform="rotate(-20 60 140)" />
-              <Ellipse cx={100} cy={70} rx={8} ry={12} fill={C.highlight} opacity={0.2} />
-              <Ellipse cx={104} cy={196} rx={40} ry={13} fill={C.highlight} opacity={0.09} />
-            </G>
+            <SvgImage href={BODY_SPRITE} x={0} y={0} width={200} height={250} preserveAspectRatio="xMidYMid meet" />
 
             {/* ── face ── */}
             <AEllipse cx={CHEEK.left} cy={CHEEK.y} rx={CHEEK.rx} ry={CHEEK.ry} fill={`url(#${id("fBlush")})`} animatedProps={cheekProps} />
@@ -370,8 +372,8 @@ export function Floo({ mood = "happy", size = "m", animate = true, detail, style
               <AEllipse rx={IRIS_RX} ry={IRIS_RY} fill={`url(#${id("fIris")})`} animatedProps={irisL} />
               <AEllipse rx={5.4} ry={5.4} fill={C.highlight} animatedProps={glintL} />
               <AEllipse rx={2.4} ry={2.4} fill={C.highlight} opacity={0.7} animatedProps={glintL2} />
-              <AEllipse rx={LID_RX} ry={LID_RY} fill={`url(#${id("fBody")})`} animatedProps={lidTopL} />
-              <AEllipse rx={LID_RX} ry={LID_RY} fill={`url(#${id("fBody")})`} animatedProps={lidBotL} />
+              <AEllipse rx={LID_RX} ry={LID_RY} fill={`url(#${id("fLid")})`} animatedProps={lidTopL} />
+              <AEllipse rx={LID_RX} ry={LID_RY} fill={`url(#${id("fLid")})`} animatedProps={lidBotL} />
             </G>
             <G clipPath={`url(#${id("fEyeR")})`}>
               <Ellipse cx={EYE.right} cy={EYE.y} rx={EYE.rx} ry={EYE.ry} fill="#FFFFFF" />
@@ -379,8 +381,8 @@ export function Floo({ mood = "happy", size = "m", animate = true, detail, style
               <AEllipse rx={IRIS_RX} ry={IRIS_RY} fill={`url(#${id("fIris")})`} animatedProps={irisR} />
               <AEllipse rx={5.4} ry={5.4} fill={C.highlight} animatedProps={glintR} />
               <AEllipse rx={2.4} ry={2.4} fill={C.highlight} opacity={0.7} animatedProps={glintR2} />
-              <AEllipse rx={LID_RX} ry={LID_RY} fill={`url(#${id("fBody")})`} animatedProps={lidTopR} />
-              <AEllipse rx={LID_RX} ry={LID_RY} fill={`url(#${id("fBody")})`} animatedProps={lidBotR} />
+              <AEllipse rx={LID_RX} ry={LID_RY} fill={`url(#${id("fLid")})`} animatedProps={lidTopR} />
+              <AEllipse rx={LID_RX} ry={LID_RY} fill={`url(#${id("fLid")})`} animatedProps={lidBotR} />
             </G>
 
                 {/* Hinged on the outline and drawn in front, so the whole arm reads, not just the hand. */}

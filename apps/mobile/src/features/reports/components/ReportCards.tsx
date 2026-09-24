@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import type { MuscleVolume, WeeklyReportDTO } from "@fitfloow/core";
 import { fmtCm, fmtDate, fmtDelta, fmtInt, fmtKcal, fmtKg, fmtNumber, fmtPct } from "../../../lib/format";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { SpeechBubble } from "../../../mascot/SpeechBubble";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { spacing, type Tone } from "../../../theme/tokens";

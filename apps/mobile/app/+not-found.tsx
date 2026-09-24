@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Floo } from "../src/mascot/Floo";
+import { Floo } from "../src/mascot";
 import { EmptyState, Screen } from "../src/ui";
 
 export default function NotFound() {

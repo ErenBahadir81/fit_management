@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import type { HomeDTO } from "@fitfloow/core";
 import { greetingFor, trHour } from "../../../lib/dates";
 import { fmtDate } from "../../../lib/format";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { SpeechBubble } from "../../../mascot/SpeechBubble";
 import { spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";

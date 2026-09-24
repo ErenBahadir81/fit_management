@@ -7,7 +7,7 @@ import type { Mood } from "@fitfloow/core";
 import { getApi } from "../../lib/api";
 import { env } from "../../lib/env";
 import { haptic } from "../../lib/haptics";
-import { Floo } from "../../mascot/Floo";
+import { Floo } from "../../mascot";
 import { spacing } from "../../theme/tokens";
 import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";

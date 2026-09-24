@@ -7,7 +7,7 @@ import { getApi } from "../../lib/api";
 import { todayKey } from "../../lib/dates";
 import { describeError } from "../../lib/errors";
 import { fmtDate, fmtKg, fmtPct } from "../../lib/format";
-import { Floo } from "../../mascot/Floo";
+import { Floo } from "../../mascot";
 import { SpeechBubble } from "../../mascot/SpeechBubble";
 import { useMascot } from "../../mascot/useMascot";
 import { useTheme } from "../../theme/ThemeProvider";

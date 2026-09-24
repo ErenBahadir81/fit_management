@@ -4,7 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { useRouter } from "expo-router";
 import { weekKeyFor, type Weekday } from "@fitfloow/core";
 import { todayKey } from "../../lib/dates";
-import { Floo } from "../../mascot/Floo";
+import { Floo } from "../../mascot";
 import { timing } from "../../theme/motion";
 import { spacing } from "../../theme/tokens";
 import { EmptyState } from "../../ui/EmptyState";

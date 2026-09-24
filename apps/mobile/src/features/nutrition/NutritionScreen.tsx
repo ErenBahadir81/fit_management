@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { List, type ListRenderItem } from "../../ui/List";
 import { useRouter } from "expo-router";
 import type { Meal, MealEntryDTO } from "@fitfloow/core";
-import { Floo } from "../../mascot/Floo";
+import { Floo } from "../../mascot";
 import { fmtDate } from "../../lib/format";
 import { todayKey, trHour } from "../../lib/dates";
 import { haptic } from "../../lib/haptics";

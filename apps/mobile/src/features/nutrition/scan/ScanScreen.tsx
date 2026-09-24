@@ -6,7 +6,7 @@ import { Image } from "expo-image";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { zMeal, type Meal } from "@fitfloow/core";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { SpeechBubble } from "../../../mascot/SpeechBubble";
 import { useMascot } from "../../../mascot/useMascot";
 import { getApi } from "../../../lib/api";

@@ -153,6 +153,12 @@ export const FLOO_COLORS = {
   tongue: "#F2708C",
   cheeks: "#FF9DB4",
   mitten: "#6455E8",
+  /**
+   * Eyelid fill, sampled from floo-body.png across the eye band (SVG y 103…141). The rendered body
+   * is much lighter there than `bodyMid` because of the key light, so lids need their own pair.
+   */
+  lidLight: "#D6CCFF",
+  lidDeep: "#C0B6F7",
   scarf: "#F5A524",
   scarfAlt: "#FFF0D6",
   boot: "#D98A12",

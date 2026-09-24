@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { BODY_FAT_CATEGORY_TR, type BodySummary, type BodyTrends } from "@fitfloow/core";
 import { fmtCm, fmtDelta, fmtKg, fmtNumber, fmtPct } from "../../../lib/format";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Card } from "../../../ui/Card";

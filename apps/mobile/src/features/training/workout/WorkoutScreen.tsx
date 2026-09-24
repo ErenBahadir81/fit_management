@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import type { ExerciseDTO } from "@fitfloow/core";
 import { fmtDuration, fmtInt } from "../../../lib/format";
 import { haptic } from "../../../lib/haptics";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { SpeechBubble } from "../../../mascot/SpeechBubble";
 import { useMascot } from "../../../mascot/useMascot";
 import { useTheme } from "../../../theme/ThemeProvider";

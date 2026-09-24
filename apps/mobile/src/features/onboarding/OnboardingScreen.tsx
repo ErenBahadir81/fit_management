@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import Animated, { FadeIn, SlideInLeft, SlideInRight, useReducedMotion } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import type { Mood } from "@fitfloow/core";
-import { Floo } from "../../mascot/Floo";
+import { Floo } from "../../mascot";
 import { spacing } from "../../theme/tokens";
 import { useTheme } from "../../theme/ThemeProvider";
 import { Button } from "../../ui/Button";

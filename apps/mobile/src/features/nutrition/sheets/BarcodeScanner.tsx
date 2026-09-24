@@ -11,7 +11,7 @@ import { EmptyState } from "../../../ui/EmptyState";
 import { Header } from "../../../ui/Header";
 import { Surface } from "../../../ui/Surface";
 import { Text } from "../../../ui/Text";
-import { Floo } from "../../../mascot/Floo";
+import { Floo } from "../../../mascot";
 import { BARCODE_TYPES, CAMERA_SUPPORTED } from "../scan/camera";
 import { useBarcodeLookup } from "../useNutrition";
 import { FoodDetail } from "./FoodDetail";
