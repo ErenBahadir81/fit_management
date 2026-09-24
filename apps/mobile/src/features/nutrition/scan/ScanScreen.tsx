@@ -24,7 +24,7 @@ import { SuccessCheck } from "../../../ui/SuccessCheck";
 import { Text } from "../../../ui/Text";
 import { useToast } from "../../../ui/Toast";
 import { mealForHour } from "../model/meals";
-import { MIN_ANALYZE_MS, canSave, initialScanState, mapScanError, scanReducer } from "../model/scanMachine";
+import { canSave, initialScanState, mapScanError, scanReducer } from "../model/scanMachine";
 import { SearchSheet } from "../sheets/SearchSheet";
 import { useAddEntries } from "../useNutrition";
 import { AiThinking } from "./AiThinking";
@@ -34,10 +34,9 @@ import { CAMERA_SUPPORTED, scanUploadFrom } from "./camera";
 /** Marks drawn over the camera / photo scrim: always light. `onPrimary` is navy in dark mode. */
 const ON_SCRIM = dark.onScrim;
 
-const TICK_MS = 200;
 const DONE_MS = 1100;
 
-/** Full-screen scan flow: camera → AI theatre → results sheet → the day log. */
+/** Full-screen scan flow: camera → analysing (as long as the request takes) → results sheet → the day log. */
 export function ScanScreen() {
   const router = useRouter();
   const toast = useToast();
@@ -60,12 +59,10 @@ export function ScanScreen() {
     if (CAMERA_SUPPORTED && permission && !permission.granted && permission.canAskAgain) void requestPermission();
   }, [permission, requestPermission]);
 
-  /* The analyze run: the request, the minimum theatre duration and the status ticker. */
+  /* The analyze run: just the request. The results show the moment it answers. */
   useEffect(() => {
     if (state.phase !== "analyzing" || !state.photoUri) return;
     const controller = new AbortController();
-    const min = setTimeout(() => dispatch({ type: "minElapsed" }), MIN_ANALYZE_MS);
-    const ticker = setInterval(() => dispatch({ type: "tick", at: Date.now() }), TICK_MS);
     const uri = state.photoUri;
     void (async () => {
       try {
@@ -76,11 +73,7 @@ export function ScanScreen() {
         if (!controller.signal.aborted) dispatch({ type: "failed", error: mapScanError(e) });
       }
     })();
-    return () => {
-      clearTimeout(min);
-      clearInterval(ticker);
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [state.phase, state.photoUri]);
 
   /* Success: let the check land, then drop back into the day. */
@@ -96,7 +89,7 @@ export function ScanScreen() {
     void haptic.medium();
     try {
       const photo = await camera.current?.takePictureAsync({ quality: 0.6, skipProcessing: true });
-      if (photo?.uri) dispatch({ type: "captured", uri: photo.uri, at: Date.now() });
+      if (photo?.uri) dispatch({ type: "captured", uri: photo.uri });
       else dispatch({ type: "retake" });
     } catch {
       dispatch({ type: "retake" });
@@ -108,7 +101,7 @@ export function ScanScreen() {
     try {
       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.6, allowsEditing: false });
       const uri = res.canceled ? null : res.assets?.[0]?.uri;
-      if (uri) dispatch({ type: "captured", uri, at: Date.now() });
+      if (uri) dispatch({ type: "captured", uri });
     } catch {
       toast.show({ message: "Galeriyi açamadım.", kind: "error" });
     }
@@ -137,6 +130,29 @@ export function ScanScreen() {
 
   const close = useCallback(() => router.back(), [router]);
 
+  /*
+   * Swiping the results sheet down means "not this photo": back to the camera, nothing is logged.
+   * The sheet also unmounts on purpose (search opens in its place, the save finishes) and gorhom
+   * reports that as a dismiss a beat later, so only a dismiss while the results are still showing
+   * and no swap is in flight counts as the user's swipe.
+   */
+  const swappingSheet = useRef(false);
+  const openSearch = useCallback(() => {
+    swappingSheet.current = true;
+    setSearchOpen(true);
+  }, []);
+  const closeSearch = useCallback(() => {
+    swappingSheet.current = false;
+    setSearchOpen(false);
+  }, []);
+  const onResultsDismissed = useCallback(() => {
+    if (swappingSheet.current) {
+      swappingSheet.current = false;
+      return;
+    }
+    dispatch({ type: "resultsDismissed" });
+  }, []);
+
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]} testID="scan-screen">
       {state.phase === "camera" || state.phase === "capturing" ? (
@@ -153,7 +169,7 @@ export function ScanScreen() {
         />
       ) : null}
 
-      {state.phase === "analyzing" ? <AiThinking uri={state.photoUri} statusIndex={state.statusIndex} /> : null}
+      {state.phase === "analyzing" ? <AiThinking uri={state.photoUri} /> : null}
 
       {(showResults || state.phase === "error" || state.phase === "done") && state.photoUri ? (
         <Image source={{ uri: state.photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
@@ -199,7 +215,7 @@ export function ScanScreen() {
         whole scan gone. Swapping them keeps the state and re-presents the results on the way back.
       */}
       {showResults && !searchOpen ? (
-        <Sheet open enablePanDownToClose={false}>
+        <Sheet open onDismiss={onResultsDismissed}>
           <ScanResults
             items={state.items}
             meal={state.meal}
@@ -208,8 +224,10 @@ export function ScanScreen() {
             saving={state.phase === "saving"}
             onGrams={(key, grams) => dispatch({ type: "setGrams", key, grams })}
             onRemove={(key) => dispatch({ type: "removeItem", key })}
+            onPickAlternative={(key, index) => dispatch({ type: "pickAlternative", key, index })}
+            onConfirm={(key) => dispatch({ type: "confirmItem", key })}
             onMeal={(meal) => dispatch({ type: "setMeal", meal })}
-            onAddMore={() => setSearchOpen(true)}
+            onAddMore={openSearch}
             onSave={() => void onSave()}
             onRetake={() => dispatch({ type: "retake" })}
           />
@@ -219,16 +237,25 @@ export function ScanScreen() {
       {searchOpen ? (
         <SearchSheet
           meal={state.meal}
-          onClose={() => setSearchOpen(false)}
+          onClose={closeSearch}
           onAdd={(input) => {
             const per100g = input.food?.per100g ?? input.custom?.per100g;
             if (!per100g) return;
             dispatch({
               type: "addItem",
-              item: { name: input.food?.name ?? input.custom?.name ?? "Yiyecek", confidence: null, grams: input.grams, per100g, foodId: input.food?.id ?? null },
+              item: {
+                name: input.food?.name ?? input.custom?.name ?? "Yiyecek",
+                confidence: null,
+                grams: input.grams,
+                per100g,
+                foodId: input.food?.id ?? null,
+                defaultServingG: input.food?.defaultServingG,
+                servings: input.food?.servings,
+                category: input.food?.category ?? null,
+              },
             });
             dispatch({ type: "setMeal", meal: input.meal });
-            setSearchOpen(false);
+            closeSearch();
           }}
         />
       ) : null}

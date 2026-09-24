@@ -510,7 +510,21 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   on("GET", "/body/summary", () => ok(fx.makeSummary(state.bodyEntries, state.weighIns, state.user)));
 
   // goals
-  on("GET", "/goals/current", () => ok({ goal: state.goal, progress: progress() }));
+  const evaluation = () => (state.goal && state.goal.status === "active" ? domain.evaluateFor(today(), state.user, state.goal, state.weighIns, state.bodyEntries, state.mealEntries) : null);
+  on("GET", "/goals/current", () => {
+    const e = evaluation();
+    return ok({ goal: state.goal, progress: e?.progress ?? null, feedback: e?.feedback ?? null, adjustment: e?.adjustment ?? null });
+  });
+  const answerAdjustment = (body: Record<string, unknown>, dismiss: boolean) => {
+    const e = evaluation();
+    if (!state.goal || !e) return err(404, "NOT_FOUND", "Aktif hedef yok");
+    const res = domain.answerAdjustment(today(), state.goal, e, { id: String(body.id ?? ""), action: body.action as never, dismiss });
+    if ("error" in res) return res.error === "stale" ? err(409, "ADJUSTMENT_STALE", "Bu öneri artık geçerli değil, güncel durumu yeniden yükle") : err(400, "VALIDATION", "Bu öneride böyle bir seçenek yok");
+    state.goal = res.goal;
+    return ok(res);
+  };
+  on("POST", "/goals/current/adjustment/accept", ({ body }) => answerAdjustment(body, false));
+  on("POST", "/goals/current/adjustment/dismiss", ({ body }) => answerAdjustment(body, true));
   on("POST", "/goals/preview", ({ body }) => {
     const start = state.bodyEntries[state.bodyEntries.length - 1];
     if (!start) return err(409, "NO_BODY_ENTRY", "Önce bir vücut ölçümü gir");
@@ -648,10 +662,17 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
   });
   on("POST", "/nutrition/scan", () => {
     const pick = (id: string, conf: number, grams: number) => {
-      const f = state.foods.find((x) => x.id === id)!;
-      return { label: f.nameEn ?? f.name, labelTr: f.name, confidence: conf, food: f, suggestedGrams: grams };
+      const f = state.foods.find((x) => x.id === id);
+      return f ? { label: f.nameEn ?? f.name, labelTr: f.name, confidence: conf, food: f, suggestedGrams: grams } : null;
     };
-    return ok({ scanId: fx.nextId("scan"), imageUrl: null, detections: [pick("f_tavuk", 0.84, 150), pick("f_bulgur", 0.61, 150), pick("f_salata", 0.42, 120)], mock: true, latencyMs: 420, modelVersion: "fake-1" });
+    /** Other readings of the same photo ("Bunu mu demek istedin?"); foods the demo lacks are skipped. */
+    const alts = (...picks: [string, number][]) => picks.map(([id, conf]) => pick(id, conf, state.foods.find((x) => x.id === id)?.defaultServingG ?? 100)).filter((a) => a !== null);
+    const detections = [
+      { ...pick("f_tavuk", 0.84, 150)!, alternatives: alts(["f_kofte", 0.09]) },
+      { ...pick("f_bulgur", 0.61, 150)!, alternatives: alts(["f_pilav", 0.21]) },
+      { ...pick("f_salata", 0.42, 120)!, alternatives: alts(["f_cacik", 0.31], ["f_mercimek", 0.12], ["f_yogurt", 0.05]) },
+    ];
+    return ok({ scanId: fx.nextId("scan"), imageUrl: null, detections, mock: true, latencyMs: 420, modelVersion: "fake-1" });
   });
   on("GET", "/nutrition/week", ({ query }) => ok(fx.makeWeekNutrition(query.week ? weekKeyFor(query.week, md()) : weekKeyFor(today(), md()), state.mealEntries, state.target)));
   on("GET", "/nutrition/target", () => ok(state.target));
