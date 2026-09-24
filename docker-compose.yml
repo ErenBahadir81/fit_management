@@ -39,8 +39,10 @@ services:
     environment:
       MODEL_DIR: /models
       VISION_MOCK: "${VISION_MOCK:-}"   # empty = real model if the weights are present, mock otherwise
-      TOP_K: "3"
-      MIN_CONFIDENCE: "0.15"
+      # The API keeps items at its own floor (settings.vision.minConfidence, 0.15) and offers the
+      # rest of the candidates as "Bunu mu demek istedin?" alternatives, so vision returns more.
+      TOP_K: "5"
+      MIN_CONFIDENCE: "0.02"
       INTRA_OP_THREADS: "4"             # use 2 when CLIP_ENABLED=1 (measured: 522 ms -> 284 ms)
       MAX_UPLOAD_MB: "6"
       CLIP_ENABLED: "${CLIP_ENABLED:-0}"
