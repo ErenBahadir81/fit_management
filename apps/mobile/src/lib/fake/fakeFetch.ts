@@ -16,6 +16,8 @@ import {
   round,
   type BodyEntryDTO,
   type GoalDTO,
+  type GoalInput,
+  type OnboardingTraining,
   type MascotKey,
   type MascotMessage,
   type MealEntryDTO,
@@ -31,6 +33,9 @@ import {
   jumpTransition,
   logDayTransition,
   normalizeProgramInput,
+  exerciseNameKey,
+  starterProgram,
+  trainingLevelForExperience,
   pointerOf,
   programMode,
   reconcilePointer,
@@ -75,6 +80,8 @@ export interface FakeState {
   sessions: Set<string>;
   /** Per-log pointer history (`pointerBeforeId`…), which the API stores on the log but never sends. */
   pointerMeta: Record<string, LogPointerLike>;
+  /** T8 — registered in this session and not yet onboarded: the one account a starter program may replace. */
+  freshAccount?: boolean;
 }
 
 export function createFakeState(today = trDateKey()): FakeState {
@@ -320,6 +327,7 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
       state.weighIns = [];
       state.mealEntries = [];
       state.goal = null;
+      state.freshAccount = true;
       return ok({ ...issueTokens(), user: state.user });
     },
     false
@@ -365,11 +373,23 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
     state.bodyEntries = [...state.bodyEntries.filter((e) => e.dateKey !== entry.dateKey), entry].sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1));
     upsertWeighIn(entry.weightKg, entry.dateKey, "bodyEntry");
 
-    const wanted = body.goal as { targetBodyFatPct?: number; profile?: GoalDTO["profile"] } | null | undefined;
+    const wanted = body.goal as GoalInput | null | undefined;
     if (wanted && state.goal?.status !== "active") {
-      state.goal = domain.goalCreate(today(), state.user, entry, Number(wanted.targetBodyFatPct), wanted.profile ?? "optimal");
+      state.goal = domain.goalFromInput(today(), state.user, entry, wanted);
     }
-    return ok({ user: state.user, bodyEntry: entry, goal: wanted ? state.goal : null });
+    // T8 — a freshly registered demo account gets the starter program, like the API.
+    const training = body.training as OnboardingTraining | null | undefined;
+    if (training && state.freshAccount) {
+      const starter = starterProgram({ daysPerWeek: training.daysPerWeek, level: trainingLevelForExperience(training.experience) });
+      const known = new Set(fx.EXERCISES.map((e) => exerciseNameKey(e.name)));
+      // The demo catalog is small: an exercise it lacks keeps its name with no muscle load.
+      const input = starter.days.map((d) => ({ ...d, exercises: d.exercises.map((e) => (known.has(exerciseNameKey(e.name)) ? e : { ...e, muscles: [] })) }));
+      const { days } = normalizeProgramInput(input, fx.EXERCISES, { mode: "cycle" });
+      const now = nowIso();
+      state.program = { ...state.program, id: fx.nextId("p"), name: starter.name, mode: "cycle", days, currentDayId: days[0].id, currentIndex: 0, cycleNumber: 1, weekNumber: 1, startedAt: now, lastActionAt: now, sourceTemplateId: null };
+      state.freshAccount = false;
+    }
+    return ok({ user: state.user, bodyEntry: entry, goal: wanted ? state.goal : null, program: state.program });
   });
 
   // catalog

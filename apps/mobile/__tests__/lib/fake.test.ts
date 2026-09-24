@@ -124,6 +124,34 @@ describe("FakeApi (EXPO_PUBLIC_API_FAKE=1)", () => {
     expect(second.bodyEntry.waistCm).toBe(94);
   });
 
+  test("T8: onboarding plans a bulk through the real engine and hands a new account its starter program", async () => {
+    const api = createFakeApi({ latencyMs: 0 });
+    await api.auth.register({ username: "yeni", password: "coksaglam", displayName: "Yeni" });
+    const res = await api.onboarding.complete({
+      profile: { gender: "male", birthDate: "1998-04-12", heightCm: 180, activityLevel: "moderate", measurementDay: 3 },
+      measurement: { weightKg: 72, neckCm: 38, waistCm: 78 },
+      goal: { direction: "bulk", targetLeanGainKg: 3, trainingLevel: "beginner", profile: "optimal" },
+      training: { daysPerWeek: 4, experience: "none" },
+    });
+    expect(res.goal).toMatchObject({ direction: "bulk", targetLeanGainKg: 3, trainingLevel: "beginner" });
+    expect(res.goal?.plan.direction).toBe("bulk");
+    expect(res.goal?.plan.estimatedWeeks).toBeGreaterThan(0);
+    expect(res.program?.days.filter((d) => d.kind === "strength")).toHaveLength(4);
+    expect((await api.training.program()).program.name).toBe(res.program?.name);
+  });
+
+  test("T8: the demo account keeps its own program through onboarding", async () => {
+    const api = createFakeApi({ latencyMs: 0, signedIn: true });
+    const before = (await api.training.program()).program;
+    const res = await api.onboarding.complete({
+      profile: { gender: "male", birthDate: "1998-04-12", heightCm: 180, activityLevel: "moderate", measurementDay: 3 },
+      measurement: { weightKg: 80, neckCm: 38, waistCm: 88 },
+      goal: null,
+      training: { daysPerWeek: 2, experience: "none" },
+    });
+    expect(res.program?.id).toBe(before.id);
+  });
+
   test("onboarding asks women for the hip measurement", async () => {
     const api = createFakeApi({ latencyMs: 0, signedIn: true });
     await expect(

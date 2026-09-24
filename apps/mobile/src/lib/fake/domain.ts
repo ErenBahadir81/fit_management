@@ -14,6 +14,7 @@ import {
   buildWeeklyReport,
   computeGoalPlan,
   computeGoalProgress,
+  goalDirectionOf,
   ewmaTrend,
   latestTrendWeight,
   pickRoadmapWeek,
@@ -27,6 +28,7 @@ import {
   type DayIntake,
   type EnergyDTO,
   type GoalDTO,
+  type GoalInput,
   type GoalPlan,
   type GoalProfile,
   type GoalProgress,
@@ -113,7 +115,14 @@ export function goalFor(today: string, user: UserDTO, entries: BodyEntryDTO[]): 
   };
 }
 
-export function goalCreate(today: string, user: UserDTO, start: BodyEntryDTO, targetBodyFatPct: number, profile: GoalProfile): GoalDTO {
+export function goalCreate(
+  today: string,
+  user: UserDTO,
+  start: BodyEntryDTO,
+  targetBodyFatPct: number,
+  profile: GoalProfile,
+  plan: GoalPlan = planFor(user, start, targetBodyFatPct, profile, today)
+): GoalDTO {
   const now = new Date().toISOString();
   return {
     id: nextId("goal"),
@@ -125,11 +134,40 @@ export function goalCreate(today: string, user: UserDTO, start: BodyEntryDTO, ta
     targetBodyFatPct,
     profile,
     start: { dateKey: today, weightKg: start.weightKg, bodyFatPct: start.bodyFatPct, leanMassKg: start.leanMassKg, fatMassKg: start.fatMassKg, bodyEntryId: start.id },
-    plan: planFor(user, start, targetBodyFatPct, profile, today),
+    plan,
     tdeeOverride: null,
     createdAt: now,
     updatedAt: now,
     completedAt: null,
+  };
+}
+
+/** T8 — `POST /onboarding`'s goal in any direction (cut / bulk / recomp), through the real engine. */
+export function goalFromInput(today: string, user: UserDTO, start: BodyEntryDTO, input: GoalInput): GoalDTO {
+  const direction = goalDirectionOf(input);
+  const profile = input.profile ?? "optimal";
+  const plan = computeGoalPlan({
+    sex: user.gender,
+    weightKg: start.weightKg,
+    bodyFatPct: start.bodyFatPct,
+    heightCm: start.heightCm || user.heightCm || 175,
+    age: ageOf(user, today),
+    activityLevel: user.activityLevel,
+    direction,
+    targetBodyFatPct: input.targetBodyFatPct ?? null,
+    targetLeanGainKg: input.targetLeanGainKg ?? null,
+    trainingLevel: input.trainingLevel ?? null,
+    profile,
+    startDate: today,
+    settings: SETTINGS,
+  });
+  // Same rule as the API's `storedTarget`: a bulk stores the body fat its plan ends at.
+  const target = direction === "bulk" ? (plan.roadmap.at(-1)?.endBfPct ?? start.bodyFatPct) : (input.targetBodyFatPct ?? start.bodyFatPct);
+  return {
+    ...goalCreate(today, user, start, target, profile, plan),
+    direction,
+    targetLeanGainKg: direction === "bulk" ? (input.targetLeanGainKg ?? null) : null,
+    trainingLevel: input.trainingLevel ?? null,
   };
 }
 
