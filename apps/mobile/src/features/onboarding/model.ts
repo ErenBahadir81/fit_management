@@ -1,44 +1,28 @@
 /**
- * The first-run flow as data.
+ * The first-run session as data.
  *
  * Every rule about what a step needs, what is wrong with it, and what finally gets sent lives here
  * and nowhere else, so the screens stay thin and the whole flow is testable without rendering it.
+ *
+ * A welcome door, then seven stages the progress bar counts (hello + account share the first):
+ * name → body → measurements → training → "where you are now" → Floo's goal → finish.
  */
-import { ageFromBirthDate, isDateKey, navyBodyFat, type ActivityLevel, type Gender, type GoalProfile, type OnboardingInput, type Weekday } from "@fitfloow/core";
+import { ageFromBirthDate, isDateKey, type Gender, type GoalInput, type OnboardingInput, type Weekday } from "@fitfloow/core";
 import { todayKey } from "../../lib/dates";
-import type { GoalIntent } from "../goals/goalIntent";
+import { trainingLevelOf, type OnboardingDraft, type OnboardingStep } from "./draftShape";
+import { assessmentFor, choiceError, resolvedGoal } from "./plan";
 
-export type OnboardingStep = "welcome" | "account" | "about" | "measure" | "goal" | "done";
+export { DEFAULT_HEIGHT_CM, bodyFatFor, emptyDraft, type GoalChoice, type OnboardingDraft, type OnboardingStep } from "./draftShape";
 
-export const STEP_ORDER: readonly OnboardingStep[] = ["welcome", "account", "about", "measure", "goal", "done"];
+export const STEP_ORDER: readonly OnboardingStep[] = ["welcome", "hello", "account", "body", "measure", "training", "assessment", "goal", "done"];
 
-/**
- * The height the stepper shows on the first frame. It is a real answer, not a placeholder: the
- * control displays it, so the draft must agree with it rather than sit on `null` and quietly
- * disable the Continue button with nothing on screen to explain why.
- */
-export const DEFAULT_HEIGHT_CM = 175;
+/** Stages on the progress bar. */
+export const STAGE_COUNT = 7;
 
-export interface OnboardingDraft {
-  /** Bumped whenever the shape changes; an older draft is dropped instead of half-restored. */
-  version: 1;
-  step: OnboardingStep;
-  /** The password is deliberately absent — it lives in component state and never touches disk. */
-  account: { displayName: string; username: string };
-  profile: { gender: Gender | null; birthDate: string | null; heightCm: number | null; activityLevel: ActivityLevel | null };
-  measurement: { weightKg: number | null; neckCm: number | null; waistCm: number | null; hipCm: number | null };
-  goal: { intent: GoalIntent | null; targetBodyFatPct: number | null; profile: GoalProfile };
-}
+const STAGE: Record<OnboardingStep, number> = { welcome: 0, hello: 1, account: 1, body: 2, measure: 3, training: 4, assessment: 5, goal: 6, done: 7 };
 
-export function emptyDraft(): OnboardingDraft {
-  return {
-    version: 1,
-    step: "welcome",
-    account: { displayName: "", username: "" },
-    profile: { gender: null, birthDate: null, heightCm: DEFAULT_HEIGHT_CM, activityLevel: null },
-    measurement: { weightKg: null, neckCm: null, waistCm: null, hipCm: null },
-    goal: { intent: null, targetBodyFatPct: null, profile: "optimal" },
-  };
+export function stageOf(step: OnboardingStep): number {
+  return STAGE[step];
 }
 
 export function nextStep(step: OnboardingStep): OnboardingStep {
@@ -53,55 +37,87 @@ export function prevStep(step: OnboardingStep): OnboardingStep | null {
 
 /* ------------------------------------------------------------- validation */
 
-export type FieldErrors = Partial<Record<"displayName" | "username" | "password" | "gender" | "birthDate" | "heightCm" | "activityLevel" | "weightKg" | "neckCm" | "waistCm" | "hipCm" | "intent" | "targetBodyFatPct", string>>;
+export type MeasurementField = keyof OnboardingDraft["measurement"];
+
+export type FieldErrors = Partial<
+  Record<
+    "displayName" | "username" | "password" | "gender" | "birthDate" | "heightCm" | MeasurementField | "activityLevel" | "daysPerWeek" | "experience" | "assessment" | "target",
+    string
+  >
+>;
 
 const USERNAME_RE = /^[a-z0-9_.]{3,32}$/i;
 /** C3: the API refuses anything shorter. Catch it here so nobody types a password twice. */
 export const MIN_PASSWORD = 8;
 
-function range(value: number | null, lo: number, hi: number, message: string): string | undefined {
-  if (value === null || !Number.isFinite(value)) return message;
-  return value < lo || value > hi ? message : undefined;
+/** The accepted range of each measurement (the API's own, a little tighter where people mistype). */
+export const MEASUREMENT_RANGE: Record<MeasurementField, { min: number; max: number; message: string }> = {
+  weightKg: { min: 30, max: 300, message: "Kilonu 30-300 kg arasında gir." },
+  neckCm: { min: 20, max: 80, message: "Boyun ölçünü 20-80 cm arasında gir." },
+  waistCm: { min: 40, max: 200, message: "Bel ölçünü 40-200 cm arasında gir." },
+  hipCm: { min: 50, max: 200, message: "Kalça ölçünü 50-200 cm arasında gir." },
+};
+
+export function measurementFields(gender: Gender | null): MeasurementField[] {
+  return gender === "female" ? ["weightKg", "neckCm", "waistCm", "hipCm"] : ["weightKg", "neckCm", "waistCm"];
+}
+
+export function inRange(field: MeasurementField, value: number | null): boolean {
+  const r = MEASUREMENT_RANGE[field];
+  return value !== null && Number.isFinite(value) && value >= r.min && value <= r.max;
+}
+
+/** How many of this person's measurements are in and plausible: the ring's segments. */
+export function measuredCount(d: OnboardingDraft): number {
+  return measurementFields(d.profile.gender).filter((f) => inRange(f, d.measurement[f])).length;
 }
 
 /** What is still wrong on this step. An empty object means the step is done. */
 export function fieldErrors(step: OnboardingStep, d: OnboardingDraft, password: string): FieldErrors {
   const e: FieldErrors = {};
-  if (step === "account") {
+  if (step === "hello") {
     if (d.account.displayName.trim().length < 2) e.displayName = "Sana nasıl sesleneyim?";
+  }
+  if (step === "account") {
     const u = d.account.username.trim();
     if (!u) e.username = "Bir kullanıcı adı seç.";
     else if (!USERNAME_RE.test(u)) e.username = "3-32 karakter; harf, rakam, nokta ve alt çizgi.";
     if (password.length < MIN_PASSWORD) e.password = `En az ${MIN_PASSWORD} karakter.`;
   }
-  if (step === "about") {
-    if (!d.profile.gender) e.gender = "Navy formülü cinsiyete göre değişiyor.";
-    if (!d.profile.birthDate || !isDateKey(d.profile.birthDate)) e.birthDate = "Doğum tarihini seç.";
+  if (step === "body") {
+    const p = d.profile;
+    if (!p.gender) e.gender = "Yağ oranı formülü cinsiyete göre değişiyor.";
+    if (!p.birthDate || !isDateKey(p.birthDate)) e.birthDate = "Doğum tarihini seç.";
     else {
-      const age = ageFromBirthDate(d.profile.birthDate, todayKey());
+      const age = ageFromBirthDate(p.birthDate, todayKey());
       if (age < 13 || age > 100) e.birthDate = "13-100 yaş arası bir tarih seç.";
     }
-    e.heightCm = range(d.profile.heightCm, 100, 250, "Boyunu 100-250 cm arasında gir.");
-    if (!e.heightCm) delete e.heightCm;
-    if (!d.profile.activityLevel) e.activityLevel = "Günün ne kadar hareketli geçiyor?";
+    if (p.heightCm === null || !Number.isFinite(p.heightCm) || p.heightCm < 100 || p.heightCm > 250) e.heightCm = "Boyunu 100-250 cm arasında gir.";
   }
   if (step === "measure") {
     const m = d.measurement;
-    const put = (k: keyof FieldErrors, v: string | undefined) => {
-      if (v) e[k] = v;
-    };
-    put("weightKg", range(m.weightKg, 30, 300, "Kilonu 30-300 kg arasında gir."));
-    put("neckCm", range(m.neckCm, 20, 80, "Boyun ölçünü 20-80 cm arasında gir."));
-    put("waistCm", range(m.waistCm, 40, 200, "Bel ölçünü 40-200 cm arasında gir."));
-    if (d.profile.gender === "female") put("hipCm", range(m.hipCm, 50, 200, "Kadınlarda kalça ölçüsü de gerekiyor."));
+    for (const f of measurementFields(d.profile.gender)) {
+      if (!inRange(f, m[f])) e[f] = f === "hipCm" && m.hipCm === null ? "Kadınlarda kalça ölçüsü de gerekiyor." : MEASUREMENT_RANGE[f].message;
+    }
     // The formula needs a waist wider than the neck; without it there is no estimate to show.
     if (!e.waistCm && !e.neckCm && m.waistCm !== null && m.neckCm !== null && m.waistCm <= m.neckCm) {
       e.waistCm = "Bel ölçüsü boyun ölçüsünden büyük olmalı.";
     }
   }
-  if (step === "goal") {
-    if (!d.goal.intent) e.intent = "Bir yön seç.";
-    else if (d.goal.intent === "lose" && d.goal.targetBodyFatPct === null) e.targetBodyFatPct = "Bir hedef yağ oranı seç.";
+  if (step === "training") {
+    const t = d.training;
+    if (!t.activityLevel) e.activityLevel = "Günün ne kadar hareketli geçiyor?";
+    if (t.daysPerWeek === null || t.daysPerWeek < 2 || t.daysPerWeek > 6) e.daysPerWeek = "Haftada kaç gün ayırabilirsin?";
+    if (!t.experience) e.experience = "Ne zamandır antrenman yapıyorsun?";
+  }
+  if (step === "assessment" || step === "goal") {
+    const a = assessmentFor(d);
+    if (!a) e.assessment = "Önce ölçülerin gerekiyor.";
+    else if (step === "goal" && !d.goal.skipped) {
+      const c = resolvedGoal(d);
+      const err = c ? choiceError(c, a) : "Bir hedef seç.";
+      if (err) e.target = err;
+    }
   }
   return e;
 }
@@ -110,28 +126,32 @@ export function stepReady(step: OnboardingStep, d: OnboardingDraft, password: st
   return Object.keys(fieldErrors(step, d, password)).length === 0;
 }
 
-/* ----------------------------------------------------------------- derived */
-
-/** The Navy estimate, the moment every input it needs is present. */
-export function bodyFatFor(d: OnboardingDraft): number | null {
-  const { gender, heightCm } = d.profile;
-  const { neckCm, waistCm, hipCm } = d.measurement;
-  if (!gender || heightCm === null || neckCm === null || waistCm === null) return null;
-  return navyBodyFat({ gender, heightCm, neckCm, waistCm, hipCm });
-}
-
 /* ----------------------------------------------------------------- payload */
 
-/** The `POST /onboarding` body (C3). One call commits the whole flow. */
+/** The goal exactly as `POST /onboarding` takes it (`zGoalInput`), or null for "not now". */
+export function goalPayload(d: OnboardingDraft): GoalInput | null {
+  if (d.goal.skipped) return null;
+  const c = resolvedGoal(d);
+  if (!c) return null;
+  const trainingLevel = trainingLevelOf(d) ?? undefined;
+  const level = trainingLevel ? { trainingLevel } : {};
+  if (c.direction === "bulk") {
+    return c.targetLeanGainKg === null ? null : { direction: "bulk", targetLeanGainKg: c.targetLeanGainKg, ...level, profile: d.goal.profile };
+  }
+  return c.targetBodyFatPct === null ? null : { direction: c.direction, targetBodyFatPct: c.targetBodyFatPct, ...level, profile: d.goal.profile };
+}
+
+/** The `POST /onboarding` body (C3 + T8). One call commits the whole session. */
 export function onboardingPayload(d: OnboardingDraft, measurementDay: Weekday): OnboardingInput {
   const p = d.profile;
   const m = d.measurement;
+  const t = d.training;
   return {
     profile: {
       gender: p.gender ?? "male",
       birthDate: p.birthDate ?? "",
       heightCm: p.heightCm ?? 0,
-      activityLevel: p.activityLevel ?? "moderate",
+      activityLevel: t.activityLevel ?? "moderate",
       measurementDay,
     },
     measurement: {
@@ -140,29 +160,47 @@ export function onboardingPayload(d: OnboardingDraft, measurementDay: Weekday): 
       waistCm: m.waistCm ?? 0,
       ...(p.gender === "female" && m.hipCm !== null ? { hipCm: m.hipCm } : {}),
     },
-    // Only fat loss is a *goal*; the other two intents shape the diet target instead.
-    goal: d.goal.intent === "lose" && d.goal.targetBodyFatPct !== null ? { targetBodyFatPct: d.goal.targetBodyFatPct, profile: d.goal.profile } : null,
+    goal: goalPayload(d),
+    ...(t.daysPerWeek !== null && t.experience ? { training: { daysPerWeek: t.daysPerWeek, experience: t.experience } } : {}),
   };
 }
 
 /* ------------------------------------------------------------------ resume */
 
+/** Steps answered from the draft alone, in order (hello and account need the session). */
+const DRAFT_STEPS: readonly OnboardingStep[] = ["body", "measure", "training", "assessment", "goal"];
+
+/** The first step whose question is still unanswered, or null when everything up to the goal is. */
+export function firstIncompleteStep(d: OnboardingDraft, password: string): OnboardingStep | null {
+  return DRAFT_STEPS.find((s) => !stepReady(s, d, password)) ?? null;
+}
+
+const at = (s: OnboardingStep) => STEP_ORDER.indexOf(s);
+
 /**
  * Where to drop someone back into a restored draft.
  *
- * A draft can outlive the session that made it: if the app died between "account" and the register
- * call, the answers are still on disk but there is no account yet, so the furthest they may resume
- * is the account step. Once signed in, the account step is behind them for good.
+ * A draft can outlive the session that made it: if the app died between the account step and the
+ * register call, the answers are still on disk but there is no account yet, so the furthest they
+ * may resume is the account step (or hello, if the name is missing). Once signed in, both are
+ * behind them for good. A saved step never skips a question that is still unanswered.
  */
 export function resumeStep(draft: OnboardingDraft, signedIn: boolean): OnboardingStep {
-  const at = STEP_ORDER.indexOf(draft.step);
-  if (!signedIn) return draft.step === "welcome" ? "welcome" : "account";
-  return at < STEP_ORDER.indexOf("about") ? "about" : draft.step;
+  if (!signedIn) {
+    if (draft.step === "welcome") return "welcome";
+    if (!stepReady("hello", draft, "")) return "hello";
+    return draft.step === "hello" ? "hello" : "account";
+  }
+  if (draft.step === "done") return "done";
+  const saved = at(draft.step) < at("body") ? "body" : draft.step;
+  const gap = firstIncompleteStep(draft, "");
+  return gap !== null && at(gap) < at(saved) ? gap : saved;
 }
 
-/** Steps a signed-in user can walk back to (the account step is done and gone). */
+/** Steps a signed-in user can walk back to (hello and the account step are done and gone). */
 export function canGoBackTo(step: OnboardingStep, signedIn: boolean): boolean {
   if (step === "done") return false;
-  if (signedIn && (step === "welcome" || step === "account")) return false;
+  if (signedIn && (step === "welcome" || step === "hello" || step === "account")) return false;
   return true;
 }
+
