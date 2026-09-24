@@ -164,7 +164,7 @@ describe("api-client", () => {
         detections: [{ label: "lahmacun", labelTr: "Lahmacun", confidence: 0.4, food: null, suggestedGrams: 180, alternatives: [{ label: "pide", labelTr: "Pide", confidence: 0.3, food, suggestedGrams: 200 }] }],
       });
     });
-    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never, tokens: memoryTokenStore({ accessToken: "a" }) });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never, tokens: memoryTokenStore({ accessToken: "a", refreshToken: "r" }) });
     const res = await api.nutrition.scan(new Blob(["x"], { type: "image/jpeg" }) as never);
     expect(res.detections[0].alternatives?.[0]).toMatchObject({ label: "pide", suggestedGrams: 200, food });
   });
@@ -176,7 +176,7 @@ describe("api-client", () => {
       if (url.endsWith("/dismiss")) return jsonResponse(409, { error: { code: "ADJUSTMENT_STALE", message: "Bu öneri artık geçerli değil" } });
       return jsonResponse(200, { goal: { id: "g" }, adjustment: { id: "adj", status: "accepted" } });
     });
-    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never, tokens: memoryTokenStore({ accessToken: "a" }) });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never, tokens: memoryTokenStore({ accessToken: "a", refreshToken: "r" }) });
     const res = await api.goals.acceptAdjustment({ id: "adj", action: "lowerCalories" });
     expect(res.adjustment.status).toBe("accepted");
     const err = await api.goals.dismissAdjustment({ id: "adj" }).catch((e: unknown) => e);
