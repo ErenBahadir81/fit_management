@@ -1,6 +1,6 @@
 import React from "react";
 import { Text } from "react-native";
-import { fireEvent, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen } from "@testing-library/react-native";
 import { renderUI } from "../helpers";
 import { Header } from "../../src/ui/Header";
 import { List } from "../../src/ui/List";
@@ -10,7 +10,17 @@ const DATA = ["a", "b", "c"];
 const row = ({ item }: { item: string }) => <Text>{item}</Text>;
 const scrollTo = (y: number) => ({ nativeEvent: { contentOffset: { x: 0, y }, contentSize: { width: 390, height: 2000 }, layoutMeasurement: { width: 390, height: 800 } } });
 
+/** Lets the animated style catch up with the shared value (its mapper runs on the next frame). */
+async function settle() {
+  await act(async () => {
+    jest.advanceTimersByTime(32);
+  });
+}
+
 describe("Screen top bar", () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
   test("a list screen gets the top bar too: invisible at rest, opaque as soon as the list scrolls", async () => {
     const own = jest.fn();
     await renderUI(
@@ -19,8 +29,10 @@ describe("Screen top bar", () => {
       </Screen>
     );
     const bar = screen.getByTestId("screen-top-bar");
+    await settle();
     expect(bar).toHaveAnimatedStyle({ opacity: 0 });
     await fireEvent.scroll(screen.getByTestId("list"), scrollTo(40));
+    await settle();
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 1 });
     // The list's own handler still runs.
     expect(own).toHaveBeenCalledTimes(1);
@@ -33,6 +45,7 @@ describe("Screen top bar", () => {
       </Screen>
     );
     await fireEvent.scroll(screen.getByTestId("list"), scrollTo(40));
+    await settle();
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 1 });
   });
 
@@ -55,12 +68,14 @@ describe("Screen top bar", () => {
       </Screen>
     );
     await fireEvent.scroll(screen.getByTestId("list"), scrollTo(400));
+    await settle();
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 1 });
     await rerender(
       <Screen scroll={false}>
         <Text>week view</Text>
       </Screen>
     );
+    await settle();
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 0 });
   });
 
@@ -73,9 +88,11 @@ describe("Screen top bar", () => {
       </Screen>
     );
     await fireEvent.scroll(screen.getByTestId("chips"), scrollTo(40));
+    await settle();
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 0 });
     await fireEvent.scroll(screen.getByTestId("list"), scrollTo(400));
     await rerender(<Screen scroll={false}>{page}</Screen>);
+    await settle();
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 1 });
   });
 
@@ -100,6 +117,7 @@ describe("Screen top bar", () => {
         <Text>content</Text>
       </Screen>
     );
+    await settle();
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 0 });
   });
 });
