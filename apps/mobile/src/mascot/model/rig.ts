@@ -655,6 +655,8 @@ export interface CompiledGesture {
   values: number[];
   duration: number;
   loop: boolean;
+  /** Per touched channel: the IK weight channel it is the goal of (ikX/ikY), else −1. */
+  goalIk: number[];
 }
 
 const EASE_ID: Record<Ease, number> = { inOut: 0, out: 1, in: 2, hold: 3 };
@@ -700,6 +702,10 @@ export function compileGesture(g: GestureSpec): CompiledGesture {
     values,
     duration,
     loop: !!g.loop,
+    goalIk: channels.map((ch) => {
+      const name = CHANNELS[ch];
+      return /_ik[XY]$/.test(name) ? CH[`${name.slice(0, 2)}ik` as Channel] : -1;
+    }),
   };
 }
 
@@ -731,6 +737,10 @@ export function applyGesture(g: CompiledGesture, tMs: number, out: number[], wei
   const u = t1 > t0 ? (t - t0) / (t1 - t0) : 1;
   const e = ease(g.ease[k + 1] ?? 0, u);
   const m = g.channels.length;
+  // The base pose's own reach weights, read before this gesture writes over them.
+  const baseIkL = out[CH.L_ik];
+  const baseIkR = out[CH.R_ik];
+  const lastSeg = !g.loop && k + 1 === n - 1;
   for (let j = 0; j < m; j++) {
     const ch = g.channels[j];
     const base = out[ch];
@@ -738,6 +748,17 @@ export function applyGesture(g: CompiledGesture, tMs: number, out: number[], wei
     let b = g.values[(k + 1) * m + j];
     if (!Number.isFinite(a)) a = base;
     if (!Number.isFinite(b)) b = base;
+    const gi = g.goalIk[j];
+    if (gi >= 0) {
+      // An IK goal is a place, not an amount: never scaled by the weight. It holds while the
+      // gesture lets go — unless the base pose itself reaches, then it travels home to that goal.
+      if (lastSeg) {
+        const bw = Math.max(0, Math.min(1, gi === CH.L_ik ? baseIkL : baseIkR));
+        b = b + (base - b) * bw;
+      }
+      out[ch] = a + (b - a) * e;
+      continue;
+    }
     const val = a + (b - a) * e;
     out[ch] = base + (val - base) * weight;
   }

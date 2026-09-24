@@ -410,6 +410,23 @@ describe("rig — IK targets follow the hand while unused", () => {
     expect(fk[ARM_BASE.R + A.front]).toBe(1);
   });
 
+  test("a partial-weight gesture (an idle fidget) scales the reach, never the goal's position", () => {
+    const c = COMPILED[GESTURE_INDEX.scratchHead];
+    const out = REST.slice();
+    applyGesture(c, 800, out, 0.55);
+    expect(out[CH.R_ikX]).toBeCloseTo(158, 5);
+    expect(out[CH.R_ik]).toBeCloseTo(0.55, 5);
+  });
+
+  test("letting go of a gesture's reach on a mood that reaches itself travels home to the mood's goal", () => {
+    const c = COMPILED[GESTURE_INDEX.point];
+    const base = MOOD_RIG.worried;
+    const end = base.slice();
+    applyGesture(c, c.duration - 1, end);
+    expect(Math.abs(end[CH.R_ikX] - base[CH.R_ikX])).toBeLessThan(2);
+    expect(Math.abs(end[CH.R_ikY] - base[CH.R_ikY])).toBeLessThan(2);
+  });
+
   test("compiled IK goals hold their authored values instead of travelling from the base pose", () => {
     const c = COMPILED[GESTURE_INDEX.bellyPat];
     const out = REST.slice();

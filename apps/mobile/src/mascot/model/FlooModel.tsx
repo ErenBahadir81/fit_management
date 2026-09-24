@@ -284,6 +284,7 @@ export function FlooModel({
     bU: 0.5 / 2.15,
     wU: 0.5 / 2.12,
     wPeriod: shiftPeriod,
+    loopAmt: 0,
     primed: false,
     /** The frame's target pose, rebuilt in place every frame (no per-frame allocation). */
     tgt: REST.slice(),
@@ -636,8 +637,9 @@ export function FlooModel({
     const ms = Math.max(560, flooTriggerPlan(name).durationMs);
     const t = setTimeout(end, ms);
     return () => clearTimeout(t);
+    // `reduce` is read, not a dependency: toggling it mid-beat must not clear the end timer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trigger?.key, reduce]);
+  }, [trigger?.key]);
 
   // ── the frame loop: pose → springs → published rig ──────────────────────
   /*
@@ -661,18 +663,16 @@ export function FlooModel({
     // an 8–12 s weight shift onto one foot and back, much slower than the breath and on its own
     // period, so the two never land on the same beat twice. The mood's tempo sets their speed;
     // with the loops off they ease out rather than snap.
-    if (loopsSV.value > 0.5 && !reduced) {
+    const loopOn = loopsSV.value > 0.5 && !reduced ? 1 : 0;
+    st.loopAmt += (loopOn - st.loopAmt) * Math.min(1, dt * 6);
+    if (st.loopAmt < 1e-3 && loopOn === 0) st.loopAmt = 0;
+    if (st.loopAmt > 0 || breath.value !== 0 || wshift.value !== 0) {
+      // Faded in and out by amount, so turning the loops off or back on never pops.
       const tp = Math.max(0.35, tempo.value);
       st.bU = (st.bU + dt / ((BREATH_IN * 2.15) / tp)) % 1;
       st.wU = (st.wU + dt / ((st.wPeriod * 2.12) / tp)) % 1;
-      breath.value = BREATH_AMP * loopCurve(st.bU, 1 / 2.15);
-      wshift.value = loopCurve(st.wU, 1 / 2.12);
-    } else if (breath.value !== 0 || wshift.value !== 0) {
-      const f = Math.min(1, dt * 8);
-      breath.value = Math.abs(breath.value) < 1e-4 ? 0 : breath.value * (1 - f);
-      wshift.value = Math.abs(wshift.value) < 1e-3 ? 0 : wshift.value * (1 - f);
-    }
-    if (loopsSV.value > 0.5 && !reduced) {
+      breath.value = st.loopAmt * BREATH_AMP * loopCurve(st.bU, 1 / 2.15);
+      wshift.value = st.loopAmt * loopCurve(st.wU, 1 / 2.12);
       // The shoulders rise a hair on the in-breath and the arms counter the weight shift.
       const b = breath.value;
       const w = wshift.value;
@@ -704,10 +704,21 @@ export function FlooModel({
       const el = now - st.gStart;
       let playing: boolean;
       if (reduced) {
-        // One held pose, then back; the reduced springs turn both changes into cross-fades.
+        // One held pose, then back; the reduced springs turn both changes into cross-fades. Only
+        // the limbs and the face take the pose: the body does not hop, squash, tip or shift.
         const r = REDUCED[st.gIdx];
         playing = el < r.total;
-        if (el < r.hold) applyGesture(g, r.at, tgt, 1);
+        if (el < r.hold) {
+          const hop = tgt[CH.hop];
+          const sq = tgt[CH.squash];
+          const ln = tgt[CH.lean];
+          const bx = tgt[CH.x];
+          applyGesture(g, r.at, tgt, 1);
+          tgt[CH.hop] = hop;
+          tgt[CH.squash] = sq;
+          tgt[CH.lean] = ln;
+          tgt[CH.x] = bx;
+        }
       } else {
         playing = applyGesture(g, el, tgt, 1);
         if (playing && st.gIdx === WALK_ID) walkWanted = 1;
