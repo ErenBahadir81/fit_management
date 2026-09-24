@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import { Blur, Canvas, Circle, Group, Oval, Path, Rect } from "@shopify/react-native-skia";
 import {
   Easing,
   cancelAnimation,
+  runOnJS,
   useAnimatedReaction,
   useDerivedValue,
   useFrameCallback,
@@ -49,7 +50,8 @@ import {
   volumePreservingScale,
 } from "./geometry";
 import { FLOO_MODEL_COLORS, FLOO_MODEL_COLORS as C, MOOD_BROW_WEIGHT, MOOD_LABEL_TR, MOOD_PARAMS, type FlooParams, type Mood, type Trigger } from "./params";
-import { COMPILED, COMPILED_MIRROR, GESTURE_INDEX, IDLE_GESTURES, MOOD_RIG, type Gesture } from "./poses";
+import { COMPILED, COMPILED_MIRROR, GESTURE_INDEX, IDLE_GESTURES, MOOD_RIG, REDUCED, gestureDuration, reducedGestureDuration, type Gesture } from "./poses";
+import { GestureEndTracker, type GestureEndEvent } from "./gestureEnd";
 import { FlooLimbs } from "./FlooLimbs";
 import {
   A,
@@ -58,6 +60,7 @@ import {
   CHANNEL_COUNT,
   REST,
   SPRING,
+  SPRING_REDUCED,
   applyGesture,
   applyWalk,
   stepSprings,
@@ -98,6 +101,14 @@ export interface FlooModelProps {
    * Change the key to replay; `mirror` plays it with the other hand.
    */
   gesture?: { name: Gesture; key: number; mirror?: boolean } | null;
+  /**
+   * Called exactly once for every gesture played through `gesture` (once per key): when its
+   * timeline completes, or — with `completed: false` — when another gesture or a trigger replaces
+   * it first, or when the name is not in the library. Under reduced motion the gesture plays as a
+   * short cross-fade to its key pose and back, and this fires when that is done. Gestures a
+   * trigger plays report through `onTriggerEnd` instead. Not called after unmount.
+   */
+  onGestureEnd?: (name: Gesture, info: { key: number; completed: boolean }) => void;
   /**
    * Point at something: a position in this view's own pixels (0,0 = top-left of the box). The
    * nearer hand reaches for it with two-bone IK and holds until this goes back to null.
@@ -176,6 +187,7 @@ export function FlooModel({
   trigger = null,
   onTriggerEnd,
   gesture = null,
+  onGestureEnd,
   pointAt = null,
   walking = false,
   lod: lodProp,
@@ -448,15 +460,59 @@ export function FlooModel({
     walkingSV.set(walking && !reduce ? 1 : 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walking, reduce]);
+  // ── gesture requests and their ends ─────────────────────────────────────
+  /** Request ids handed to the rig. Only the JS thread writes `gestureReq`, so it counts here. */
+  const reqCounter = useRef(0);
+  const [endTracker] = useState(() => new GestureEndTracker());
+  const onGestureEndRef = useRef(onGestureEnd);
+  useEffect(() => {
+    onGestureEndRef.current = onGestureEnd;
+  }, [onGestureEnd]);
+  /** False once unmounted: a report still in flight from the UI thread is dropped, not delivered. */
+  const mounted = useRef(false);
+  const emitGestureEnd = useCallback((e: GestureEndEvent | null) => {
+    if (e && mounted.current) onGestureEndRef.current?.(e.name, { key: e.key, completed: e.completed });
+  }, []);
+  /** The frame loop finished rig request `req` (UI thread → here through runOnJS). */
+  const rigGestureDone = useCallback((req: number) => emitGestureEnd(endTracker.complete(req)), [emitGestureEnd, endTracker]);
+  /** Jest only (no frame loop): stands in for the rig's report, so the contract is testable. */
+  const stubTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const requestRigGesture = (id: number, mirror: boolean): number => {
+    reqCounter.current += 1;
+    const req = reqCounter.current;
+    gestureReq.set({ id, key: req, mirror });
+    return req;
+  };
+  useEffect(() => {
+    mounted.current = true;
+    const timers = stubTimers.current;
+    return () => {
+      mounted.current = false;
+      timers.forEach(clearTimeout);
+      timers.length = 0;
+    };
+  }, []);
+
   const lastGestureKey = useRef<number | null>(null);
   useEffect(() => {
-    if (!gesture || reduce) return;
+    if (!gesture) return;
     if (lastGestureKey.current === gesture.key) return;
     lastGestureKey.current = gesture.key;
-    const prev = gestureReq.get();
-    gestureReq.set({ id: GESTURE_INDEX[gesture.name] ?? -1, key: prev.key + 1, mirror: !!gesture.mirror });
+    const id = GESTURE_INDEX[gesture.name] ?? -1;
+    if (id < 0) {
+      // Not in the library: nothing plays (whatever is playing carries on), but the caller still
+      // gets its one end.
+      onGestureEndRef.current?.(gesture.name, { key: gesture.key, completed: false });
+      return;
+    }
+    const req = requestRigGesture(id, !!gesture.mirror);
+    emitGestureEnd(endTracker.start(req, gesture.name, gesture.key));
+    if (!FRAME_LOOP) {
+      const ms = reduce ? reducedGestureDuration(gesture.name) : gestureDuration(gesture.name);
+      stubTimers.current.push(setTimeout(() => rigGestureDone(req), ms));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gesture?.key, gesture?.name, reduce]);
+  }, [gesture?.key, gesture?.name]);
   useEffect(() => {
     if (!pointAt || !Number.isFinite(pointAt.x) || !Number.isFinite(pointAt.y)) {
       pointSV.set({ on: 0, x: 0, y: 0 });
@@ -492,18 +548,20 @@ export function FlooModel({
     const name = trigger.name;
     const end = () => onTriggerEnd?.(name);
 
-    if (reduce) {
-      tBright.set(withSequence(withTiming(0.25, { duration: 150 }), withTiming(0, { duration: 200 })));
-      const t = setTimeout(end, 400);
-      return () => clearTimeout(t);
-    }
-
     // The limbs' part of every trigger is a gesture from the pose library, started on the UI thread
-    // in the same frame as the body's own sequence below.
+    // in the same frame as the body's own sequence below. Under reduced motion the rig plays it as
+    // a cross-fade to its key pose, so the reaction still reads without any travel.
     const plan = TRIGGER_GESTURE[name];
     if (plan.gesture) {
-      const prev = gestureReq.get();
-      gestureReq.set({ id: GESTURE_INDEX[plan.gesture], key: prev.key + 1, mirror: plan.mirror });
+      requestRigGesture(GESTURE_INDEX[plan.gesture], plan.mirror);
+      emitGestureEnd(endTracker.interrupt());
+    }
+
+    if (reduce) {
+      tBright.set(withSequence(withTiming(0.25, { duration: 150 }), withTiming(0, { duration: 200 })));
+      const ms = plan.gesture ? reducedGestureDuration(plan.gesture) : 400;
+      const t = setTimeout(end, ms);
+      return () => clearTimeout(t);
     }
 
     /** Anticipation → air → landing → settle. Never a teleport to the apex. */
@@ -632,10 +690,23 @@ export function FlooModel({
       st.iStart = now;
     }
     let walkWanted = walkingSV.value;
-    if (!reduced && st.gIdx >= 0) {
+    if (st.gIdx >= 0) {
       const g = st.gMirror ? COMPILED_MIRROR[st.gIdx] : COMPILED[st.gIdx];
-      if (!applyGesture(g, now - st.gStart, tgt, 1)) st.gIdx = -1;
-      else if (st.gIdx === WALK_ID) walkWanted = 1;
+      const el = now - st.gStart;
+      let playing: boolean;
+      if (reduced) {
+        // One held pose, then back; the reduced springs turn both changes into cross-fades.
+        const r = REDUCED[st.gIdx];
+        playing = el < r.total;
+        if (el < r.hold) applyGesture(g, r.at, tgt, 1);
+      } else {
+        playing = applyGesture(g, el, tgt, 1);
+        if (playing && st.gIdx === WALK_ID) walkWanted = 1;
+      }
+      if (!playing) {
+        st.gIdx = -1;
+        runOnJS(rigGestureDone)(st.gKey);
+      }
     } else if (!reduced && st.iIdx >= 0) {
       const g = st.iMirror ? COMPILED_MIRROR[st.iIdx] : COMPILED[st.iIdx];
       if (!applyGesture(g, now - st.iStart, tgt, 0.85)) st.iIdx = -1;
@@ -673,10 +744,7 @@ export function FlooModel({
       }
       st.primed = true;
     } else if (reduced) {
-      for (let i = 0; i < tgt.length; i++) {
-        st.x[i] += (tgt[i] - st.x[i]) * Math.min(1, dt * 14);
-        st.v[i] = 0;
-      }
+      stepSprings(st.x, st.v, tgt, dt, SPRING_REDUCED.k, SPRING_REDUCED.z);
     } else {
       stepSprings(st.x, st.v, tgt, dt, SPRING.k, SPRING.z);
     }
