@@ -116,12 +116,15 @@ export function TabBar({ activeIndex, onChange, items = TAB_ITEMS, width, insetB
   );
 }
 
-/** The icon lifts a touch when it becomes active (1 → 1.08, spring), and settles back when it leaves. */
+/**
+ * The icon lifts a touch when it becomes active (1 → 1.04) and settles back when it leaves. Tabs
+ * switch dozens of times a day, so it is the snappy spring, not a bouncy one: no wobble to wait for.
+ */
 function TabIcon({ name, active }: { name: IconName; active: boolean }) {
   const reduce = useReducedMotion();
   const s = useSharedValue(active ? 1.04 : 1);
   useEffect(() => {
-    s.set(reduce ? withTiming(1, timing.reduced) : withSpring(active ? 1.04 : 1, springs.bouncy));
+    s.set(reduce ? withTiming(1, timing.reduced) : withSpring(active ? 1.04 : 1, springs.snappy));
   }, [active, reduce, s]);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: s.get() }] }));
   return (

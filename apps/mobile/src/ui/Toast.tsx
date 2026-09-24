@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeInUp, FadeOutUp } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInUp, FadeOut, FadeOutUp, useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptic } from "../lib/haptics";
 import { useTheme } from "../theme/ThemeProvider";
@@ -72,9 +72,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Drops in from the top edge (spring), leaves faster and with less travel than it came. Reduced
+ * motion: a plain 150 ms fade each way, no travel.
+ */
 function ToastHost({ toast, onDismiss }: { toast: (ToastOptions & { id: number }) | null; onDismiss: () => void }) {
   const { colors, shadows } = useTheme();
   const insets = useSafeAreaInsets();
+  const reduce = useReducedMotion();
   if (!toast) return null;
   const kind = toast.kind ?? "info";
   const tint = { success: colors.success, error: colors.danger, info: colors.primary }[kind];
@@ -82,8 +87,8 @@ function ToastHost({ toast, onDismiss }: { toast: (ToastOptions & { id: number }
     <View pointerEvents="box-none" style={[styles.host, { top: insets.top + spacing.sm }]}>
       <Animated.View
         key={toast.id}
-        entering={FadeInUp.springify().damping(18).stiffness(220)}
-        exiting={FadeOutUp.duration(160)}
+        entering={reduce ? FadeIn.duration(150) : FadeInUp.springify().damping(18).stiffness(220)}
+        exiting={reduce ? FadeOut.duration(150) : FadeOutUp.duration(160)}
         accessible
         accessibilityRole="alert"
         accessibilityLiveRegion="assertive"
