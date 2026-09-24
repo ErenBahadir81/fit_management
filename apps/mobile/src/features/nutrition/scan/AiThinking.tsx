@@ -22,7 +22,7 @@ import { Text } from "../../../ui/Text";
 import { SCAN_STATUS_LABELS } from "../model/scanMachine";
 
 /** Marks drawn over the camera / photo scrim: always light. `onPrimary` is navy in dark mode. */
-const ON_SCRIM = dark.ink;
+const ON_SCRIM = dark.onScrim;
 
 const SWEEP_MS = 1600;
 const BRACKET = 42;

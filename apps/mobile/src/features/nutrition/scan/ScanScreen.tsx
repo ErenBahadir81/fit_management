@@ -32,7 +32,7 @@ import { ScanResults } from "./ScanResults";
 import { CAMERA_SUPPORTED, scanUploadFrom } from "./camera";
 
 /** Marks drawn over the camera / photo scrim: always light. `onPrimary` is navy in dark mode. */
-const ON_SCRIM = dark.ink;
+const ON_SCRIM = dark.onScrim;
 
 const TICK_MS = 200;
 const DONE_MS = 1100;

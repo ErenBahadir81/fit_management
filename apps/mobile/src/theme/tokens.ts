@@ -4,7 +4,8 @@
  *
  * Derived from a Design DNA pass over MyFitnessPal, FatSecret and BitePal (App Store screenshots,
  * measured): cool light canvas, white hairline cards, one blue accent, big tabular numbers.
- * Every text pair below is WCAG AA (ratios noted as [fg on bg]).
+ * Every text pair below is WCAG AA (ratios noted as [fg on bg]); `__tests__/theme/contrast.test.ts`
+ * enforces it, including `onScrim` on the scrim over a white frame.
  *
  * The brand blue is Floo's own hue (≈200°) taken deep enough to carry text. Floo's body colour
  * (`floo`, #69C8F1) is 1.9:1 on white, so it is decoration only: the mascot, its bubble, the end of
@@ -47,7 +48,13 @@ export interface ThemeColors {
   controlBorder: string;
   /** Focus ring and selected outline. */
   focus: string;
+  /**
+   * The scrim: dims a photo, the live camera or the screen behind a floating card. Dark in both
+   * schemes, deep enough that `onScrim` stays AA even over a white frame.
+   */
   overlay: string;
+  /** Text and marks drawn on the scrim (over a photo or the camera). Light in both schemes. */
+  onScrim: string;
   skeleton: string;
   skeletonHighlight: string;
   ringTrack: string;
@@ -78,7 +85,7 @@ export const light: ThemeColors = {
   primaryStrong: "#075A91", // pressed; white on it 7.3
   primarySoft: "#E2F1FB", // primary text on it 4.6
   onPrimary: "#FFFFFF",
-  onPrimaryMuted: "rgba(255,255,255,0.86)",
+  onPrimaryMuted: "rgba(255,255,255,0.9)", // 4.6 on primary
   onPrimaryBorder: "rgba(255,255,255,0.28)",
   gradient: ["#0A70B3", "#3AA7E3"],
   success: "#13773A", // 5.6 on surface
@@ -90,9 +97,10 @@ export const light: ThemeColors = {
   dangerSoft: "#FDE8E8",
   border: "#E2E8EE",
   borderStrong: "#CDD6DF",
-  controlBorder: "#8594A5", // 3.1 on surface
+  controlBorder: "#7A8A9C", // 3.5 on surface, 3.3 on bg
   focus: "#0A70B3",
-  overlay: "rgba(13,27,38,0.45)",
+  overlay: "rgba(13,27,38,0.62)",
+  onScrim: "#FFFFFF", // 4.9 on the scrim over a white frame
   skeleton: "#E7EDF2",
   skeletonHighlight: "#F5F8FB",
   ringTrack: "#E3EBF2",
@@ -135,6 +143,7 @@ export const dark: ThemeColors = {
   controlBorder: "#5D6E80", // 3.3 on surface
   focus: "#52B7EE",
   overlay: "rgba(0,0,0,0.6)",
+  onScrim: "#FFFFFF", // 5.7 on the scrim over a white frame
   skeleton: "#1A2530",
   skeletonHighlight: "#253241",
   ringTrack: "#1F2B37",
