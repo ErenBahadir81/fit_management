@@ -170,8 +170,9 @@ const EMPTY_TREND: BodyFatTrend = {
 
 /**
  * The tape-measurement trend against the plan. On a recomp the scale barely moves by design, so
- * progress is body fat and the lean mass derived from it — but a Navy reading is only good to about
- * ±1 point while the plan moves ~0.3 points a week, so a single reading never decides:
+ * progress is body fat and the lean mass derived from it — but a Navy reading is only good to ±1
+ * point between trained observers (≈ ±1.5 self-measured) while the plan moves ~0.3 points a week,
+ * so a single reading never decides:
  *
  *  1. readings since the plan (re)started, within `bfWindowDays` of today, one per day (last wins);
  *  2. each is compared with the roadmap's expected body fat / lean mass on its day (the residual);
