@@ -1,6 +1,7 @@
 import { act, waitFor } from "@testing-library/react-native";
 import type { ProgramView } from "@fitfloow/core";
 import { makeQueryClient, renderHookUI } from "../../../__tests__/helpers";
+import { flooBus } from "../../mascot/events";
 import { setApi } from "../../lib/api";
 import { createFakeApi } from "../../lib/fake";
 import {
@@ -142,6 +143,7 @@ describe("training mutations", () => {
     const program = await renderHookUI(() => useProgram(), { queryClient: qc });
     await waitFor(() => expect(program.result.current.data).toBeTruthy());
     const invalidate = jest.spyOn(qc, "invalidateQueries");
+    const emit = jest.spyOn(flooBus, "emit");
 
     const complete = await renderHookUI(() => useCompleteWorkout(), { queryClient: qc });
     await act(async () => {
@@ -162,6 +164,8 @@ describe("training mutations", () => {
     await waitFor(() => expect(complete.result.current.isSuccess).toBe(true));
     const keys = invalidate.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
     expect(keys).toEqual(expect.arrayContaining([JSON.stringify(["home"]), JSON.stringify(["recovery"]), JSON.stringify(["program"])]));
+    expect(emit).toHaveBeenCalledWith("workoutDone", expect.objectContaining({ durationMin: 48 }));
+    emit.mockRestore();
   });
 
   test("updateProgram replaces the days in the cache before the round trip", async () => {

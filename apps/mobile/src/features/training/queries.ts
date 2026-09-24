@@ -19,6 +19,7 @@ import {
   type TrainingStats,
   type WorkoutLogDTO,
 } from "@fitfloow/core";
+import { flooBus } from "../../mascot/events";
 import { getApi } from "../../lib/api";
 import { describeError } from "../../lib/errors";
 import { haptic } from "../../lib/haptics";
@@ -254,7 +255,10 @@ export function useCompleteWorkout() {
     },
     onError: (e, _v, ctx) => rollback(ctx, e, "Antrenman kaydedilemedi. Tekrar dene."),
     // The success haptic belongs to the SuccessCheck the logger shows — one big moment, one buzz.
-    onSuccess: () => invalidate(),
+    onSuccess: ({ log }) => {
+      invalidate();
+      flooBus.emit("workoutDone", { title: log.title, kind: log.kind, durationMin: log.durationMin });
+    },
   });
 }
 

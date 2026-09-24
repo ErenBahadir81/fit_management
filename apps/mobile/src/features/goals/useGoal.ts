@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GoalDTO, GoalInput, GoalPreview, GoalProfile, GoalView, Recalibration } from "@fitfloow/core";
+import { flooBus } from "../../mascot/events";
 import { getApi } from "../../lib/api";
 import { describeError } from "../../lib/errors";
 import { haptic } from "../../lib/haptics";
@@ -133,10 +134,11 @@ export function useCompleteGoal() {
   const qc = useQueryClient();
   return useMutation<GoalDTO, unknown, void>({
     mutationFn: async () => (await getApi().goals.complete()).goal,
-    onSuccess: () => {
+    onSuccess: (goal) => {
       qc.setQueryData<GoalView>(GOAL_KEY, { goal: null, progress: null });
       after(null);
       void haptic.success();
+      flooBus.emit("goalHit", { goalId: goal.id });
     },
     onError: (e) => toast.show({ message: describeError(e, "İşlem yapılamadı. Tekrar dene."), kind: "error" }),
   });

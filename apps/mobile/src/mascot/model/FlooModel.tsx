@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
-import { Blur, Canvas, Circle, Group, Oval, Path, RadialGradient, Rect } from "@shopify/react-native-skia";
+import { Blur, Canvas, Circle, Group, Oval, Path, Rect } from "@shopify/react-native-skia";
 import {
   Easing,
   cancelAnimation,
   useAnimatedReaction,
   useDerivedValue,
+  useFrameCallback,
   useReducedMotion,
   useSharedValue,
   withDelay,
@@ -17,18 +18,9 @@ import {
 } from "react-native-reanimated";
 import { springs } from "../../theme/motion";
 import {
-  ARM_CREASE_L,
-  ARM_CREASE_R,
-  ARM_LINE_L,
-  ARM_LINE_R,
-  ARM_PATH_L,
-  ARM_PATH_R,
-  ARM_RIM_L,
-  ARM_RIM_R,
   BODY,
   BROW_L,
   BROW_R,
-  BROW_W,
   CHEEK,
   CHIN,
   EYE_L,
@@ -37,26 +29,9 @@ import {
   EYE_R,
   GAZE_RADIUS,
   FOOT_Y,
-  GROUND_Y,
   IRIS_L,
   IRIS_R,
-  IRIS_RX_L,
-  IRIS_RY_L,
-  IRIS_RX_R,
-  IRIS_RY_R,
   IRIS_R_C,
-  LEG_CREASE_L,
-  LEG_CREASE_R,
-  LEG_PATH_L,
-  LEG_PATH_R,
-  LEG_RIM_L,
-  LEG_RIM_R,
-  LIMB_CLIP,
-  PIVOT_ARM_L,
-  PIVOT_ARM_R,
-  PIVOT_LEG_L,
-  PIVOT_LEG_R,
-  SHOE_CLIP,
   MOUTH,
   OUTLINE_W,
   SHADOW,
@@ -73,9 +48,25 @@ import {
   tipAnchor,
   volumePreservingScale,
 } from "./geometry";
-import { FLOO_MODEL_COLORS, FLOO_MODEL_COLORS as C, MOOD_BROW_WEIGHT, MOOD_LABEL_TR, MOOD_PARAMS, clampParam, type FlooParams, type Mood, type Trigger } from "./params";
+import { FLOO_MODEL_COLORS, FLOO_MODEL_COLORS as C, MOOD_BROW_WEIGHT, MOOD_LABEL_TR, MOOD_PARAMS, type FlooParams, type Mood, type Trigger } from "./params";
+import { COMPILED, COMPILED_MIRROR, GESTURE_INDEX, IDLE_GESTURES, MOOD_RIG, type Gesture } from "./poses";
+import { FlooLimbs } from "./FlooLimbs";
+import {
+  A,
+  ARM_BASE,
+  CH,
+  CHANNEL_COUNT,
+  REST,
+  SPRING,
+  applyGesture,
+  applyWalk,
+  stepSprings,
+  type BodyXform,
+} from "./rig";
+import { LOD_VIEW, TRIGGER_GESTURE, flooBox, flooTriggerPlan, type FlooLod } from "./behaviour";
 
 const VB = { w: 200, h: 290 } as const;
+/** Height : width of the full-body box. Smaller LODs crop it; see `flooBox`. */
 export const FLOO_MODEL_ASPECT = VB.h / VB.w;
 
 const LID_RX = 19;
@@ -102,6 +93,20 @@ export interface FlooModelProps {
   /** Change the *key* to fire; the same key twice does nothing. */
   trigger?: { name: Trigger; key: number } | null;
   onTriggerEnd?: (name: Trigger) => void;
+  /**
+   * A one-shot body-language move from the pose library (`poses.ts`), independent of triggers.
+   * Change the key to replay; `mirror` plays it with the other hand.
+   */
+  gesture?: { name: Gesture; key: number; mirror?: boolean } | null;
+  /**
+   * Point at something: a position in this view's own pixels (0,0 = top-left of the box). The
+   * nearer hand reaches for it with two-bone IK and holds until this goes back to null.
+   */
+  pointAt?: { x: number; y: number } | null;
+  /** Walk in place (the caller moves the view). Starts and stops through a blended cycle. */
+  walking?: boolean;
+  /** Level of detail. Defaults from `size`: ≥ 96 full, 56–96 mid, < 56 badge. */
+  lod?: FlooLod;
   /** Cosmetic slot — a Skia element, anchored at the tip. */
   accessory?: React.ReactNode;
   /** Idle loops. Off inside long lists. */
@@ -113,6 +118,7 @@ export interface FlooModelProps {
 /** An ellipse as an SVG path string. `Path` and `clip` both parse strings, so nothing here has to
  *  touch the `Skia` object — which on web is only usable after CanvasKit has loaded. */
 function ellipsePath(cx: number, cy: number, rx: number, ry: number): string {
+  "worklet";
   return `M${cx - rx} ${cy}a${rx} ${ry} 0 1 0 ${rx * 2} 0a${rx} ${ry} 0 1 0 ${-rx * 2} 0Z`;
 }
 
@@ -122,57 +128,34 @@ function blinkDelay() {
 function saccadeDelay() {
   return 1800 + Math.random() * 2800;
 }
-/**
- * How far the shoulder itself rides out and up as an arm is raised.
- *
- * Pure rotation about a fixed pivot cannot make these short arms read as a cheer: past ~90° the
- * hands simply swing out sideways at shoulder height and the pose reads as a T / aeroplane. Real
- * shoulders do not stay put — they lift and open as the arms go up. So beyond 60° the whole arm
- * group slides outward and upward on a linear ramp, reaching 9 out / 6 up at 135°, which is what
- * lifts the hands clear above and outside the head. Zero at ≤60°, so rest and every low pose are
- * bit-for-bit untouched.
- */
-function shoulderRide(angle: number): { out: number; up: number } {
-  "worklet";
-  const t = angle <= 60 ? 0 : Math.min(1, (angle - 60) / 75);
-  return { out: t * 9, up: t * 6 };
-}
 
-/** Degrees → radians, worklet-callable so the limb transforms can use it on the UI thread. */
-function rad(deg: number): number {
-  "worklet";
-  return (deg * Math.PI) / 180;
-}
+const WALK_ID = GESTURE_INDEX.walk;
+/**
+ * Under Jest the canvas is a stub and a perpetual frame loop would keep fake timers busy forever,
+ * so the rig simply holds its rest pose there. Everything the loop computes is unit-tested
+ * directly (`__tests__/mascot/rig.test.ts`).
+ */
+const FRAME_LOOP = !(typeof process !== "undefined" && process.env?.JEST_WORKER_ID);
+/** Under Jest the limbs' derived chains only cost time: the canvas they would feed is a stub. */
+const MaybeLimbs: typeof FlooLimbs = FRAME_LOOP ? FlooLimbs : ({ children }) => <>{children}</>;
+/** Chosen once per process, so it is the same hook on every render. */
+const useRigLoop: typeof useFrameCallback = FRAME_LOOP ? useFrameCallback : ((() => ({ setActive: () => {}, isActive: false, callbackId: -1 })) as unknown as typeof useFrameCallback);
 
 function leanDelay() {
   return 6000 + Math.random() * 4000;
 }
 
 /**
- * Raise a limb to `to`, then wobble it around that angle at ~8 Hz for 400 ms — the "shake the
- * water off" move. `delayMs` staggers the second arm so the pair never moves as one rigid bar;
- * `phase` flips the first wobble when the two are wanted out of step instead. Returned as sequence
- * *steps*, so the caller still owns how the limb finally settles.
- */
-function shake(to: number, amp: number, phase: 1 | -1, delayMs = 0) {
-  const steps: number[] = [
-    withDelay(delayMs, withTiming(-6, { duration: 90, easing: Easing.out(Easing.quad) })),
-    withSpring(to, { damping: 12, stiffness: 260 }),
-  ];
-  // 400 ms / 8 Hz → six half-cycles of ~62 ms. Linear inside a wobble: an eased jitter reads mushy.
-  for (let i = 0; i < 6; i++) {
-    steps.push(withTiming(to + amp * phase * (i % 2 === 0 ? 1 : -1), { duration: 62, easing: Easing.linear }));
-  }
-  return steps;
-}
-
-/**
- * Floo v2 — a limbless droplet drawn entirely in Skia from seventeen numbers.
+ * Floo 3 — the droplet, now with a skeleton.
  *
- * The character is one closed path plus a face; there is nothing rigged, so every bit of life has
- * to come out of the numbers: an area-preserving breath (it flattens on the out-breath), a blink
- * that is never on a metronome, saccades on their own schedule, a tip that lags the body and
- * overshoots before it settles, and hops that crouch before they leave the ground.
+ * The body and face are one closed path plus a handful of shapes driven by seventeen numbers: an
+ * area-preserving breath, a blink that is never on a metronome, saccades on their own schedule, a
+ * tip that lags the body and overshoots before it settles, and hops that crouch first.
+ *
+ * The limbs are a rig (`rig.ts`): two-bone arms and legs drawn as rubber-hose tubes with mitten
+ * hands and boots, posed by a mood, a gesture timeline, the idle layer, a walk cycle and IK, then
+ * chased by one per-joint spring layer that runs in a frame callback on the UI thread. The legs are
+ * planted: the body crouches and they bend; it hops and they leave the ground.
  *
  * Every animated value lives on the UI thread. There is no per-frame React state anywhere.
  */
@@ -192,6 +175,10 @@ export function FlooModel({
   look,
   trigger = null,
   onTriggerEnd,
+  gesture = null,
+  pointAt = null,
+  walking = false,
+  lod: lodProp,
   accessory,
   animate = true,
   style,
@@ -199,9 +186,12 @@ export function FlooModel({
 }: FlooModelProps) {
   const reduce = useReducedMotion();
   const loops = animate && !reduce;
-  const width = size;
-  const height = size * FLOO_MODEL_ASPECT;
-  const k = size / VB.w;
+  const box = flooBox(size, lodProp);
+  const lod = box.lod;
+  const view = LOD_VIEW[lod];
+  const width = box.width;
+  const height = box.height;
+  const k = width / view.w;
 
   const preset = MOOD_PARAMS[mood];
 
@@ -224,10 +214,6 @@ export function FlooModel({
   const brightness = useSharedValue(preset.brightness);
   const tempo = useSharedValue(preset.tempo);
   const browWeight = useSharedValue(MOOD_BROW_WEIGHT[mood]);
-  const armLv = useSharedValue(preset.armL);
-  const armRv = useSharedValue(preset.armR);
-  const legLv = useSharedValue(preset.legL);
-  const legRv = useSharedValue(preset.legR);
 
   // ── idle layer (additive, always underneath) ────────────────────────────
   const breath = useSharedValue(0);
@@ -238,13 +224,6 @@ export function FlooModel({
   /** −1 … +1, a very slow weight shift. One value drives the lean, the counter-swing of both
    *  arms and the relaxed leg, so they can never drift out of phase with each other. */
   const wshift = useSharedValue(0);
-  /** One-shot micro-gestures (foot tap / hand fidget / shrug) ride on their own layer so a
-   *  gesture can fire mid-weight-shift without cancelling it. */
-  const gArmL = useSharedValue(0);
-  const gArmR = useSharedValue(0);
-  const gLegL = useSharedValue(0);
-  const gLegR = useSharedValue(0);
-  const gSquash = useSharedValue(0);
 
   // ── trigger layer (additive, transient) ─────────────────────────────────
   const tSquash = useSharedValue(0);
@@ -252,20 +231,42 @@ export function FlooModel({
   const tLean = useSharedValue(0);
   const tBright = useSharedValue(0);
   const tSquint = useSharedValue(0);
-  const tArmL = useSharedValue(0);
-  const tArmR = useSharedValue(0);
-  const tLegL = useSharedValue(0);
-  const tLegR = useSharedValue(0);
+
+  // ── rig (the skeleton; see rig.ts) ──────────────────────────────────────
+  /** The mood's resting limb pose — the base every gesture starts from and returns to. */
+  const moodRig = useSharedValue<number[]>(MOOD_RIG[mood]);
+  /** A gesture request from the JS thread; the frame loop notices the key change and starts it. */
+  const gestureReq = useSharedValue({ id: -1, key: 0, mirror: false });
+  /** An idle fidget, played only while no real gesture is running, at partial weight. */
+  const idleReq = useSharedValue({ id: -1, key: 0, mirror: false });
+  const pointSV = useSharedValue({ on: 0, x: 0, y: 0 });
+  const walkingSV = useSharedValue(walking ? 1 : 0);
+  const loopsSV = useSharedValue(loops ? 1 : 0);
+  const reduceSV = useSharedValue(reduce ? 1 : 0);
+  /** Spring state, owned by the frame loop. Mutated in place on the UI thread, never observed. */
+  const sim = useSharedValue({
+    x: REST.slice(),
+    v: new Array<number>(CHANNEL_COUNT).fill(0),
+    gKey: 0,
+    gIdx: -1,
+    gMirror: false,
+    gStart: 0,
+    iKey: 0,
+    iIdx: -1,
+    iMirror: false,
+    iStart: 0,
+    walkAmt: 0,
+    walkPhase: 0,
+    primed: false,
+  });
+  /** The posed channels, published once per frame for the geometry below. */
+  const rig = useSharedValue<number[]>(REST.slice());
 
   // ── pointer gaze + tip follow-through ───────────────────────────────────
   const gazeX = useSharedValue(0);
   const gazeY = useSharedValue(0);
   const hydra = useSharedValue(hydration);
   const tipLag = useSharedValue(preset.lean);
-  /** Soft springs chasing the body's lean and height. The *difference* between the chaser and the
-   *  body is the follow-through: arms trail a lean and a hop, overshoot, then settle. */
-  const armLag = useSharedValue(preset.lean);
-  const hopLag = useSharedValue(0);
   /** 0 → 1 once per flick; drives both droplets off the tip. */
   const flick = useSharedValue(0);
 
@@ -292,10 +293,7 @@ export function FlooModel({
     brightness.set(withTiming(p.brightness, { duration: 320, easing: Easing.out(Easing.cubic) }));
     tempo.set(withTiming(p.tempo, { duration: 320, easing: Easing.out(Easing.cubic) }));
     browWeight.set(withTiming(MOOD_BROW_WEIGHT[mood], { duration: 320, easing: Easing.out(Easing.cubic) }));
-    armLv.set(body(p.armL));
-    armRv.set(body(p.armR));
-    legLv.set(body(p.legL));
-    legRv.set(body(p.legR));
+    moodRig.set(MOOD_RIG[mood]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mood, reduce]);
 
@@ -322,11 +320,6 @@ export function FlooModel({
       breath.set(0);
       wshift.set(0);
       microLean.set(0);
-      gArmL.set(0);
-      gArmR.set(0);
-      gLegL.set(0);
-      gLegR.set(0);
-      gSquash.set(0);
       blink.set(1);
       sacX.set(0);
       sacY.set(0);
@@ -419,56 +412,23 @@ export function FlooModel({
     };
   }, [loops, microLean]);
 
-  // A micro-gesture every 9–15 s: a foot tap, a hand fidget or a shrug, picked at random and
-  // scaled ±30 %, so the character is never caught doing the same little thing on a beat.
+  // An idle fidget every 8–15 s — scratching the head, a foot tap, looking at a hand, folding
+  // the arms, a stretch — picked at random and sometimes mirrored, never on a beat. The frame loop
+  // plays it at partial weight and drops it the moment a real gesture starts.
   useEffect(() => {
     if (!loops) return;
     let t: ReturnType<typeof setTimeout> | null = null;
     let first = true;
     const run = () => {
-      t = setTimeout(() => {
-        const amp = 0.7 + Math.random() * 0.6;
-        const pick = Math.random();
-        if (pick < 0.36) {
-          // Foot tap — one toe, up and straight back down.
-          const leg = Math.random() < 0.5 ? gLegL : gLegR;
-          leg.set(
-            withSequence(
-              withTiming(6 * amp, { duration: 250, easing: Easing.out(Easing.quad) }),
-              withSpring(0, { damping: 11, stiffness: 220 })
-            )
-          );
-        } else if (pick < 0.72) {
-          // Hand fidget — one arm out and back, a spring each way so it never snaps.
-          const arm = Math.random() < 0.5 ? gArmL : gArmR;
-          arm.set(
-            withSequence(
-              withSpring(8 * amp, { damping: 12, stiffness: 190 }),
-              withSpring(0, { damping: 14, stiffness: 130 })
-            )
-          );
-        } else {
-          // Shrug — both shoulders, with the body squashing into it so it reads as one motion.
-          const up = withSequence(
-            withTiming(5 * amp, { duration: 180, easing: Easing.out(Easing.cubic) }),
-            withDelay(140, withSpring(0, springs.gentle))
-          );
-          gArmL.set(up);
-          gArmR.set(
-            withSequence(
-              withTiming(5 * amp, { duration: 180, easing: Easing.out(Easing.cubic) }),
-              withDelay(140, withSpring(0, springs.gentle))
-            )
-          );
-          gSquash.set(
-            withSequence(
-              withTiming(0.03 * amp, { duration: 180, easing: Easing.out(Easing.cubic) }),
-              withDelay(140, withSpring(0, springs.gentle))
-            )
-          );
-        }
-        run();
-      }, first ? 2200 + Math.random() * 2000 : 9000 + Math.random() * 6000);
+      t = setTimeout(
+        () => {
+          const name = IDLE_GESTURES[Math.floor(Math.random() * IDLE_GESTURES.length)];
+          const prev = idleReq.get();
+          idleReq.set({ id: GESTURE_INDEX[name], key: prev.key + 1, mirror: Math.random() < 0.5 });
+          run();
+        },
+        first ? 3500 + Math.random() * 2500 : 8000 + Math.random() * 7000
+      );
       first = false;
     };
     run();
@@ -477,6 +437,35 @@ export function FlooModel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loops]);
+
+  // ── rig inputs ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    loopsSV.set(loops ? 1 : 0);
+    reduceSV.set(reduce ? 1 : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loops, reduce]);
+  useEffect(() => {
+    walkingSV.set(walking && !reduce ? 1 : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walking, reduce]);
+  const lastGestureKey = useRef<number | null>(null);
+  useEffect(() => {
+    if (!gesture || reduce) return;
+    if (lastGestureKey.current === gesture.key) return;
+    lastGestureKey.current = gesture.key;
+    const prev = gestureReq.get();
+    gestureReq.set({ id: GESTURE_INDEX[gesture.name] ?? -1, key: prev.key + 1, mirror: !!gesture.mirror });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gesture?.key, gesture?.name, reduce]);
+  useEffect(() => {
+    if (!pointAt || !Number.isFinite(pointAt.x) || !Number.isFinite(pointAt.y)) {
+      pointSV.set({ on: 0, x: 0, y: 0 });
+      return;
+    }
+    // View pixels → body space, through this LOD's crop.
+    pointSV.set({ on: 1, x: pointAt.x / k + view.x, y: pointAt.y / k + view.y });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointAt?.x, pointAt?.y, k, view.x, view.y]);
 
   useEffect(() => {
     if (!loops) return;
@@ -505,13 +494,16 @@ export function FlooModel({
 
     if (reduce) {
       tBright.set(withSequence(withTiming(0.25, { duration: 150 }), withTiming(0, { duration: 200 })));
-      // Limbs hold the mood pose: the trigger layer is simply timed to zero, never sprung.
-      tArmL.set(withTiming(0, { duration: 150 }));
-      tArmR.set(withTiming(0, { duration: 150 }));
-      tLegL.set(withTiming(0, { duration: 150 }));
-      tLegR.set(withTiming(0, { duration: 150 }));
       const t = setTimeout(end, 400);
       return () => clearTimeout(t);
+    }
+
+    // The limbs' part of every trigger is a gesture from the pose library, started on the UI thread
+    // in the same frame as the body's own sequence below.
+    const plan = TRIGGER_GESTURE[name];
+    if (plan.gesture) {
+      const prev = gestureReq.get();
+      gestureReq.set({ id: GESTURE_INDEX[plan.gesture], key: prev.key + 1, mirror: plan.mirror });
     }
 
     /** Anticipation → air → landing → settle. Never a teleport to the apex. */
@@ -533,63 +525,23 @@ export function FlooModel({
       );
     };
 
-    /** Arms swing back on the crouch, lead the body into the air, then bounce past on the landing —
-     *  anticipation, then follow-through. The landing value is deliberately *past* rest. */
-    const armSwing = (back: number, up: number, settle: number, antic = 110) =>
-      withSequence(
-        withTiming(back, { duration: antic, easing: Easing.out(Easing.quad) }),
-        withSpring(up, { damping: 10, stiffness: 240 }),
-        withSpring(settle, { damping: 13, stiffness: 210 }),
-        withSpring(0, { damping: 14, stiffness: 150 })
-      );
-    /** Knees bend on the crouch, tuck outward in the air, then take the landing. */
-    const legTuck = (bend: number, tuck: number, antic = 110) =>
-      withSequence(
-        withTiming(bend, { duration: antic, easing: Easing.out(Easing.quad) }),
-        withSpring(tuck, { damping: 10, stiffness: 250 }),
-        withSpring(bend * 0.6, { damping: 13, stiffness: 220 }),
-        withSpring(0, springs.bouncy)
-      );
+    /** A small bounce — for acknowledgements that should not make a scene. */
+    const bob = (height: number) => {
+      tHop.set(withSequence(withTiming(-1, { duration: 90, easing: Easing.out(Easing.quad) }), withSpring(height, { damping: 10, stiffness: 260 }), withSpring(0, { damping: 14, stiffness: 220 })));
+      tSquash.set(withSequence(withTiming(0.06, { duration: 90, easing: Easing.out(Easing.quad) }), withSpring(0, springs.bouncy)));
+    };
 
-    let ms = 700;
+    // The body's share of each beat. Limbs, lean and face come from the trigger's gesture.
     switch (name) {
       case "mealLogged":
-        jump(16);
-        // Up on the hop, then both hands sweep *in* on the landing — the belly pat.
-        tArmL.set(armSwing(-8, 40, -20));
-        tArmR.set(armSwing(-8, 40, -20));
-        tLegL.set(legTuck(-5, 9));
-        tLegR.set(legTuck(-5, 9));
-        ms = 950;
+        jump(14);
         break;
       case "goalHit":
         jump(28);
         tLean.set(withSequence(withSpring(-4, springs.bouncy), withSpring(0, springs.bouncy)));
-        // The big one: arms wind back through the crouch, fly to full stretch, bounce on landing.
-        tArmL.set(
-          withSequence(
-            withTiming(-25, { duration: 110, easing: Easing.out(Easing.quad) }),
-            withSpring(135, { damping: 11, stiffness: 230 }),
-            withSpring(101, { damping: 12, stiffness: 200 }),
-            withSpring(124, { damping: 16, stiffness: 220 }),
-            withSpring(0, { damping: 14, stiffness: 120 })
-          )
-        );
-        tArmR.set(
-          withSequence(
-            withTiming(-25, { duration: 110, easing: Easing.out(Easing.quad) }),
-            withSpring(135, { damping: 11, stiffness: 230 }),
-            withSpring(101, { damping: 12, stiffness: 200 }),
-            withSpring(124, { damping: 16, stiffness: 220 }),
-            withSpring(0, { damping: 14, stiffness: 120 })
-          )
-        );
-        tLegL.set(legTuck(-8, 25));
-        tLegR.set(legTuck(-8, 25));
-        ms = 1400;
         break;
       case "streakUp":
-        jump(20);
+        // Two hops, one per punch of the fist.
         tHop.set(
           withSequence(
             withTiming(-2.5, { duration: 100, easing: Easing.out(Easing.quad) }),
@@ -599,104 +551,145 @@ export function FlooModel({
             withSpring(0, { damping: 13, stiffness: 200 })
           )
         );
-        // One fist punches the air on each hop; the other arm only counter-balances.
-        tArmR.set(
-          withSequence(
-            withTiming(-10, { duration: 100, easing: Easing.out(Easing.quad) }),
-            withSpring(135, { damping: 11, stiffness: 300 }),
-            withSpring(35, { damping: 14, stiffness: 240 }),
-            withSpring(135, { damping: 11, stiffness: 300 }),
-            withSpring(0, { damping: 14, stiffness: 150 })
-          )
-        );
-        tArmL.set(
-          withSequence(
-            withTiming(-6, { duration: 100, easing: Easing.out(Easing.quad) }),
-            withSpring(20, { damping: 12, stiffness: 220 }),
-            withSpring(4, { damping: 14, stiffness: 200 }),
-            withSpring(18, { damping: 12, stiffness: 220 }),
-            withSpring(0, { damping: 14, stiffness: 150 })
-          )
-        );
-        tLegL.set(legTuck(-5, 12, 100));
-        tLegR.set(legTuck(-5, 12, 100));
-        ms = 1400;
+        tSquash.set(withSequence(withTiming(0.12, { duration: 100, easing: Easing.out(Easing.quad) }), withSpring(0, springs.bouncy)));
         break;
       case "missedDay":
-        // Sinks, then picks itself back up. Never a punishment.
-        tSquash.set(withSequence(withSpring(0.09, springs.gentle), withDelay(1100, withSpring(0, springs.gentle))));
-        // Everything sags at once and comes back on a much softer spring than it went down on.
-        tArmL.set(withSequence(withSpring(-17, { damping: 16, stiffness: 95 }), withDelay(1100, withSpring(0, { damping: 18, stiffness: 45 }))));
-        tArmR.set(withSequence(withSpring(-17, { damping: 16, stiffness: 95 }), withDelay(1100, withSpring(0, { damping: 18, stiffness: 45 }))));
-        tLegL.set(withSequence(withSpring(-9, { damping: 16, stiffness: 95 }), withDelay(1100, withSpring(0, { damping: 18, stiffness: 45 }))));
-        tLegR.set(withSequence(withSpring(-9, { damping: 16, stiffness: 95 }), withDelay(1100, withSpring(0, { damping: 18, stiffness: 45 }))));
-        tBright.set(withSequence(withTiming(-0.15, { duration: 300 }), withDelay(900, withTiming(0, { duration: 320 }))));
-        ms = 2400;
-        break;
-      case "overTarget":
-        tLean.set(withSequence(withSpring(4, { damping: 11, stiffness: 160 }), withDelay(600, withSpring(0, springs.gentle))));
-        tHop.set(withSequence(withSpring(-2, { damping: 12, stiffness: 200 }), withDelay(500, withSpring(0, springs.gentle))));
-        // A shuffling step back: the legs alternate twice while the arms come up defensively.
-        tLegL.set(
-          withSequence(
-            withSpring(11, { damping: 12, stiffness: 270 }),
-            withSpring(-11, { damping: 12, stiffness: 270 }),
-            withSpring(11, { damping: 12, stiffness: 270 }),
-            withSpring(0, springs.bouncy)
-          )
-        );
-        tLegR.set(
-          withSequence(
-            withSpring(-11, { damping: 12, stiffness: 270 }),
-            withSpring(11, { damping: 12, stiffness: 270 }),
-            withSpring(-11, { damping: 12, stiffness: 270 }),
-            withSpring(0, springs.bouncy)
-          )
-        );
-        tArmL.set(withSequence(withSpring(24, { damping: 13, stiffness: 210 }), withDelay(450, withSpring(0, springs.gentle))));
-        tArmR.set(withSequence(withSpring(24, { damping: 13, stiffness: 210 }), withDelay(450, withSpring(0, springs.gentle))));
-        ms = 1300;
+        // The fall itself is the gesture; the colour drains while it sits, and comes back as it gets up.
+        tBright.set(withSequence(withTiming(-0.15, { duration: 300 }), withDelay(1000, withTiming(0, { duration: 360 }))));
         break;
       case "waterLogged":
-        tSquash.set(
-          withSequence(
-            withTiming(0.12, { duration: 110, easing: Easing.out(Easing.quad) }),
-            withTiming(-0.16, { duration: 220, easing: Easing.out(Easing.cubic) }),
-            withSpring(0, springs.bouncy)
-          )
-        );
-        tHop.set(withSequence(withSpring(12, { damping: 10, stiffness: 220 }), withSpring(0, { damping: 14, stiffness: 200 })));
-        tBright.set(withSequence(withTiming(0.3, { duration: 200 }), withTiming(0, { duration: 420 })));
-        flick.set(withSequence(withTiming(1, { duration: 520, easing: Easing.out(Easing.quad) }), withTiming(0, { duration: 0 })));
-        // Stretch both arms overhead, then shake the droplets off: ±12° at ~8 Hz for 400 ms.
-        // Both arms shake the same way (in phase) but the right one starts ~60 ms late, so the
-        // stretch reads as one body reaching up rather than two arms bolted to the same pole.
-        tArmL.set(withSequence(...shake(100, 6, 1, 0), withSpring(0, { damping: 14, stiffness: 140 })));
-        tArmR.set(withSequence(...shake(100, 6, 1, 60), withSpring(0, { damping: 14, stiffness: 140 })));
-        tLegL.set(withSequence(withSpring(4, { damping: 13, stiffness: 220 }), withDelay(400, withSpring(0, springs.gentle))));
-        tLegR.set(withSequence(withSpring(4, { damping: 13, stiffness: 220 }), withDelay(400, withSpring(0, springs.gentle))));
-        ms = 1400;
+        // Drinks first (the gesture), then glows and shakes a couple of drops off the crown.
+        tBright.set(withDelay(700, withSequence(withTiming(0.3, { duration: 220 }), withTiming(0, { duration: 480 }))));
+        flick.set(withDelay(900, withSequence(withTiming(1, { duration: 520, easing: Easing.out(Easing.quad) }), withTiming(0, { duration: 0 }))));
+        tSquash.set(withDelay(1050, withSequence(withTiming(0.08, { duration: 100, easing: Easing.out(Easing.quad) }), withSpring(0, springs.bouncy))));
+        break;
+      case "setCompleted":
+        bob(5);
+        break;
+      case "workoutDone":
+        jump(12);
+        tBright.set(withSequence(withTiming(0.2, { duration: 200 }), withTiming(0, { duration: 500 })));
+        break;
+      case "measurementLogged":
+      case "greet":
+        bob(4);
+        break;
+      case "volumeWarning":
+      case "goalAdjustProposal":
+      case "overTarget":
         break;
       case "tap":
         tSquash.set(withSequence(withTiming(0.14, { duration: 90, easing: Easing.out(Easing.quad) }), withSpring(0, springs.bouncy)));
         tSquint.set(withSequence(withTiming(0.45, { duration: 90 }), withDelay(90, withTiming(0, { duration: 180 }))));
-        // Everything flails out on the pop and springs back — the juice must return to rest.
-        tArmL.set(withSequence(withTiming(46, { duration: 70, easing: Easing.out(Easing.quad) }), withSpring(0, { damping: 9, stiffness: 170 })));
-        tArmR.set(withSequence(withTiming(46, { duration: 70, easing: Easing.out(Easing.quad) }), withSpring(0, { damping: 9, stiffness: 170 })));
-        tLegL.set(withSequence(withTiming(14, { duration: 70, easing: Easing.out(Easing.quad) }), withSpring(0, { damping: 9, stiffness: 170 })));
-        tLegR.set(withSequence(withTiming(14, { duration: 70, easing: Easing.out(Easing.quad) }), withSpring(0, { damping: 9, stiffness: 170 })));
-        ms = 560;
         break;
     }
+    const ms = Math.max(560, flooTriggerPlan(name).durationMs);
     const t = setTimeout(end, ms);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger?.key, reduce]);
 
+  // ── the frame loop: pose → springs → published rig ──────────────────────
+  /*
+   * One pass per frame on the UI thread. The target pose is built in layers — the mood's resting
+   * pose, the idle breath and weight shift, an idle fidget or a real gesture, the walk cycle, and a
+   * pointing target — and every channel then chases its target on its own spring. The springs are
+   * what make the motion read as a body: the shoulder leads, the elbow and the hand trail it and
+   * overshoot, the feet land after the body does.
+   */
+  useRigLoop((frame) => {
+    "worklet";
+    const st = sim.value;
+    const now = frame.timestamp;
+    const dt = Math.min(0.05, Math.max(0.001, (frame.timeSincePreviousFrame ?? 16) / 1000));
+    const tgt = moodRig.value.slice();
+    const reduced = reduceSV.value > 0.5;
+
+    if (loopsSV.value > 0.5 && !reduced) {
+      // Idle layer: the shoulders rise a hair on the in-breath and the arms counter the weight shift.
+      const b = breath.value;
+      const w = wshift.value;
+      tgt[CH.L_sh] += b * 40 - w * 3.5;
+      tgt[CH.R_sh] += b * 40 + w * 3.5;
+      tgt[CH.L_el] += -b * 25;
+      tgt[CH.R_el] += -b * 25;
+    }
+
+    // A real gesture replaces any idle fidget the moment it is requested.
+    const req = gestureReq.value;
+    if (req.key !== st.gKey) {
+      st.gKey = req.key;
+      st.gIdx = req.id;
+      st.gMirror = req.mirror;
+      st.gStart = now;
+      if (req.id >= 0) st.iIdx = -1;
+    }
+    const idle = idleReq.value;
+    if (idle.key !== st.iKey) {
+      st.iKey = idle.key;
+      st.iIdx = st.gIdx >= 0 || walkingSV.value > 0.5 || reduced ? -1 : idle.id;
+      st.iMirror = idle.mirror;
+      st.iStart = now;
+    }
+    let walkWanted = walkingSV.value;
+    if (!reduced && st.gIdx >= 0) {
+      const g = st.gMirror ? COMPILED_MIRROR[st.gIdx] : COMPILED[st.gIdx];
+      if (!applyGesture(g, now - st.gStart, tgt, 1)) st.gIdx = -1;
+      else if (st.gIdx === WALK_ID) walkWanted = 1;
+    } else if (!reduced && st.iIdx >= 0) {
+      const g = st.iMirror ? COMPILED_MIRROR[st.iIdx] : COMPILED[st.iIdx];
+      if (!applyGesture(g, now - st.iStart, tgt, 0.85)) st.iIdx = -1;
+    }
+
+    // Walk: fade the cycle in and out so starting and stopping never pops; 1.7 steps a second.
+    st.walkAmt += (walkWanted - st.walkAmt) * Math.min(1, dt * 5);
+    if (st.walkAmt > 0.001) {
+      st.walkPhase += dt * Math.PI * 1.7;
+      applyWalk(tgt, st.walkPhase, st.walkAmt);
+    } else {
+      st.walkPhase = 0;
+    }
+
+    // Pointing: the nearer hand takes the target and holds it.
+    const pt = pointSV.value;
+    if (pt.on > 0.5) {
+      const b = pt.x >= 100 ? ARM_BASE.R : ARM_BASE.L;
+      tgt[b + A.ik] = 1;
+      tgt[b + A.ikX] = pt.x;
+      tgt[b + A.ikY] = pt.y;
+      tgt[b + A.point] = 1;
+      tgt[b + A.curl] = 1;
+      tgt[b + A.thumb] = -0.6;
+      tgt[b + A.wr] = 0;
+      tgt[b + A.front] = 0;
+    }
+
+    if (!st.primed) {
+      // First frame: start ON the pose. A mascot that flails in from the rest pose every time a
+      // screen mounts is the mascot everyone learns to hate.
+      for (let i = 0; i < tgt.length; i++) {
+        st.x[i] = tgt[i];
+        st.v[i] = 0;
+      }
+      st.primed = true;
+    } else if (reduced) {
+      for (let i = 0; i < tgt.length; i++) {
+        st.x[i] += (tgt[i] - st.x[i]) * Math.min(1, dt * 14);
+        st.v[i] = 0;
+      }
+    } else {
+      stepSprings(st.x, st.v, tgt, dt, SPRING.k, SPRING.z);
+    }
+    // Front/behind is a layer switch, not a motion: never spring it.
+    st.x[ARM_BASE.L + A.front] = tgt[ARM_BASE.L + A.front];
+    st.x[ARM_BASE.R + A.front] = tgt[ARM_BASE.R + A.front];
+    rig.value = st.x.slice();
+  });
+
   // ── derived: the numbers the renderer actually eats ─────────────────────
   const leanTotal = useDerivedValue(() => {
     "worklet";
-    const v = lean.get() + microLean.get() + tLean.get() + wshift.get() * 1.5;
+    const v = lean.get() + microLean.get() + tLean.get() + wshift.get() * 1.5 + rig.get()[CH.lean];
     return Number.isFinite(v) ? Math.max(-22, Math.min(22, v)) : 0;
   });
 
@@ -707,30 +700,17 @@ export function FlooModel({
     (v) => {
       "worklet";
       tipLag.set(withSpring(v, { damping: 8, stiffness: 90, mass: 1 }));
-      // The arms get their own, looser chaser: ~80 ms behind the body with a 30–40 % overshoot,
-      // so a lean or a hop leaves them trailing and they swing past before they settle.
-      armLag.set(withSpring(v, { damping: 7, stiffness: 130, mass: 0.9 }));
     }
   );
 
   const hopTotal = useDerivedValue(() => {
     "worklet";
-    const v = hop.get() + tHop.get();
+    const v = hop.get() + tHop.get() + rig.get()[CH.hop];
     return Number.isFinite(v) ? v : 0;
   });
-
-  // Same trick for height: the arms lag the hop, so they swing out on the way up and tuck in on
-  // the landing instead of being welded to the body.
-  useAnimatedReaction(
-    () => hopTotal.get(),
-    (v) => {
-      "worklet";
-      hopLag.set(withSpring(v, { damping: 8, stiffness: 150, mass: 0.9 }));
-    }
-  );
   const squashTotal = useDerivedValue(() => {
     "worklet";
-    const v = squash.get() + breath.get() + tSquash.get() + gSquash.get();
+    const v = squash.get() + breath.get() + tSquash.get() + rig.get()[CH.squash];
     return Number.isFinite(v) ? v : 0;
   });
   const hydroScale = useDerivedValue(() => {
@@ -758,62 +738,35 @@ export function FlooModel({
     return bodyPath(bend, len, hydroScale.get());
   });
 
-  const bodyTransform = useDerivedValue(() => {
+  /** The body's transform as numbers, shared by the body group and every limb root. */
+  const bodyX = useDerivedValue<BodyXform>(() => {
     "worklet";
     const s = volumePreservingScale(squashTotal.get());
+    return {
+      ox: BODY.cx,
+      oy: FOOT_Y,
+      tx: rig.get()[CH.x],
+      ty: -hopTotal.get(),
+      lean: leanTotal.get(),
+      sx: Number.isFinite(s.scaleX) ? s.scaleX : 1,
+      sy: Number.isFinite(s.scaleY) ? s.scaleY : 1,
+      k: 1,
+    };
+  });
+  const bodyTransform = useDerivedValue(() => {
+    "worklet";
+    const b = bodyX.get();
     return [
-      { translateY: -hopTotal.get() },
-      { rotate: (leanTotal.get() * Math.PI) / 180 },
-      { scaleX: Number.isFinite(s.scaleX) ? s.scaleX : 1 },
-      { scaleY: Number.isFinite(s.scaleY) ? s.scaleY : 1 },
+      { translateX: Number.isFinite(b.tx) ? b.tx : 0 },
+      { translateY: b.ty },
+      { rotate: (b.lean * Math.PI) / 180 },
+      { scaleX: b.sx },
+      { scaleY: b.sy },
     ];
   });
   // Lean pivots at the soles now that the character stands on feet, not at the body's underside.
   const bodyOrigin = { x: BODY.cx, y: FOOT_Y };
-  /**
-   * Every limb angle is four layers summed on the UI thread: the mood pose, the idle weight shift,
-   * whatever micro-gesture or trigger is currently running, and the follow-through lag.
-   *
-   * `lagSwing` is signed in *world* terms (clockwise positive), so it is added to the left arm and
-   * subtracted from the right — the renderer mirrors the right-hand pair. `lagLift` is symmetric:
-   * both arms swing outward together on the way up and tuck in on the landing.
-   */
-  const limbLag = useDerivedValue(() => {
-    "worklet";
-    const swing = (armLag.get() - leanTotal.get()) * 0.9;
-    const lift = (hopTotal.get() - hopLag.get()) * 0.55;
-    return {
-      swing: Number.isFinite(swing) ? Math.max(-10, Math.min(10, swing)) : 0,
-      lift: Number.isFinite(lift) ? Math.max(-10, Math.min(10, lift)) : 0,
-    };
-  });
 
-  const armLT = useDerivedValue(() => {
-    "worklet";
-    const l = limbLag.get();
-    const v = clampParam("armL", armLv.get() + wshift.get() * -4.5 + breath.get() * 60 + gArmL.get() + tArmL.get() + l.swing + l.lift);
-    const r = shoulderRide(v);
-    // Translate first, then rotate about the pivot: the arm swings, and the shoulder it swings
-    // from rides out and up with it.
-    return [{ translateX: -r.out }, { translateY: -r.up }, { rotate: rad(v) }];
-  });
-  const armRT = useDerivedValue(() => {
-    "worklet";
-    const l = limbLag.get();
-    const v = clampParam("armR", armRv.get() + wshift.get() * 4.5 + breath.get() * 60 + gArmR.get() + tArmR.get() - l.swing + l.lift);
-    const r = shoulderRide(v);
-    return [{ translateX: r.out }, { translateY: -r.up }, { rotate: -rad(v) }];
-  });
-  const legLT = useDerivedValue(() => {
-    "worklet";
-    const v = legLv.get() + wshift.get() * 3 + breath.get() * 20 + gLegL.get() + tLegL.get();
-    return [{ rotate: rad(clampParam("legL", v)) }];
-  });
-  const legRT = useDerivedValue(() => {
-    "worklet";
-    const v = legRv.get() + wshift.get() * -3 + breath.get() * 20 + gLegR.get() + tLegR.get();
-    return [{ rotate: -rad(clampParam("legR", v)) }];
-  });
 
   const dullOpacity = useDerivedValue(() => {
     "worklet";
@@ -840,16 +793,22 @@ export function FlooModel({
   const pupilTransform = useDerivedValue(() => {
     "worklet";
     const g = clampGaze(
-      (gazeX.get() + moodLookX.get()) * GAZE_RADIUS + sacX.get(),
-      (gazeY.get() + moodLookY.get()) * GAZE_RADIUS + sacY.get(),
+      (gazeX.get() + moodLookX.get() + rig.get()[CH.lookX]) * GAZE_RADIUS + sacX.get(),
+      (gazeY.get() + moodLookY.get() + rig.get()[CH.lookY]) * GAZE_RADIUS + sacY.get(),
       GAZE_RADIUS
     );
     return [{ translateX: Number.isFinite(g.x) ? g.x : 0 }, { translateY: Number.isFinite(g.y) ? g.y : 0 }];
   });
 
+  /** A gesture can squeeze the eyes shut (a yawn, a stretch) on top of the mood and the blink. */
+  const eyeTotal = useDerivedValue(() => {
+    "worklet";
+    const shut = Math.max(0, Math.min(1, rig.get()[CH.eye]));
+    return Math.max(0, Math.min(1, eyeOpen.get() * blink.get() * (1 - shut)));
+  });
   const lidDrop = useDerivedValue(() => {
     "worklet";
-    const open = Math.max(0, Math.min(1, eyeOpen.get() * blink.get()));
+    const open = eyeTotal.get();
     const v = (1 - open) * (EYE_L.ry * 2 + 4);
     return Number.isFinite(v) ? v : 0;
   });
@@ -864,9 +823,15 @@ export function FlooModel({
     return [{ translateY: -(Number.isFinite(squint) ? squint : 0) * 18 }];
   });
 
+  /** The mouth's depth, mood plus whatever the gesture adds (a yawn opens it wide). */
+  const mouthOpenTotal = useDerivedValue(() => {
+    "worklet";
+    const v = mouthOpen.get() + rig.get()[CH.mouth];
+    return Number.isFinite(v) ? Math.max(0, Math.min(30, v)) : mouthOpen.get();
+  });
   const mouthP = useDerivedValue(() => {
     "worklet";
-    return mouthPath({ halfWidth: mouthWidth.get(), open: mouthOpen.get(), curve: mouthCurve.get() });
+    return mouthPath({ halfWidth: mouthWidth.get(), open: mouthOpenTotal.get(), curve: mouthCurve.get() });
   });
   /** Top and floor of the opening, so the teeth and the tongue are placed off real geometry. */
   const lipY = useDerivedValue(() => {
@@ -875,7 +840,7 @@ export function FlooModel({
   });
   const openingH = useDerivedValue(() => {
     "worklet";
-    return Math.max(0.5, mouthFloorY(mouthOpen.get()) - lipY.get());
+    return Math.max(0.5, mouthFloorY(mouthOpenTotal.get()) - lipY.get());
   });
   /**
    * The teeth are a thin upper row — about 30% of the opening — whose lower edge bulges down in
@@ -925,7 +890,7 @@ export function FlooModel({
   });
   const lashOpacity = useDerivedValue(() => {
     "worklet";
-    const open = Math.max(0, Math.min(1, eyeOpen.get() * blink.get()));
+    const open = eyeTotal.get();
     return 1 - open;
   });
 
@@ -999,7 +964,7 @@ export function FlooModel({
    *  radius 51 and width 22 is exactly that ring, and it fades at its own ends. */
   const shadeZone = useMemo(() => "M49 158A51 51 0 0 0 151 158", []);
 
-  const scale = useMemo(() => [{ scale: k }], [k]);
+  const scale = useMemo(() => [{ scale: k }, { translateX: -view.x }, { translateY: -view.y }], [k, view.x, view.y]);
 
   return (
     <View
@@ -1012,19 +977,28 @@ export function FlooModel({
       <Canvas style={{ width, height }}>
         <Group transform={scale}>
           {/* contact shadow — drawn first, so the body lands on it */}
-          <Group transform={shadowTransform} origin={{ x: SHADOW.x, y: SHADOW.y }}>
-            <Oval
-              x={SHADOW.x - SHADOW.rx}
-              y={SHADOW.y - SHADOW.ry}
-              width={SHADOW.rx * 2}
-              height={SHADOW.ry * 2}
-              color={C.shadow}
-              opacity={shadowOpacity}
-            >
-              <Blur blur={3.5} />
-            </Oval>
-          </Group>
+          {lod === "full" ? (
+            <Group transform={shadowTransform} origin={{ x: SHADOW.x, y: SHADOW.y }}>
+              <Oval
+                x={SHADOW.x - SHADOW.rx}
+                y={SHADOW.y - SHADOW.ry}
+                width={SHADOW.rx * 2}
+                height={SHADOW.ry * 2}
+                color={C.shadow}
+                opacity={shadowOpacity}
+              >
+                <Blur blur={3.5} />
+              </Oval>
+            </Group>
+          ) : lod === "mid" ? (
+            <Group transform={shadowTransform} origin={{ x: 100, y: 232 }}>
+              <Oval x={48} y={226} width={104} height={12} color={C.shadow} opacity={shadowOpacity}>
+                <Blur blur={3} />
+              </Oval>
+            </Group>
+          ) : null}
 
+          <MaybeLimbs rig={rig} body={bodyX} hydroScale={hydroScale} lod={lod}>
           <Group transform={bodyTransform} origin={bodyOrigin}>
             {/* flying flicks — behind the body, so they read as spinning off the far side */}
             <Group transform={tipTransform}>
@@ -1035,56 +1009,6 @@ export function FlooModel({
               <Group transform={flickB} opacity={flickBOpacity}>
                 <Path path={flickShapeB} color={C.bodyLight} />
                 <Path path={flickShapeB} color={C.outline} style="stroke" strokeWidth={1.8} />
-              </Group>
-            </Group>
-
-            {/* All four limbs are traced outlines drawn BEHIND the body, and clipped to the
-                OUTSIDE of it: the trace includes slivers that hug the body edge, and without the
-                inverted clip their contour runs parallel to the body's own, doubling it. */}
-
-            <Group transform={legLT} origin={PIVOT_LEG_L}>
-              <Group clip={LIMB_CLIP}>
-                <Path path={LEG_PATH_L} color={C.bodyMid} />
-                <Group clip={SHOE_CLIP}>
-                  <Path path={LEG_PATH_L} color={C.shoe} />
-                </Group>
-                <Group clip={LEG_PATH_L}>
-                  <Path path={LEG_RIM_L} color={C.limbRim} />
-                  <Path path={LEG_CREASE_L} color={C.limbCrease} />
-                </Group>
-              </Group>
-            </Group>
-            <Group transform={legRT} origin={PIVOT_LEG_R}>
-              <Group clip={LIMB_CLIP}>
-                <Path path={LEG_PATH_R} color={C.bodyMid} />
-                <Group clip={SHOE_CLIP}>
-                  <Path path={LEG_PATH_R} color={C.shoe} />
-                </Group>
-                <Group clip={LEG_PATH_R}>
-                  <Path path={LEG_RIM_R} color={C.limbRim} />
-                  <Path path={LEG_CREASE_R} color={C.limbCrease} />
-                </Group>
-              </Group>
-            </Group>
-            {/* Limb contours after all limb fills, so one limb's fill never covers another's
-                line. The trace keeps ≥4 units clear of the body and tucks the attachment under
-                it, so nothing here needs clipping against the body. */}
-            <Group>
-              <Group>
-                <Group transform={legLT} origin={PIVOT_LEG_L}>
-                  <Group clip={LIMB_CLIP}>
-                    <Group clip={LEG_PATH_L}>
-                      <Path path={LEG_PATH_L} color={C.outline} style="stroke" strokeWidth={OUTLINE_W * 2} strokeJoin="round" />
-                    </Group>
-                  </Group>
-                </Group>
-                <Group transform={legRT} origin={PIVOT_LEG_R}>
-                  <Group clip={LIMB_CLIP}>
-                    <Group clip={LEG_PATH_R}>
-                      <Path path={LEG_PATH_R} color={C.outline} style="stroke" strokeWidth={OUTLINE_W * 2} strokeJoin="round" />
-                    </Group>
-                  </Group>
-                </Group>
               </Group>
             </Group>
 
@@ -1119,57 +1043,6 @@ export function FlooModel({
                 and a centred stroke would push the whole character ~1.2 units wider all round. */}
             <Group clip={bodyP}>
               <Path path={bodyP} color={C.outline} style="stroke" strokeWidth={OUTLINE_W * 2} strokeJoin="round" />
-            </Group>
-
-            {/* The LEFT arm is drawn IN FRONT of the body — measured off the reference, where the body's
-                lower-left/right contour is interrupted by the arm at the shoulder rather than
-                running over it. Legs stay behind, which is what the reference does there. */}
-            {/* BOTH arms draw IN FRONT of the body. The reference has the right arm behind, but
-                behind-the-body only works for a hanging arm: raised to ~150° the whole limb
-                vanishes into the silhouette and all that survives is a row of fingertip spikes at
-                the contour. Drawing it in front costs a hair of the resting armpit line and buys a
-                raised arm that is actually visible. Each arm's contour is the OPEN `ARM_LINE_*`,
-                which stops short of the root edge, so no cap line is painted across the body. */}
-            <Group transform={armRT} origin={PIVOT_ARM_R}>
-              <Group clip={LIMB_CLIP}>
-                <Path path={ARM_PATH_R} color={C.bodyMid} />
-                <Group clip={ARM_PATH_R}>
-                  <Oval x={146} y={176} width={14} height={62} color={C.armShade} opacity={0.28}>
-                    <Blur blur={7} />
-                  </Oval>
-                  <Path path={ARM_RIM_R} color={C.limbRim} />
-                  <Path path={ARM_CREASE_R} color={C.limbCrease} />
-                </Group>
-              </Group>
-            </Group>
-            <Group transform={armRT} origin={PIVOT_ARM_R}>
-              <Group clip={LIMB_CLIP}>
-                <Group clip={ARM_PATH_R}>
-                  <Path path={ARM_LINE_R} color={C.outline} style="stroke" strokeWidth={OUTLINE_W * 2} strokeJoin="round" strokeCap="round" />
-                </Group>
-              </Group>
-            </Group>
-            <Group transform={armLT} origin={PIVOT_ARM_L}>
-              <Group clip={LIMB_CLIP}>
-                <Path path={ARM_PATH_L} color={C.bodyMid} />
-                <Group clip={ARM_PATH_L}>
-                  {/* One soft shade hugging the inner edge only. Measured off the reference the
-                      forearm is otherwise a flat #6EC1E8 — the old pair of blurred ovals pulled
-                      the whole limb ~11 levels too dark. */}
-                  <Oval x={40} y={176} width={14} height={62} color={C.armShade} opacity={0.28}>
-                    <Blur blur={7} />
-                  </Oval>
-                  <Path path={ARM_RIM_L} color={C.limbRim} />
-                  <Path path={ARM_CREASE_L} color={C.limbCrease} />
-                </Group>
-              </Group>
-            </Group>
-            <Group transform={armLT} origin={PIVOT_ARM_L}>
-              <Group clip={LIMB_CLIP}>
-                <Group clip={ARM_PATH_L}>
-                  <Path path={ARM_LINE_L} color={C.outline} style="stroke" strokeWidth={OUTLINE_W * 2} strokeJoin="round" strokeCap="round" />
-                </Group>
-              </Group>
             </Group>
 
             {/* blush */}
@@ -1283,6 +1156,8 @@ export function FlooModel({
             {/* cosmetic slot, riding the tip */}
             {accessory ? <Group transform={tipTransform}>{accessory}</Group> : null}
           </Group>
+
+          </MaybeLimbs>
         </Group>
       </Canvas>
     </View>
