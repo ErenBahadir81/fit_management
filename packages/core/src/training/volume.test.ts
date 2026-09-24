@@ -85,18 +85,22 @@ describe("setsByMuscle / weeklyVolume", () => {
     expect(setsByMuscle(hits, NOW)).toEqual({ chest: 6 });
   });
 
-  it("builds one row per active muscle with target + status", () => {
-    const logs = [log(1, [ex(["chest"], 9), ex(["legs"], 16)]), log(3, [ex(["chest"], 8)])];
+  it("builds one row per muscle, rated on the global bands (recommended 10–15)", () => {
+    const logs = [log(1, [ex(["chest"], 9), ex(["legs"], 22)]), log(3, [ex(["chest"], 8)])];
     const rows = weeklyVolume(logs, TEST_MUSCLES, NOW);
     expect(rows.map((r) => r.key)).toEqual(TEST_MUSCLES.map((m) => m.key));
     expect(rows.find((r) => r.key === "chest")).toEqual({
       key: "chest",
       name: "Göğüs",
       done: 17,
-      target: { min: 15, max: 20 },
+      target: { min: 10, max: 15 },
       status: "in",
+      zone: "optimal",
+      score: 0.941,
+      risk: 0,
+      severity: "none",
     });
-    expect(rows.find((r) => r.key === "legs")).toMatchObject({ done: 16, status: "over" });
+    expect(rows.find((r) => r.key === "legs")).toMatchObject({ done: 22, status: "over", zone: "excessive", severity: "warn" });
     expect(rows.find((r) => r.key === "abs")).toMatchObject({ done: 0, status: "none" });
   });
 

@@ -105,28 +105,28 @@ function ex(name: string, sets: number, reps: number, rir: number | null = 2) {
 }
 
 const PPL_DAYS: DayDTO[] = [
-  { order: 1, title: "Push A", focus: "Göğüs & Ön Omuz", kind: "strength", exercises: [ex("Bench Press", 4, 8), ex("Incline DB Press", 3, 10), ex("Lateral Raise", 3, 15, 1), ex("Triceps Pushdown", 3, 14, 1)], run: null, swim: null },
-  { order: 2, title: "Pull A", focus: "Sırt & Biceps", kind: "strength", exercises: [ex("Pull-up", 4, 8), ex("Barbell Row", 4, 10), ex("Face Pull", 3, 15, 1), ex("Barbell Curl", 3, 12, 1)], run: null, swim: null },
-  { order: 3, title: "Bacak A", focus: "Quad ağırlıklı", kind: "strength", exercises: [ex("Squat", 4, 8), ex("Lunge", 3, 12), ex("Calf Raise", 4, 20, 0), ex("Plank", 3, 45, null)], run: null, swim: null },
-  { order: 4, title: "Kondisyon", focus: "Koşu & karın", kind: "run", exercises: [ex("Leg Raises", 3, 15, 1), ex("Hollow Hold", 3, 30, null)], run: { targetKm: 6, targetMin: 34, label: "Tempolu koşu" }, swim: null },
-  { order: 5, title: "Push B", focus: "Omuz ağırlıklı", kind: "strength", exercises: [ex("HSPU", 4, 6), ex("DB Fly", 4, 12), ex("Lateral Raise", 3, 15, 1), ex("Dips", 3, 10)], run: null, swim: null },
-  { order: 6, title: "Pull B & Bacak", focus: "Hamstring & lats", kind: "strength", exercises: [ex("Romanian Deadlift", 4, 10), ex("Lat Pulldown", 4, 12), ex("Hip Thrust", 3, 12), ex("Hammer Curl", 3, 12, 1)], run: null, swim: null },
-  { order: 7, title: "Dinlenme", focus: "Mobilite & yürüyüş", kind: "rest", exercises: [ex("Mobility Flow", 1, 1, null)], run: null, swim: null },
+  { id: "d1", order: 1, title: "Push A", focus: "Göğüs & Ön Omuz", kind: "strength", exercises: [ex("Bench Press", 4, 8), ex("Incline DB Press", 3, 10), ex("Lateral Raise", 3, 15, 1), ex("Triceps Pushdown", 3, 14, 1)], run: null, swim: null },
+  { id: "d2", order: 2, title: "Pull A", focus: "Sırt & Biceps", kind: "strength", exercises: [ex("Pull-up", 4, 8), ex("Barbell Row", 4, 10), ex("Face Pull", 3, 15, 1), ex("Barbell Curl", 3, 12, 1)], run: null, swim: null },
+  { id: "d3", order: 3, title: "Bacak A", focus: "Quad ağırlıklı", kind: "strength", exercises: [ex("Squat", 4, 8), ex("Lunge", 3, 12), ex("Calf Raise", 4, 20, 0), ex("Plank", 3, 45, null)], run: null, swim: null },
+  { id: "d4", order: 4, title: "Kondisyon", focus: "Koşu & karın", kind: "run", exercises: [ex("Leg Raises", 3, 15, 1), ex("Hollow Hold", 3, 30, null)], run: { targetKm: 6, targetMin: 34, label: "Tempolu koşu" }, swim: null },
+  { id: "d5", order: 5, title: "Push B", focus: "Omuz ağırlıklı", kind: "strength", exercises: [ex("HSPU", 4, 6), ex("DB Fly", 4, 12), ex("Lateral Raise", 3, 15, 1), ex("Dips", 3, 10)], run: null, swim: null },
+  { id: "d6", order: 6, title: "Pull B & Bacak", focus: "Hamstring & lats", kind: "strength", exercises: [ex("Romanian Deadlift", 4, 10), ex("Lat Pulldown", 4, 12), ex("Hip Thrust", 3, 12), ex("Hammer Curl", 3, 12, 1)], run: null, swim: null },
+  { id: "d7", order: 7, title: "Dinlenme", focus: "Mobilite & yürüyüş", kind: "rest", exercises: [ex("Mobility Flow", 1, 1, null)], run: null, swim: null },
 ];
 
 const FULLBODY_DAYS: DayDTO[] = [
-  { order: 1, title: "Full Body A", focus: "Bileşik hareketler", kind: "strength", exercises: [ex("Squat", 3, 10), ex("Bench Press", 3, 10), ex("Barbell Row", 3, 10), ex("Plank", 3, 45, null)], run: null, swim: null },
-  { order: 2, title: "Yüzme", focus: "Aktif toparlanma", kind: "swim", exercises: [], run: null, swim: { targetKm: 1.2, targetMin: 40, label: "Serbest" } },
-  { order: 3, title: "Full Body B", focus: "Kalça & sırt", kind: "strength", exercises: [ex("Romanian Deadlift", 3, 10), ex("Pull-up", 3, 8), ex("Hip Thrust", 3, 12), ex("Lateral Raise", 3, 15, 1)], run: null, swim: null },
-  { order: 4, title: "Dinlenme", focus: "Yürüyüş", kind: "rest", exercises: [], run: null, swim: null },
+  { id: "d1", order: 1, title: "Full Body A", focus: "Bileşik hareketler", kind: "strength", exercises: [ex("Squat", 3, 10), ex("Bench Press", 3, 10), ex("Barbell Row", 3, 10), ex("Plank", 3, 45, null)], run: null, swim: null },
+  { id: "d2", order: 2, title: "Yüzme", focus: "Aktif toparlanma", kind: "swim", exercises: [], run: null, swim: { targetKm: 1.2, targetMin: 40, label: "Serbest" } },
+  { id: "d3", order: 3, title: "Full Body B", focus: "Kalça & sırt", kind: "strength", exercises: [ex("Romanian Deadlift", 3, 10), ex("Pull-up", 3, 8), ex("Hip Thrust", 3, 12), ex("Lateral Raise", 3, 15, 1)], run: null, swim: null },
+  { id: "d4", order: 4, title: "Dinlenme", focus: "Yürüyüş", kind: "rest", exercises: [], run: null, swim: null },
 ];
 
 const CALISTHENICS_DAYS: DayDTO[] = [
-  { order: 1, title: "İtiş", focus: "Göğüs & triceps", kind: "strength", exercises: [ex("Push-up", 5, 12), ex("Dips", 4, 10), ex("Pike Push-up", 3, 8)], run: null, swim: null },
-  { order: 2, title: "Çekiş", focus: "Sırt & biceps", kind: "strength", exercises: [ex("Pull-up", 5, 8), ex("Barbell Row", 3, 10), ex("Face Pull", 3, 15, 1)], run: null, swim: null },
-  { order: 3, title: "Bacak & Karın", focus: "Tek bacak gücü", kind: "strength", exercises: [ex("Pistol Squat", 3, 8), ex("Wall Sit", 3, 45, null), ex("Leg Raises", 3, 15, 1)], run: null, swim: null },
-  { order: 4, title: "Denge", focus: "Handstand çalışması", kind: "strength", exercises: [ex("Handstand", 5, 30, null), ex("Hollow Hold", 3, 30, null), ex("Mobility Flow", 1, 1, null)], run: null, swim: null },
-  { order: 5, title: "Dinlenme", focus: "", kind: "rest", exercises: [], run: null, swim: null },
+  { id: "d1", order: 1, title: "İtiş", focus: "Göğüs & triceps", kind: "strength", exercises: [ex("Push-up", 5, 12), ex("Dips", 4, 10), ex("Pike Push-up", 3, 8)], run: null, swim: null },
+  { id: "d2", order: 2, title: "Çekiş", focus: "Sırt & biceps", kind: "strength", exercises: [ex("Pull-up", 5, 8), ex("Barbell Row", 3, 10), ex("Face Pull", 3, 15, 1)], run: null, swim: null },
+  { id: "d3", order: 3, title: "Bacak & Karın", focus: "Tek bacak gücü", kind: "strength", exercises: [ex("Pistol Squat", 3, 8), ex("Wall Sit", 3, 45, null), ex("Leg Raises", 3, 15, 1)], run: null, swim: null },
+  { id: "d4", order: 4, title: "Denge", focus: "Handstand çalışması", kind: "strength", exercises: [ex("Handstand", 5, 30, null), ex("Hollow Hold", 3, 30, null), ex("Mobility Flow", 1, 1, null)], run: null, swim: null },
+  { id: "d5", order: 5, title: "Dinlenme", focus: "", kind: "rest", exercises: [], run: null, swim: null },
 ];
 
 export const TEMPLATES: ProgramTemplateDTO[] = [

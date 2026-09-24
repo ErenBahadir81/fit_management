@@ -5,6 +5,7 @@ export type { NavyInput, BodyComposition, BodyFatCategory } from "./navy/index";
 export * from "./utils/index";
 export * from "./training/index";
 export * from "./goal/index";
+export * from "./body/index";
 export * from "./reports/index";
 export * from "./nutrition/index";
 export * from "./mascot/index";

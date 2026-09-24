@@ -38,10 +38,10 @@ function seedSession(view: ProgramView): Session {
   const day = view.current?.day;
   if (!day) return null;
   const dateKey = todayKey();
-  const draft = restoreDraft(readDraft(), { dayOrder: day.order, dateKey });
+  const draft = restoreDraft(readDraft(), { dayOrder: day.order, dayId: day.id, dateKey });
   if (draft) return { state: draft, restored: true };
   return {
-    state: createLoggerState({ day, dayIndex: view.current.index, programId: view.program.id, weekNumber: view.program.weekNumber, dateKey, startedAt: Date.now() }),
+    state: createLoggerState({ day, dayIndex: view.current.index, programId: view.program.id, weekNumber: view.program.cycleNumber ?? view.program.weekNumber, dateKey, startedAt: Date.now() }),
     restored: false,
   };
 }

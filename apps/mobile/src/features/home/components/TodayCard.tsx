@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import type { HomeDTO } from "@fitfloow/core";
+import { isBreakLog, type HomeDTO } from "@fitfloow/core";
 import { fmtDuration } from "../../../lib/format";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
@@ -29,7 +29,7 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
       </Card>
     );
   }
-  if (log && !log.isOffDay) {
+  if (log && !isBreakLog(log)) {
     return (
       <Card onPress={onOpenProgram} style={styles.min} testID="home-today">
         <View style={styles.head}>
@@ -54,7 +54,7 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
       </Card>
     );
   }
-  if (log?.isOffDay) {
+  if (log && isBreakLog(log)) {
     return (
       <Card variant="muted" onPress={onOpenProgram} style={styles.min} testID="home-today">
         <Row icon="skip" eyebrow="Bugün" title="Bugün atlandı" body="Sorun değil, program kaldığı yerden devam eder." />

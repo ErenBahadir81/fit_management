@@ -22,7 +22,19 @@ export const zCardioTarget = z.object({
 });
 export type CardioTargetDTO = z.infer<typeof zCardioTarget>;
 
+/**
+ * Stable day id. The pointer, logs and the editor all refer to a day by id — never by position —
+ * so reordering or deleting days can't move "today" to a different day (B5).
+ */
+export const zDayId = z
+  .string()
+  .trim()
+  .min(1)
+  .max(40)
+  .regex(/^[A-Za-z0-9_-]+$/, "gün kimliği");
+
 export const zDay = z.object({
+  id: zDayId,
   order: z.number().int().min(1),
   title: z.string().min(1),
   focus: z.string().default(""),
@@ -33,11 +45,25 @@ export const zDay = z.object({
 });
 export type DayDTO = z.infer<typeof zDay>;
 
+/**
+ * `cycle`  — N days that repeat independently of the calendar (e.g. idman · koşu · mola).
+ * `weekly` — exactly 7 days, Monday first; the calendar decides the day.
+ */
+export const zProgramMode = z.enum(["cycle", "weekly"]);
+export type ProgramMode = z.infer<typeof zProgramMode>;
+
 export const zProgram = z.object({
   id: zId,
   name: z.string(),
+  mode: zProgramMode,
   days: z.array(zDay),
+  /** The next day to do (cycle mode). "Next = the one after the last day actually done." */
+  currentDayId: zDayId.nullable(),
+  /** Position of `currentDayId` in `days` — derived, kept for older clients. */
   currentIndex: z.number().int().min(0),
+  /** How many times the cycle has come round (weekly mode: weeks since the start). */
+  cycleNumber: z.number().int().min(1),
+  /** @deprecated alias of `cycleNumber`, kept for older clients. */
   weekNumber: z.number().int().min(1),
   startedAt: zIso,
   lastActionAt: zIso,
@@ -46,12 +72,15 @@ export const zProgram = z.object({
 export type ProgramDTO = z.infer<typeof zProgram>;
 
 export const zDayInput = zDay.extend({
+  id: zDayId.optional(),
   exercises: z.array(zExerciseTarget.partial({ metric: true, targetRIR: true, muscles: true })).default([]),
   run: zCardioTarget.nullable().default(null),
   swim: zCardioTarget.nullable().default(null),
 });
 export const zProgramInput = z.object({
   name: z.string().trim().min(1).max(60).optional(),
+  /** Omitted = keep the program's current mode. */
+  mode: zProgramMode.optional(),
   days: z.array(zDayInput).min(1).max(14),
 });
 export type ProgramInput = z.infer<typeof zProgramInput>;
@@ -119,8 +148,14 @@ export const zWorkoutLog = z.object({
   id: zId,
   date: zIso,
   dateKey: z.string(),
+  /** The program day that was actually done; `null` for a break and for pre-3.0 logs. */
+  dayId: zDayId.nullable(),
   dayOrder: z.number().int().min(0),
+  cycleNumber: z.number().int().min(1),
+  /** @deprecated alias of `cycleNumber`. */
   weekNumber: z.number().int().min(1),
+  /** A day off outside the plan: nothing done, the cycle did not move. A rest *day* is not a break. */
+  isBreak: z.boolean(),
   title: z.string(),
   kind: zDayKind,
   isOffDay: z.boolean(),
@@ -158,6 +193,18 @@ export const zCompleteWorkoutInput = z.object({
 export type CompleteWorkoutInput = z.infer<typeof zCompleteWorkoutInput>;
 
 /**
+ * The one pointer-moving operation: "today I did day `dayId`". Completing the planned day,
+ * finishing a rest day and doing a different day than planned are all this call. The cycle then
+ * continues from the day after `dayId`; `resumePlanned` instead keeps the day that was planned as
+ * the next one ("İdmanı kaçırdım, sıraya geri koy").
+ */
+export const zLogDayInput = zCompleteWorkoutInput.extend({
+  dayId: zDayId,
+  resumePlanned: z.boolean().default(false),
+});
+export type LogDayInput = z.infer<typeof zLogDayInput>;
+
+/**
  * Editing a logged session. Written out longhand rather than as `zCompleteWorkoutInput.partial()`
  * because `.partial()` keeps the `.default(...)`s: `{ rpe: 7 }` would come out as
  * `{ rpe: 7, strength: [], run: null, … }` and quietly erase the whole session. Here, a field the
@@ -184,14 +231,71 @@ export const zScheduleEntry = z.object({
 export type ScheduleEntry = z.infer<typeof zScheduleEntry>;
 
 export const zVolumeStatus = z.enum(["under", "in", "over", "none"]);
+
+/**
+ * Weekly effective sets per muscle, banded (see `training/volumeBands.ts`):
+ * none · low (<5) · maintain (5+) · grow (10+) · optimal (15+) · excessive (20+).
+ */
+export const zVolumeZone = z.enum(["none", "low", "maintain", "grow", "optimal", "excessive"]);
+export type VolumeZone = z.infer<typeof zVolumeZone>;
+/** `none` fine · `info` could be better · `warn` should change · `alert` injury territory. */
+export const zVolumeSeverity = z.enum(["none", "info", "warn", "alert"]);
+export type VolumeSeverity = z.infer<typeof zVolumeSeverity>;
+
+export const zVolumeRating = z.object({
+  zone: zVolumeZone,
+  /** 0..1, continuous: how good this weekly volume is for growth (peaks across 10–18). */
+  score: z.number().min(0).max(1),
+  /** 0..1, continuous: overuse risk — ~0 at 18, small at 20, real from ~23, full at 25. */
+  risk: z.number().min(0).max(1),
+  severity: zVolumeSeverity,
+});
+export type VolumeRating = z.infer<typeof zVolumeRating>;
+
 export const zMuscleVolume = z.object({
   key: z.string(),
   name: z.string(),
   done: z.number(),
+  /** The recommended band (10–15 weekly effective sets). */
   target: z.object({ min: z.number().optional(), max: z.number() }),
   status: zVolumeStatus,
+  zone: zVolumeZone.optional(),
+  score: z.number().optional(),
+  risk: z.number().optional(),
+  severity: zVolumeSeverity.optional(),
 });
 export type MuscleVolume = z.infer<typeof zMuscleVolume>;
+
+/** One muscle of a program's planned volume, normalized to a 7-day week. */
+export const zPlannedMuscleVolume = zVolumeRating.extend({
+  key: z.string(),
+  name: z.string(),
+  /** Σ targetSets × activation over one pass of the program's days. */
+  perCycle: z.number(),
+  /** `perCycle × 7 / cycleLength` — what the bands are applied to. */
+  weekly: z.number(),
+  /** Exercises feeding this muscle, biggest contribution first (weekly effective sets). */
+  sources: z.array(z.object({ name: z.string(), sets: z.number() })),
+});
+export type PlannedMuscleVolume = z.infer<typeof zPlannedMuscleVolume>;
+
+/** A ready-to-say hint for Floo / the editor. */
+export const zVolumeAdvice = z.object({
+  key: z.string(),
+  name: z.string(),
+  severity: zVolumeSeverity,
+  kind: z.enum(["missing", "low", "maintain", "high", "excessive"]),
+  weekly: z.number(),
+  message: z.string(),
+});
+export type VolumeAdvice = z.infer<typeof zVolumeAdvice>;
+
+export const zProgramVolume = z.object({
+  cycleLength: z.number().int().min(0),
+  muscles: z.array(zPlannedMuscleVolume),
+  advice: z.array(zVolumeAdvice),
+});
+export type ProgramVolume = z.infer<typeof zProgramVolume>;
 
 export const zProgramView = z.object({
   program: zProgram,
@@ -199,6 +303,8 @@ export const zProgramView = z.object({
   todayLog: zWorkoutLog.nullable(),
   schedule: z.array(zScheduleEntry),
   weeklyVolume: z.array(zMuscleVolume),
+  /** The program's planned weekly volume per active muscle, banded, with advice. */
+  plannedVolume: zProgramVolume,
 });
 export type ProgramView = z.infer<typeof zProgramView>;
 

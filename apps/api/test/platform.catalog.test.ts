@@ -18,9 +18,9 @@ beforeEach(async () => {
 
 const API = "/api/v1";
 const newMuscle = {
-  key: "rearDelt",
-  name: "Arka Omuz",
-  short: "Arka Omuz",
+  key: "serratus",
+  name: "Serratus",
+  short: "Serratus",
   size: "small",
   fullRecoveryHours: 48,
   weeklyTarget: { min: 6, max: 12 },
@@ -40,7 +40,7 @@ describe("admin muscles", () => {
     const res = await t.app.inject({ method: "GET", url: `${API}/admin/muscles`, headers });
     expect(res.statusCode).toBe(200);
     const muscles = res.json().muscles as Array<{ key: string; order: number; active: boolean }>;
-    expect(muscles).toHaveLength(14);
+    expect(muscles).toHaveLength(18);
     expect(muscles.filter((m) => !m.active)).not.toHaveLength(0);
     expect(muscles.map((m) => m.order)).toEqual([...muscles.map((m) => m.order)].sort((a, b) => a - b));
   });
@@ -49,7 +49,7 @@ describe("admin muscles", () => {
     const { headers } = await asAdmin(t);
     const res = await t.app.inject({ method: "POST", url: `${API}/admin/muscles`, headers, payload: newMuscle });
     expect(res.statusCode).toBe(201);
-    expect(res.json().muscle).toMatchObject({ key: "rearDelt", name: "Arka Omuz", order: 14 });
+    expect(res.json().muscle).toMatchObject({ key: "serratus", name: "Serratus", order: 18 });
 
     const dup = await t.app.inject({ method: "POST", url: `${API}/admin/muscles`, headers, payload: newMuscle });
     expect(dup.statusCode).toBe(409);

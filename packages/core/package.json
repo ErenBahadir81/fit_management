@@ -10,6 +10,7 @@
     "./schemas": "./src/schemas/index.ts",
     "./time": "./src/time/index.ts",
     "./navy": "./src/navy/index.ts",
+    "./body": "./src/body/index.ts",
     "./utils": "./src/utils/index.ts",
     "./training": "./src/training/index.ts",
     "./goal": "./src/goal/index.ts",

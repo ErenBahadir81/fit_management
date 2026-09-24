@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { ArrowLeft, CalendarDays, Dumbbell, Ruler, Target, TrendingDown } from "lucide-react";
-import { ACTIVITY_TR, BODY_FAT_CATEGORY_TR, WEEKDAYS_TR, bodyFatCategory } from "@fitfloow/core";
+import { ACTIVITY_TR, BODY_FAT_CATEGORY_TR, WEEKDAYS_TR, bodyFatCategory, pointerIndex } from "@fitfloow/core";
 import { date, dateShort, int, kcal, kg, num, pct, relative } from "@/lib/format";
 import { useUserOverview } from "@/lib/queries";
 import { PageHeader } from "@/components/layout/PanelShell";
@@ -128,8 +128,9 @@ export default function UserDetailPage() {
               ) : program ? (
                 <dl>
                   <DataRow label="Döngü uzunluğu" value={`${program.days.length} gün`} />
-                  <DataRow label="Sıradaki gün" value={program.days[program.currentIndex]?.title ?? "—"} />
-                  <DataRow label="Hafta" value={int(program.weekNumber)} />
+                  <DataRow label="Mod" value={program.mode === "weekly" ? "Haftalık" : "Döngü"} />
+                  <DataRow label="Sıradaki gün" value={program.days[pointerIndex(program)]?.title ?? "—"} />
+                  <DataRow label={program.mode === "weekly" ? "Hafta" : "Döngü"} value={int(program.cycleNumber)} />
                   <DataRow label="Son işlem" value={relative(program.lastActionAt)} />
                 </dl>
               ) : (

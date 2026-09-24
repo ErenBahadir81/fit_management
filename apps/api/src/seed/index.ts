@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
-import { DEFAULT_MASCOT_MESSAGES, DEFAULT_SETTINGS, trDateKey, type DayDTO } from "@fitfloow/core";
+import { DEFAULT_MASCOT_MESSAGES, DEFAULT_SETTINGS, exerciseNameKey, trDateKey, type DayDTO } from "@fitfloow/core";
 import { User } from "../models/user";
 import { Muscle } from "../models/muscle";
 import { Exercise } from "../models/exercise";
-import { Program, ProgramTemplate } from "../models/program";
+import { Program, ProgramTemplate, plainDays } from "../models/program";
+import { upgradeMusclesToV3 } from "./catalogV3";
 import { WorkoutLog } from "../models/workoutLog";
 import { BodyEntry } from "../models/body";
 import { DietTarget } from "../models/nutrition";
@@ -168,8 +169,9 @@ async function ensureCatalogs(report: SeedReport): Promise<void> {
     await Muscle.insertMany(SEED_MUSCLES);
     report.created.muscles += SEED_MUSCLES.length;
   }
+  report.created.muscles += await upgradeMusclesToV3();
   if ((await Exercise.countDocuments()) === 0) {
-    await Exercise.insertMany(SEED_EXERCISES.map((e) => ({ ...e, nameKey: e.name.trim().toLowerCase() })));
+    await Exercise.insertMany(SEED_EXERCISES.map((e) => ({ ...e, nameKey: exerciseNameKey(e.name) })));
     report.created.exercises += SEED_EXERCISES.length;
   }
   if ((await ProgramTemplate.countDocuments()) === 0) {
@@ -192,11 +194,14 @@ async function ensurePrograms(report: SeedReport): Promise<void> {
     if (!user) continue;
     if (await Program.exists({ userId: user._id })) continue;
     const template = await ProgramTemplate.findOne({ name: seed.templateName }).lean();
-    const days = (template?.days as DayDTO[] | undefined) ?? seed.days;
+    const days = plainDays((template?.days as DayDTO[] | undefined) ?? seed.days);
     await Program.create({
       userId: user._id,
       name: template?.name ?? seed.templateName,
+      mode: "cycle",
       days,
+      currentDayId: days[0]?.id ?? null,
+      cycleNumber: 1,
       currentIndex: 0,
       weekNumber: 1,
       sourceTemplateId: template?._id ?? null,

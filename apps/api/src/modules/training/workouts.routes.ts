@@ -1,10 +1,21 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { zDateKey, zUpdateWorkoutInput, type LastPerformance, type WorkoutLogDTO } from "@fitfloow/core";
+import { dayOfLog, undoTransition, zDateKey, zUpdateWorkoutInput, type DayDTO, type LastPerformance, type WorkoutLogDTO } from "@fitfloow/core";
+import { Program } from "../../models/program";
 import { AppError } from "../../lib/errors";
 import { WorkoutLog, toSetEntryDTO, toWorkoutLogDTO, type WorkoutLogDoc } from "../../models/workoutLog";
 import { escapeRegex } from "../platform/users.service";
-import { buildCardio, buildStrengthEntries, catalogFor, invalidateWeeks, measurementDayOf, objectIdOrNotFound, workoutFilter } from "./service";
+import {
+  buildCardio,
+  buildStrengthEntries,
+  catalogFor,
+  invalidateWeeks,
+  measurementDayOf,
+  objectIdOrNotFound,
+  setPointer,
+  upgradeProgramDoc,
+  workoutFilter,
+} from "./service";
 
 const zListQuery = z.object({
   from: zDateKey.optional(),
@@ -66,8 +77,11 @@ export async function workoutRoutes(app: FastifyInstance) {
     if (log.isOffDay) throw AppError.validation("Dinlenme günü düzenlenemez");
 
     if (input.strength !== undefined) {
+      // B6: planned targets survive the edit — from the entries being replaced, then the day.
+      const program = await Program.findOne({ userId: req.auth.id }).select({ days: 1 }).lean();
+      const day = program ? dayOfLog((program.days ?? []) as DayDTO[], toWorkoutLogDTO(log)) : null;
       const catalog = await catalogFor(input.strength.map((e) => e.name));
-      log.strength = buildStrengthEntries(input.strength, null, catalog);
+      log.strength = buildStrengthEntries(input.strength, day, catalog, toWorkoutLogDTO(log).strength);
       log.markModified("strength");
     }
     if (input.run !== undefined) log.run = buildCardio(input.run, log.run);
@@ -86,6 +100,13 @@ export async function workoutRoutes(app: FastifyInstance) {
     const { id } = req.params as z.infer<typeof zIdParams>;
     const log = await WorkoutLog.findOneAndDelete({ _id: objectIdOrNotFound(id, "Antrenman"), userId: req.auth.id });
     if (!log) throw AppError.notFound("Antrenman");
+    // B4: if this log still owns the pointer (nothing moved it since), put the pointer back.
+    const program = await Program.findOne({ userId: req.auth.id });
+    if (program) {
+      upgradeProgramDoc(program);
+      setPointer(program, undoTransition(program, log));
+      await program.save();
+    }
     await invalidateWeeks(req.auth.id, [log.dateKey], await measurementDayOf(req.auth.id));
     return reply.status(204).send();
   });

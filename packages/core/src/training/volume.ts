@@ -10,6 +10,7 @@ import type { z } from "zod";
 import { buildHits, effectiveSets, type MuscleHit } from "./recovery";
 import { templateWeeklyVolume, type PlannedDayLike } from "./templateVolume";
 import { WEEK_MS, toMs, type WorkoutLogLike } from "./types";
+import { RECOMMENDED_WEEKLY_SETS, bandStatus, rateVolume } from "./volumeBands";
 
 export type VolumeStatus = z.infer<typeof zVolumeStatus>;
 
@@ -46,7 +47,10 @@ export function setsByMuscle(
   return out;
 }
 
-/** One row per given muscle: sets done in the last 7 days vs. its weekly target. */
+/**
+ * One row per given muscle: effective sets done in the last 7 days, rated on the global volume
+ * bands (`volumeBands.ts`) against the recommended 10–15.
+ */
 export function weeklyVolume(
   logs: readonly WorkoutLogLike[],
   muscles: readonly MuscleDTO[],
@@ -56,7 +60,14 @@ export function weeklyVolume(
   const done = setsByMuscle(buildHits(logs), now, windowMs);
   return (muscles ?? []).map((m) => {
     const value = round(done[m.key] ?? 0, 1);
-    return { key: m.key, name: m.name, done: value, target: m.weeklyTarget, status: volumeStatus(value, m.weeklyTarget) };
+    return {
+      key: m.key,
+      name: m.name,
+      done: value,
+      target: { ...RECOMMENDED_WEEKLY_SETS },
+      status: bandStatus(value),
+      ...rateVolume(value),
+    };
   });
 }
 

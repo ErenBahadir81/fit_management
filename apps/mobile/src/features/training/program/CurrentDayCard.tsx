@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { clamp, type DayDTO, type WorkoutLogDTO } from "@fitfloow/core";
+import { clamp, isBreakLog, type DayDTO, type WorkoutLogDTO } from "@fitfloow/core";
 import { fmtDuration, fmtInt, fmtNumber } from "../../../lib/format";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
@@ -32,7 +32,7 @@ export interface ResumeState {
 export interface CurrentDayCardProps {
   day: DayDTO | null;
   todayLog: WorkoutLogDTO | null;
-  weekNumber: number;
+  cycleNumber: number;
   resume?: ResumeState | null;
   busy?: boolean;
   onStart: () => void;
@@ -43,16 +43,16 @@ export interface CurrentDayCardProps {
 }
 
 /** The one card that says what to do today — and holds the screen's single primary action. */
-export function CurrentDayCard({ day, todayLog, weekNumber, resume, busy, onStart, onSkip, onJump, onUndo, onOpenLog }: CurrentDayCardProps) {
+export function CurrentDayCard({ day, todayLog, cycleNumber, resume, busy, onStart, onSkip, onJump, onUndo, onOpenLog }: CurrentDayCardProps) {
   if (todayLog) return <DoneCard log={todayLog} busy={busy} onUndo={onUndo} onOpenLog={onOpenLog} onJump={onJump} />;
   if (!day) return null;
   if (day.kind === "rest") return <RestCard day={day} busy={busy} onSkip={onSkip} onJump={onJump} />;
-  return <DueCard day={day} weekNumber={weekNumber} resume={resume ?? null} busy={busy} onStart={onStart} onSkip={onSkip} onJump={onJump} />;
+  return <DueCard day={day} cycleNumber={cycleNumber} resume={resume ?? null} busy={busy} onStart={onStart} onSkip={onSkip} onJump={onJump} />;
 }
 
 function DueCard({
   day,
-  weekNumber,
+  cycleNumber,
   resume,
   busy,
   onStart,
@@ -60,7 +60,7 @@ function DueCard({
   onJump,
 }: {
   day: DayDTO;
-  weekNumber: number;
+  cycleNumber: number;
   resume: ResumeState | null;
   busy?: boolean;
   onStart: () => void;
@@ -73,7 +73,7 @@ function DueCard({
     <Card variant="primary" style={styles.card} testID="current-day-card">
       <View style={styles.head}>
         <Text variant="label" color="onPrimaryMuted" tabular>
-          {weekNumber}. hafta · {day.order}. gün
+          {cycleNumber}. hafta · {day.order}. gün
         </Text>
         <Icon icon={KIND_ICON[day.kind]} size={18} color="onPrimaryMuted" />
       </View>
@@ -184,7 +184,8 @@ function RestCard({ day, busy, onSkip, onJump }: { day: DayDTO; busy?: boolean; 
 function DoneCard({ log, busy, onUndo, onOpenLog, onJump }: { log: WorkoutLogDTO; busy?: boolean; onUndo: () => void; onOpenLog: (l: WorkoutLogDTO) => void; onJump: () => void }) {
   const { colors } = useTheme();
   const s = logSummary(log);
-  const skipped = log.isOffDay;
+  // A break is "skipped"; a rest day that was done is a done day like any other.
+  const skipped = isBreakLog(log);
   return (
     <Card style={styles.card} testID="current-day-card">
       <View style={styles.badgeRow}>
