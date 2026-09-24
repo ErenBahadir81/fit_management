@@ -354,9 +354,9 @@ describe("adaptive goal — recomp is judged on body fat", () => {
 
   it("stalled body fat: GET proposes fewer calories, one tap re-plans exactly as previewed", async () => {
     const { user, headers, goal } = await recompGoal();
-    await weighIns(user, START, 71, () => 90);
-    await tapeReadings(user, 70, () => goal.start.bodyFatPct);
-    const today = shiftKey(START, 70);
+    await weighIns(user, START, 99, () => 90);
+    await tapeReadings(user, 98, () => goal.start.bodyFatPct);
+    const today = shiftKey(START, 98);
     at(today);
     const v = await view(headers);
     expect(v.progress!.onTrack).toBe("stalled");
@@ -393,9 +393,9 @@ describe("adaptive goal — recomp is judged on body fat", () => {
 
   it("a dismissed recomp proposal changes nothing and is not repeated", async () => {
     const { user, headers, goal } = await recompGoal();
-    await weighIns(user, START, 71, () => 90);
-    await tapeReadings(user, 70, () => goal.start.bodyFatPct);
-    at(shiftKey(START, 70));
+    await weighIns(user, START, 99, () => 90);
+    await tapeReadings(user, 98, () => goal.start.bodyFatPct);
+    at(shiftKey(START, 98));
     const proposal = (await view(headers)).adjustment!;
     expect(proposal.kind).toBe("stalled");
     const res = await t.app.inject({ method: "POST", url: `${api}/goals/current/adjustment/dismiss`, headers, payload: { id: proposal.id } });
@@ -411,10 +411,10 @@ describe("adaptive goal — recomp is judged on body fat", () => {
 
   it("flat weight with body fat on plan is a working recomp: no proposal", async () => {
     const { user, headers, goal } = await recompGoal();
-    await weighIns(user, START, 64, () => 90);
+    await weighIns(user, START, 99, () => 90);
     const rate = (goal.plan.roadmap[0].startBfPct - goal.plan.roadmap.at(-1)!.endBfPct) / goal.plan.roadmap.length;
-    await tapeReadings(user, 63, (d) => goal.start.bodyFatPct - (rate * d) / 7);
-    at(shiftKey(START, 63));
+    await tapeReadings(user, 98, (d) => goal.start.bodyFatPct - (rate * d) / 7);
+    at(shiftKey(START, 98));
     const v = await view(headers);
     expect(v.progress!.onTrack).toBe("onTrack");
     expect(v.adjustment).toBeNull();

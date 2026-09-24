@@ -39,6 +39,7 @@ import { formatTrNumber } from "./milestones";
 import { computeGoalPlan, type GoalEngineInput } from "./plan";
 import {
   bodyFatTrend,
+  smoothedBodyFat,
   directionOf,
   roadmapWeekAt,
   tdeeAtDay,
@@ -72,6 +73,8 @@ export interface AdjustmentInput {
   weighIns: WeightPoint[];
   /** Tape measurements. A recomp is judged on these alone (besides "reached"); without them it proposes nothing. */
   bodyEntries?: BodyPoint[];
+  /** Recomp: `bodyFatTrend` of those measurements for `todayKey`, when the caller already has it. */
+  bodyFat?: BodyFatTrend | null;
   todayKey: string;
   replanBase: ReplanBase;
   /** Result of `recalibrateTdee` for today, when available: its measured TDEE sizes calorie changes. */
@@ -191,25 +194,28 @@ interface Situation {
 const behindLike = (s: BodyFatTrend["status"]) => s === "behind" || s === "stalled";
 
 /**
- * Recomp target reached: the latest reading is at the target and, once there are enough readings
- * for a trend, the fitted trend is too — one low tape reading (±1.5 points) is not the finish line.
+ * Recomp target reached: the latest reading is at the target and, once there are enough readings,
+ * so is the smoothed body fat (`smoothedBodyFat`, which a re-plan does not reset) — one low tape
+ * reading (±1.5 points) is not the finish line.
  */
 function recompReached(input: AdjustmentInput): boolean {
   const { goal, progress, todayKey, settings } = input;
   if (progress.actualBodyFatPct === null || progress.actualBodyFatPct > goal.targetBodyFatPct) return false;
-  const trend = bodyFatTrend(goal, input.bodyEntries ?? [], todayKey, settings);
-  return trend.count < settings.adaptive.bfMinMeasurements || trend.bodyFatPct === null || trend.bodyFatPct <= goal.targetBodyFatPct;
+  const smoothed = smoothedBodyFat(input.bodyEntries ?? [], todayKey, settings);
+  return smoothed === null || smoothed <= goal.targetBodyFatPct;
 }
 
 /**
  * Recomp: the body-fat verdict, only when it already held at the previous measurement — a single
- * slipped tape reading must not decide (the cut's "today and a week ago" rule, per measurement).
+ * slipped tape reading must not decide (the cut's "today and a week ago" rule, per measurement) —
+ * and only on a reading taken after the last answer, so a dismissed proposal is never re-made from
+ * the same evidence.
  */
-function recompSituation(input: AdjustmentInput, deviationKg: number): Situation | null {
+function recompSituation(input: AdjustmentInput, deviationKg: number, sinceKey: string): Situation | null {
   const { goal, todayKey, settings } = input;
   const entries = input.bodyEntries ?? [];
-  const now = bodyFatTrend(goal, entries, todayKey, settings);
-  if (!now.enough || now.previousKey === null) return null;
+  const now = input.bodyFat ?? bodyFatTrend(goal, entries, todayKey, settings);
+  if (!now.enough || now.previousKey === null || now.latestKey === null || now.latestKey <= sinceKey) return null;
   const prev = bodyFatTrend(goal, entries, now.previousKey, settings);
   if (!prev.enough) return null;
   const leanLoss = now.leanLoss && prev.leanLoss;
@@ -237,7 +243,7 @@ function situation(input: AdjustmentInput, direction: GoalDirection, sinceKey: s
 
   if (daysBetween(sinceKey, todayKey) < a.cooldownDays) return null;
   // Weight is flat on a recomp by design: only body fat and lean mass count, never the scale.
-  if (direction === "recomp") return recompSituation(input, deviationKg);
+  if (direction === "recomp") return recompSituation(input, deviationKg, sinceKey);
   if (dev === null) return null;
 
   if (direction === "bulk") {

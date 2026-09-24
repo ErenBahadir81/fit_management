@@ -184,44 +184,58 @@ it, and these have to be judged against their own noise.
   https://pmc.ncbi.nlm.nih.gov/articles/PMC11732917/).
 
 **Rule in code (`bodyFatTrend`, docs/plan/11 §Recomp on body fat).**
-- **Residuals.** Take the readings since the plan (re)started, from the last 56 days, one per day.
-  For each, the residual is the measured value minus the plan's expected body fat (and lean mass)
-  on that day.
-- **Deviation.** A least-squares line through the residuals gives the deviation at the latest
-  reading and its standard error. The noise is max(1.5 points, the person's own scatter). For lean
-  mass the noise is weight/100 × √(1.5² + 0.5²) kg; the 0.5 is scale noise in %BW (Orsama 2014, §7).
-- **When it counts.** A deviation counts beyond max(1 point, 2.25 × SE). The 1-point floor is the
-  tape's reproducibility and the ≥ 1-point criterion used by Foulis. For lean mass the floor is 1 kg.
-- **Minimum data.** At least 3 readings spanning ≥ 21 days, the latest ≤ 14 days old. Three weeks
-  matches §7's "judge after ≥ 3 weeks", and three points are the fewest that leave any scatter to
-  estimate noise from.
-- **Stalled.** "Stalled" means body fat falls < 0.05 points a week. This is the body-fat counterpart
-  of the cut's 0.1 kg / 14 days.
-- **Proposals.** A proposal also needs the same verdict at the previous reading, the counterpart of
-  the cut's "today and 7 days ago" rule. The 21-day cool-down stays.
-- **Reached.** "Reached" needs the latest reading at the target and, once there are 3 readings, the
-  fitted trend at the target too. With 1.5 points of noise, someone 1 point above target reads at or
-  below it on about 25 % of single readings.
-- Confidence: medium-low. The structure is standard statistics; the calibration is mine (below).
+- **Residuals.** Take the readings since the plan (re)started, from the last 112 days, one per
+  day. For each, the residual is the measured value minus the plan's expected body fat (and lean
+  mass) on that day. A least-squares line goes through the residuals.
+- **Pace and level.** The line's slope is the *pace gap* (observed minus planned change a week).
+  Its value at the latest reading is the *level gap*. The plan is drawn from one start reading,
+  which is itself off by up to ±σ. That error shifts every residual equally, so it moves the level
+  gap but cannot bias the pace gap.
+- **Why the verdict rests on pace.** A simulation that made the start reading as noisy as the
+  others showed what happens when the level gap alone decides (at z = 2.25 × its SE): 17 % (σ 1)
+  to 44 % (σ 1.6) of people who were exactly on plan got a wrong calorie proposal.
+- **When it counts.** The pace gap must exceed 2.25 standard errors. The noise is max(1.5 points,
+  the person's own scatter); for lean mass it is weight/100 × √(1.5² + 0.5²) kg, where 0.5 is
+  scale noise in %BW (Orsama 2014, §7). The level gap must also be at least 1 point the same way:
+  the tape's reproducibility and Foulis's ≥ 1-point criterion. For lean mass that floor is 1 kg.
+- **Minimum data.** At least 3 readings spanning ≥ 21 days (§7's "≥ 3 weeks"), the latest ≤ 14
+  days old. In practice the pace test needs about 10 or more weekly readings: at ±1.5 points, a
+  pace gap of 0.28 points a week only clears 2.25 SE once Σ(t − t̄)² ≳ 150 week².
+- **Stalled.** "Stalled" means body fat falls < 0.05 points a week, the body-fat counterpart of
+  the cut's 0.1 kg / 14 days.
+- **Proposals.** A proposal needs the same verdict at the previous reading, the counterpart of
+  the cut's "today and 7 days ago" rule. It also needs a reading newer than the last answer, and
+  the 21-day cool-down still applies.
+- **Reached.** "Reached" needs the latest reading at the target and, once there are 3 readings,
+  the smoothed body fat at the target too. The smoothed value is the line through the window's
+  readings, read at the latest one. With 1.5 points of noise, someone 1 point above target reads
+  at or below it on about 25 % of single readings.
+- **Projection.** The projected end uses the smoothed body fat, at the plan's pace until a verdict
+  shows the pace differs.
+- Confidence: medium-low. The structure is standard regression; the calibration is mine (below).
 
 **Calibration (simulation, own work, low-medium confidence).** The setup:
 - a man, 85 kg, 20 → 15 %, over an 18-week plan (≈ 0.28 points a week)
+- the start reading as noisy as the others (the plan is drawn from it)
 - Gaussian tape noise σ on each reading, 0.4 kg scale noise
-- proposals checked at every reading, from week 3 to the end of the plan
+- proposals checked at every reading from week 3 to the end of the plan
 
-The table shows the share of people who ever got a wrong proposal while on plan, and how many
-full stalls were caught.
+The columns show the share of people on plan who ever got a wrong proposal, and the share of full
+stalls (body fat flat) and of lean loss (−0.35 kg a week, body fat on plan) that were caught.
 
-| noise floor / z | on plan, σ 1.0, weekly | on plan, σ 1.6, weekly | on plan, σ 1.0, fortnightly | full stall caught, weekly (median week) | full stall caught, fortnightly (median week) |
-|---|---|---|---|---|---|
-| 1.0 / 2.0 | 14 % | 29 % | 3 % | 100 % (7–8) | 99 % (10) |
-| 1.5 / 2.0 | 0.7 % | 14 % | 0 % | 100 % (9) | 100 % (12) |
-| **1.5 / 2.25 (chosen)** | **0 %** | **5 %** | **0 %** | **100 % (9–10)** | **97 % (12)** |
-| 1.5 / 2.5 | 0 % | 2 % | 0 % | 99–100 % (10) | 93 % (14) |
+| noise floor / pace z / window | on plan σ 1.0 weekly | on plan σ 1.6 weekly | on plan σ 1.0 fortnightly | stall caught σ 1.0 weekly (median week) | stall caught σ 1.6 weekly | stall caught σ 1.0 fortnightly | lean loss caught |
+|---|---|---|---|---|---|---|---|
+| 1.5 / 2.0 / 112 d | 0 % | 10 % | 0.3 % | 100 % (12) | 91 % | 75 % | 100 % (9) |
+| **1.5 / 2.25 / 112 d (chosen)** | **0 %** | **4.7 %** | **0 %** | **99 % (13)** | **85 %** | **64 %** | **99 % (10)** |
+| 1.5 / 2.25 / 56 d | 0 % | 4 % | 0 % | 31 % (13) | 50 % | 3 % | 91 % (12) |
+| 1.0 / 2.25 / 112 d | 4.7 % | 9.7 % | 1.3 % | 100 % (11) | 90 % | 87 % | 100 % (9) |
 
-A proposal is never applied silently (§2 of the sprint hand-off), but a wrong proposal still costs
-trust. That is why the chosen row keeps false alarms at or below 5 % even for noisy self-measurers.
-For a recomp, catching a stall a week later costs little.
+A proposal is never applied silently (§2 of the sprint hand-off), but a wrong calorie proposal still
+costs trust. That is why the chosen row keeps false alarms at ≤ 5 % even for noisy self-measurers.
+For a slow recomp, catching a stall a week or two later costs little. The limit is the method, not
+the rule: with ±1.5-point readings a recomp's pace cannot be read in fewer than about ten weeks.
+Two things would shorten that: a better start (for example, the plan drawn from the mean of two
+readings) or a more precise measurement.
 
 ---
 
@@ -268,8 +282,8 @@ For a recomp, catching a stall a week later costs little.
 | RECOMP_BF_NOISE_PTS (`adaptive.bfNoisePts`) | 1.5 (floor; own scatter wins when larger) | Hodgdon & Friedl 1999 (±1 trained); Barrios 2016 TEM through the Navy equation | medium |
 | RECOMP_BF_TOLERANCE_PTS (`bfTolerancePts`) | 1.0 | tape reproducibility; Foulis 2023 ≥ 1-point criterion | medium |
 | RECOMP_LEAN_TOLERANCE_KG (`leanToleranceKg`) | 1.0 | ≈ 1 point of body fat at 85–100 kg | low-medium |
-| RECOMP_CONFIDENCE_Z (`bfConfidenceZ`) | 2.25 | §8 simulation; LSC = 2.77 × precision (Slart 2024) | low-medium |
+| RECOMP_PACE_Z (`bfConfidenceZ`) | 2.25 standard errors of the pace gap | §8 simulation; LSC = 2.77 × precision (Slart 2024) | low-medium |
 | RECOMP_MIN_READINGS / SPAN / MAX_AGE | 3 readings / 21 days / 14 days | §7 "≥ 3 weeks"; 3 = fewest with scatter left | medium |
-| RECOMP_WINDOW_DAYS (`bfWindowDays`) | 56 | recomp effects read over 8–12 weeks (Barakat 2020) | low-medium |
+| RECOMP_WINDOW_DAYS (`bfWindowDays`) | 112 | pace needs 10+ readings at ±1.5 points (§8); recomp studies run 8–12+ weeks (Barakat 2020) | low-medium |
 | RECOMP_STALL_PTS_PER_WEEK (`bfStallPtsPerWeek`) | 0.05 | counterpart of the cut's 0.1 kg / 14 days | low |
 | WEIGH_IN_NOISE_PCT_BW (`weighInNoisePctBw`) | 0.5 | Orsama 2014 (§7) | medium |

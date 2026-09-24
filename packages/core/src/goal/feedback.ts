@@ -96,7 +96,9 @@ export function goalFeedback(input: FeedbackInput): GoalFeedback {
   });
 
   if (adjustment?.kind === "reached") return say("reached", "positive", "proud", "goal.completed", adjustment.messageTr);
-  if (progress.actualWeightKg === null) {
+  // A recomp is read from tape measurements, which carry their own weight: those count as data too.
+  const hasTape = (bodyFat?.count ?? 0) > 0;
+  if (progress.actualWeightKg === null && !hasTape) {
     return say("noData", "neutral", "curious", "goal.feedback.noData", "İlk tartını gir, gidişatını birlikte çizelim.");
   }
   const d = deviationKg === null ? "" : kg(deviationKg);
@@ -129,9 +131,17 @@ export function goalFeedback(input: FeedbackInput): GoalFeedback {
           ? say("ahead", "attention", "think", "goal.feedback.ahead", `Yağ oranın hızlı düşüyor ama yağsız kütlen planın ${l} kg altında.${pending}`)
           : say("ahead", "positive", "cheer", "goal.feedback.ahead", `Yağ oranında plandan ${p} puan öndesin!${faster}${pending}`);
       case "behind":
-        return say("behind", "attention", "think", "goal.feedback.behind", `Yağ oranında planın ${p} puan gerisindesin; ölçümlerle birlikte izliyoruz.${pending}`);
-      case "stalled":
-        return say("stalled", "attention", "worried", "goal.feedback.stalled", `Son haftalarda yağ oranın yerinde sayıyor; gerekirse kaloriyi ayarlarız.${pending}`);
+      case "stalled": {
+        const stalled = progress.onTrack === "stalled";
+        const what = stalled ? "Son haftalarda yağ oranın yerinde sayıyor" : `Yağ oranında planın ${p} puan gerisindesin`;
+        // Losing lean mass as well: fewer calories would cost more muscle (the proposal keeps them).
+        const next = bodyFat.leanLoss
+          ? `, yağsız kütlen de planın ${l} kg altında; kaloriyi kısmadan protein ve antrenmana odaklanalım.`
+          : stalled
+            ? "; gerekirse kaloriyi ayarlarız."
+            : "; ölçümlerle birlikte izliyoruz.";
+        return say(progress.onTrack, "attention", stalled ? "worried" : "think", `goal.feedback.${progress.onTrack}`, `${what}${next}${pending}`);
+      }
       default:
         return bodyFat.leanLoss
           ? say("onTrack", "attention", "think", "goal.feedback.onTrack", `Yağ oranın planda ama yağsız kütlen planın ${l} kg altında; proteini ve antrenmanı aksatma.${pending}`)
@@ -190,8 +200,9 @@ export interface GoalEvaluation {
 /** Progress, Floo's line and any pending adjustment — the one call to make after every entry. */
 export function evaluateGoal(input: EvaluateGoalInput): GoalEvaluation {
   const { goal, weighIns, bodyEntries, dayIntake, todayKey, settings } = input;
-  const progress = computeGoalProgress(goal, weighIns, bodyEntries, dayIntake, todayKey, settings);
+  // Computed once, so progress, the proposal and Floo's line read the very same verdict.
   const bodyFat = directionOf(goal) === "recomp" ? bodyFatTrend(goal, bodyEntries, todayKey, settings) : null;
+  const progress = computeGoalProgress(goal, weighIns, bodyEntries, dayIntake, todayKey, settings, bodyFat);
   let replanBase: ReplanBase | null = null;
   if (input.replanBase) {
     // A recomp with enough readings re-plans from the fitted body fat, not from one noisy tape reading.
@@ -202,7 +213,7 @@ export function evaluateGoal(input: EvaluateGoalInput): GoalEvaluation {
     replanBase = { ...input.replanBase, ...estimateCurrentBody(goal, measured, progress.actualWeightKg) };
   }
   const adjustment = replanBase
-    ? proposeGoalAdjustment({ goal, progress, weighIns, bodyEntries, todayKey, replanBase, recalibration: input.recalibration, settings })
+    ? proposeGoalAdjustment({ goal, progress, weighIns, bodyEntries, bodyFat, todayKey, replanBase, recalibration: input.recalibration, settings })
     : null;
   const deviationKg = trendDeviationAt(goal, weighIns, todayKey, settings);
   const latestBody =

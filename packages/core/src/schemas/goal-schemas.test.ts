@@ -173,6 +173,11 @@ describe("zGoalSettings — legacy settings", () => {
     expect(zGoalSettings.safeParse(tooFew).success).toBe(false);
     const noNoise = { ...DEFAULT_GOAL_SETTINGS, adaptive: { ...DEFAULT_GOAL_SETTINGS.adaptive, bfNoisePts: 0 } };
     expect(zGoalSettings.safeParse(noNoise).success).toBe(false);
+    // readings outside the window are dropped, so a longer span could never be met
+    const spanOutsideWindow = { ...DEFAULT_GOAL_SETTINGS, adaptive: { ...DEFAULT_GOAL_SETTINGS.adaptive, bfWindowDays: 28, bfMinSpanDays: 35 } };
+    expect(zGoalSettings.safeParse(spanOutsideWindow).success).toBe(false);
+    const beyondHistory = { ...DEFAULT_GOAL_SETTINGS, adaptive: { ...DEFAULT_GOAL_SETTINGS.adaptive, bfWindowDays: 365 } };
+    expect(zGoalSettings.safeParse(beyondHistory).success).toBe(false);
   });
 
   it("the defaults themselves parse unchanged", () => {

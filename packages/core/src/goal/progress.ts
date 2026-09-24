@@ -92,7 +92,7 @@ export function tdeeAtDay(goal: GoalLike, dayOffset: number): number {
 
 /**
  * Recomp verdict from the tape measurements (docs/plan/11-muscle-gain-engine.md §Recomp on body fat).
- * All deviations are read at `latestKey`, the day of the latest reading used.
+ * Levels are read at `latestKey`, the day of the latest reading used.
  */
 export interface BodyFatTrend {
   /** Readings used: one per day, since the plan (re)started, inside the trailing window, up to today. */
@@ -108,24 +108,27 @@ export interface BodyFatTrend {
   enough: boolean;
   /** Body fat on the fitted trend at `latestKey`. */
   bodyFatPct: number | null;
-  /** Fitted minus planned body fat, points (positive = fatter than planned). */
+  /** Fitted minus planned body fat at `latestKey`, points (positive = fatter than planned). */
   deviationPts: number | null;
-  /** The gap that counts: max(tolerance, z × standard error of the deviation). */
-  thresholdPts: number | null;
   /** Observed body-fat change per week (negative = falling). */
   slopePtsPerWeek: number | null;
-  /** Fitted minus planned lean mass, kg (negative = less lean than planned). */
+  /** Observed minus planned body-fat change per week (positive = losing slower than planned). */
+  paceGapPtsPerWeek: number | null;
+  /** `paceGapPtsPerWeek` in standard errors: how sure the pace really differs from the plan. */
+  paceZ: number | null;
+  /** Fitted minus planned lean mass at `latestKey`, kg (negative = less lean than planned). */
   deviationLeanKg: number | null;
-  thresholdLeanKg: number | null;
   /** Observed lean-mass change per week. */
   leanSlopeKgPerWeek: number | null;
+  /** Observed minus planned lean-mass change per week, in standard errors (negative = losing lean). */
+  leanPaceZ: number | null;
   /** On body fat, when `enough`: ahead / onTrack / behind / stalled. null otherwise. */
   status: OnTrack | null;
-  /** When `enough`: lean mass is below plan by more than its threshold and falling. */
+  /** When `enough`: lean mass is below plan and falling, at a pace that is not noise. */
   leanLoss: boolean;
 }
 
-/** Least-squares line through (x, y): the fitted value at `x`, its standard-error factor and the scatter. */
+/** Least-squares line through (x, y): the fitted value at `x`, the slope in standard errors and the scatter. */
 function fitLine(xs: number[], ys: number[]) {
   const n = xs.length;
   const mx = xs.reduce((a, b) => a + b, 0) / n;
@@ -143,11 +146,36 @@ function fitLine(xs: number[], ys: number[]) {
   return {
     slope,
     at,
-    /** SE of the fitted value at `x` is σ × this. */
-    seFactor: (x: number) => Math.sqrt(1 / n + (x - mx) ** 2 / sxx),
+    /** The slope in standard errors, for a reading noise σ. */
+    slopeZ: (sigma: number) => (slope * Math.sqrt(sxx)) / sigma,
     /** Residual SD (n − 2 degrees of freedom); null below three points. */
     scatter: n >= 3 ? Math.sqrt(ssr / (n - 2)) : null,
   };
+}
+
+/** Usable tape readings in [fromKey, toKey], one per day (the last of a day in input order wins), oldest first. */
+function readingsBetween(bodyEntries: BodyPoint[], fromKey: string, toKey: string): BodyPoint[] {
+  const byDay = new Map<string, BodyPoint>();
+  for (const b of bodyEntries) {
+    if (b.dateKey < fromKey || b.dateKey > toKey || !Number.isFinite(b.bodyFatPct) || !(b.weightKg > 0)) continue;
+    byDay.set(b.dateKey, b);
+  }
+  return [...byDay.values()].sort((x, y) => (x.dateKey < y.dateKey ? -1 : 1));
+}
+
+/**
+ * Body fat now, smoothed: the least-squares line through the readings of the last `bfWindowDays`
+ * (whichever plan they belong to), read at the latest one. It needs no plan, so a re-plan does not
+ * reset it. null below `bfMinMeasurements` readings.
+ */
+export function smoothedBodyFat(bodyEntries: BodyPoint[], todayKey: string, settings: GoalSettings): number | null {
+  const points = readingsBetween(bodyEntries, shiftKey(todayKey, -settings.adaptive.bfWindowDays), todayKey);
+  if (points.length < Math.max(2, settings.adaptive.bfMinMeasurements)) return null;
+  const line = fitLine(
+    points.map((p) => daysBetween(points[0].dateKey, p.dateKey)),
+    points.map((p) => p.bodyFatPct)
+  );
+  return round(line.at(daysBetween(points[0].dateKey, points[points.length - 1].dateKey)), 2);
 }
 
 const EMPTY_TREND: BodyFatTrend = {
@@ -159,39 +187,39 @@ const EMPTY_TREND: BodyFatTrend = {
   enough: false,
   bodyFatPct: null,
   deviationPts: null,
-  thresholdPts: null,
   slopePtsPerWeek: null,
+  paceGapPtsPerWeek: null,
+  paceZ: null,
   deviationLeanKg: null,
-  thresholdLeanKg: null,
   leanSlopeKgPerWeek: null,
+  leanPaceZ: null,
   status: null,
   leanLoss: false,
 };
 
 /**
  * The tape-measurement trend against the plan. On a recomp the scale barely moves by design, so
- * progress is body fat and the lean mass derived from it — but a Navy reading is only good to ±1
- * point between trained observers (≈ ±1.5 self-measured) while the plan moves ~0.3 points a week,
- * so a single reading never decides:
+ * progress is body fat and the lean mass derived from it. A Navy reading is good to ±1 point between
+ * trained observers (≈ ±1.5 self-measured) while the plan moves ~0.3 points a week, and the plan
+ * itself starts from one such reading, so neither one reading nor the gap to the plan's level
+ * decides:
  *
- *  1. readings since the plan (re)started, within `bfWindowDays` of today, one per day (last wins);
+ *  1. readings since the plan (re)started, within `bfWindowDays` of today, one per day (the last one
+ *     of a day in input order wins; pass them oldest first);
  *  2. each is compared with the roadmap's expected body fat / lean mass on its day (the residual);
- *  3. a least-squares line through the residuals gives the deviation at the latest reading and its
- *     standard error (noise = the literature floor or the person's own scatter, whichever is larger);
- *  4. a deviation counts only beyond max(tolerance, z × SE), and only with `bfMinMeasurements`
- *     readings over `bfMinSpanDays`, the latest no older than `bfMaxAgeDays`.
+ *  3. a least-squares line through the residuals: its slope is the pace gap (observed minus planned
+ *     change a week), which the start reading's error cannot bias; its value at the latest reading
+ *     is the deviation from the plan's level, which it can;
+ *  4. a verdict needs the pace gap beyond `bfConfidenceZ` standard errors (noise = the literature
+ *     floor or the person's own scatter, whichever is larger) and the level at least
+ *     `bfTolerancePts` off the same way, with `bfMinMeasurements` readings over `bfMinSpanDays`,
+ *     the latest no older than `bfMaxAgeDays`.
  */
 export function bodyFatTrend(goal: GoalLike, bodyEntries: BodyPoint[], todayKey: string, settings: GoalSettings): BodyFatTrend {
   const a = settings.adaptive;
   const planStartKey = goal.plan.startKey || goal.start.dateKey;
   const windowStartKey = shiftKey(todayKey, -a.bfWindowDays);
-  const fromKey = planStartKey > windowStartKey ? planStartKey : windowStartKey;
-  const byDay = new Map<string, BodyPoint>();
-  for (const b of bodyEntries) {
-    if (b.dateKey < fromKey || b.dateKey > todayKey || !Number.isFinite(b.bodyFatPct) || !(b.weightKg > 0)) continue;
-    byDay.set(b.dateKey, b);
-  }
-  const points = [...byDay.values()].sort((x, y) => (x.dateKey < y.dateKey ? -1 : 1));
+  const points = readingsBetween(bodyEntries, planStartKey > windowStartKey ? planStartKey : windowStartKey, todayKey);
   const count = points.length;
   if (count === 0) return EMPTY_TREND;
   const latest = points[count - 1];
@@ -212,7 +240,6 @@ export function bodyFatTrend(goal: GoalLike, bodyEntries: BodyPoint[], todayKey:
   const bfRes = fitLine(xs, points.map((p, i) => p.bodyFatPct - expected[i].bodyFatPct));
   const leanRes = fitLine(xs, leans.map((l, i) => l - expected[i].leanMassKg));
   const xLast = xs[count - 1];
-  const expLast = expected[count - 1];
   const deviationPts = bfRes.at(xLast);
   const deviationLeanKg = leanRes.at(xLast);
   const slopePtsPerWeek = fitLine(xs, points.map((p) => p.bodyFatPct)).slope * 7;
@@ -222,28 +249,29 @@ export function bodyFatTrend(goal: GoalLike, bodyEntries: BodyPoint[], todayKey:
   const sigmaBf = Math.max(a.bfNoisePts, bfRes.scatter ?? 0);
   // One point of body fat is weight/100 kg of lean mass; the scale reading adds its own noise.
   const sigmaLean = Math.max((meanWeight / 100) * Math.hypot(a.bfNoisePts, a.weighInNoisePctBw), leanRes.scatter ?? 0);
-  const thresholdPts = Math.max(a.bfTolerancePts, a.bfConfidenceZ * sigmaBf * bfRes.seFactor(xLast));
-  const thresholdLeanKg = Math.max(a.leanToleranceKg, a.bfConfidenceZ * sigmaLean * leanRes.seFactor(xLast));
+  const paceZ = bfRes.slopeZ(sigmaBf);
+  const leanPaceZ = leanRes.slopeZ(sigmaLean);
 
   const enough = count >= a.bfMinMeasurements && spanDays >= a.bfMinSpanDays && daysBetween(latest.dateKey, todayKey) <= a.bfMaxAgeDays;
   let status: OnTrack | null = null;
   if (enough) {
-    if (deviationPts >= thresholdPts) status = slopePtsPerWeek > -a.bfStallPtsPerWeek ? "stalled" : "behind";
-    else if (deviationPts <= -thresholdPts) status = "ahead";
+    if (paceZ >= a.bfConfidenceZ && deviationPts >= a.bfTolerancePts) status = slopePtsPerWeek > -a.bfStallPtsPerWeek ? "stalled" : "behind";
+    else if (paceZ <= -a.bfConfidenceZ && deviationPts <= -a.bfTolerancePts) status = "ahead";
     else status = "onTrack";
   }
   return {
     ...base,
     enough,
-    bodyFatPct: round(expLast.bodyFatPct + deviationPts, 2),
+    bodyFatPct: round(expected[count - 1].bodyFatPct + deviationPts, 2),
     deviationPts: round(deviationPts, 2),
-    thresholdPts: round(thresholdPts, 2),
     slopePtsPerWeek: round(slopePtsPerWeek, 3),
+    paceGapPtsPerWeek: round(bfRes.slope * 7, 3),
+    paceZ: round(paceZ, 2),
     deviationLeanKg: round(deviationLeanKg, 2),
-    thresholdLeanKg: round(thresholdLeanKg, 2),
     leanSlopeKgPerWeek: round(leanSlopeKgPerWeek, 3),
+    leanPaceZ: round(leanPaceZ, 2),
     status,
-    leanLoss: enough && deviationLeanKg <= -thresholdLeanKg && leanSlopeKgPerWeek < 0,
+    leanLoss: enough && leanPaceZ <= -a.bfConfidenceZ && deviationLeanKg <= -a.leanToleranceKg && leanSlopeKgPerWeek < 0,
   };
 }
 
@@ -260,7 +288,9 @@ export function computeGoalProgress(
   bodyEntries: BodyPoint[],
   dayIntake: DayIntake[],
   todayKey: string,
-  settings: GoalSettings
+  settings: GoalSettings,
+  /** Recomp: `bodyFatTrend` for the same inputs when the caller already has it (computed otherwise). */
+  bodyFat?: BodyFatTrend | null
 ): GoalProgress {
   const startKey = goal.start.dateKey;
   // A recalibration re-simulates the roadmap from the day it happened, so the plan timeline and
@@ -322,10 +352,14 @@ export function computeGoalProgress(
   if (direction === "recomp") {
     // Weight is meant to stay nearly flat, so the scale says nothing here: body fat and lean mass
     // from the tape measurements do, and only once there are enough of them.
-    const bf = bodyFatTrend(goal, bodyEntries, todayKey, settings);
+    const bf = bodyFat ?? bodyFatTrend(goal, bodyEntries, todayKey, settings);
     onTrack = bf.status ?? "onTrack";
-    toGo = bfToGo;
-    if (actualBodyFatPct !== null) ratePerWeek = bf.enough && bf.slopePtsPerWeek !== null ? -bf.slopePtsPerWeek : plannedBfRatePerWeek(goal);
+    // One tape reading must not swing the date: the distance left is read off the smoothed body fat,
+    // and the observed pace replaces the plan's only once it is shown to differ (a verdict is set).
+    const smoothed = smoothedBodyFat(bodyEntries, todayKey, settings);
+    toGo = smoothed === null ? bfToGo : Math.max(0, smoothed - goal.targetBodyFatPct);
+    const paceDiffers = bf.status !== null && bf.status !== "onTrack" && bf.slopePtsPerWeek !== null;
+    if (actualBodyFatPct !== null) ratePerWeek = paceDiffers ? -bf.slopePtsPerWeek! : plannedBfRatePerWeek(goal);
   } else {
     if (actualWeightKg !== null && expectedTrendNow !== null) {
       const ahead = sign * (actualWeightKg - expectedTrendNow);

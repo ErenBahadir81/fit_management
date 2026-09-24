@@ -99,26 +99,41 @@ A recomp's weight is flat by design, so its `onTrack` and projected end never co
 They come from the tape readings (body fat and the lean mass derived from it) against the roadmap's
 expected per-day values. Sources and calibration are in the research doc, §8.
 
-- **Readings:** since the plan (re)started, at most `bfWindowDays` (56) before today, one per day
-  (the last one of a day wins).
-- **Trend:** each reading's residual is the measured value minus the planned value on its day. A
-  least-squares line through the residuals gives the deviation at the latest reading
-  (`deviationPts`, and `deviationLeanKg` for lean mass) and its standard error. The noise used is
-  the literature floor (`bfNoisePts` 1.5 points; for lean mass that noise scaled by weight, plus
-  scale noise) or the person's own scatter around the line, whichever is larger.
+- **Readings:** since the plan (re)started, at most `bfWindowDays` (112) before today, one per day
+  (the last one of a day in input order wins).
+- **Residuals:** each reading minus the plan's expected body fat / lean mass on its day. A
+  least-squares line goes through these residuals.
+  - Its **slope** is the pace gap (`paceGapPtsPerWeek`): observed minus planned change a week.
+    The plan is drawn from one start reading that is itself ±1.5 points off. That error shifts
+    every residual by the same amount, so it cannot bias the slope.
+  - Its **value at the latest reading** is the gap to the plan's level (`deviationPts`,
+    `deviationLeanKg`), and that gap *does* carry the start reading's error.
+  - Noise per reading is the larger of the literature floor (`bfNoisePts` 1.5 points; for lean
+    mass that noise scaled by weight, plus scale noise) and the person's own scatter around the
+    line.
 - **Enough data:** at least `bfMinMeasurements` (3) readings, spanning at least `bfMinSpanDays` (21)
-  days, and the latest no older than `bfMaxAgeDays` (14) days. Until then `onTrack` stays `onTrack`,
+  days, the latest no older than `bfMaxAgeDays` (14) days. Until then `onTrack` stays `onTrack`,
   whatever the scale does.
-- **Verdict:** a deviation counts only beyond max(`bfTolerancePts` 1, `bfConfidenceZ` 2.25 × SE).
-  Fatter than planned is `behind`, or `stalled` when body fat falls slower than
-  `bfStallPtsPerWeek` (0.05). Leaner than planned is `ahead`. `leanLoss` means lean mass is below
-  plan beyond its own threshold (`leanToleranceKg` 1) and falling.
-- **Projection:** `bfToGo` ÷ the observed body-fat slope; the plan's average rate is used until
-  there are enough readings.
+- **Verdict:** the pace gap must exceed `bfConfidenceZ` (2.25) standard errors (`paceZ`), and the
+  level must be off by at least `bfTolerancePts` (1) the same way. Slower than planned is `behind`,
+  or `stalled` when body fat falls slower than `bfStallPtsPerWeek` (0.05). Faster is `ahead`.
+  `leanLoss` means the lean pace is significantly below plan (`leanPaceZ`), lean mass is at least
+  `leanToleranceKg` (1) below plan, and it is falling.
+- **Smoothed body fat now** (`smoothedBodyFat`): the line through the readings of the window,
+  whichever plan they belong to, read at the latest one (≥ 3 readings). It is used for `reached`
+  and for the projection's distance.
+- **Projection:** smoothed distance to the target ÷ pace. The pace is the plan's rate until a
+  verdict says the observed pace differs; then it is the observed one.
+- **A re-plan starts a new series.** Accepting a proposal or a recalibration re-plans from today,
+  and the verdict only reads readings since then. A dismissal changes nothing.
 
-With weekly readings, a full stall is judged `stalled` around week 8 and proposed around week 9–10.
-With fortnightly readings that moves to around week 12. In simulation over a whole 18-week plan,
-≤ 5 % of people who are on plan ever get a proposal, with tape noise of 1–1.6 points.
+In simulation, with the start reading as noisy as every other reading, over a whole 18-week plan:
+- weekly readings at 1-point tape noise: no one on plan gets a proposal
+- at 1.6 points: ≈ 5 % of people on plan get one
+- a full stall is caught in ≈ 99 % of cases, typically around week 13
+
+Tape noise simply does not allow a faster call. A faster call would need a better start reading
+(for example, the mean of two) or a more precise method. See research doc §8.
 
 ## Adaptive goal (`core/goal/adjust.ts`)
 
@@ -127,7 +142,7 @@ option with one tap (or dismisses it).
 
 | situation | when | options (first = recommended) |
 |---|---|---|
-| `reached` | cut/bulk: trend within 0.1 kg of the target weight; recomp: latest body fat ≤ target **and**, once there are ≥ 3 readings, the fitted body-fat trend ≤ target too. No cool-down. | complete · continue with a tighter target (cut/bulk) |
+| `reached` | cut/bulk: trend within 0.1 kg of the target weight; recomp: latest body fat ≤ target **and**, once there are ≥ 3 readings, the smoothed body fat ≤ target too. No cool-down. | complete · continue with a tighter target (cut/bulk) |
 | cut `ahead` | trend ≥ 0.4 kg ahead today **and** 7 days ago | re-plan from today (earlier date) · target −1 point |
 | cut `behind` / `stalled` | ≥ 0.4 kg behind today and 7 days ago / trend flat 14 days | lower calories · keep calories, move the date |
 | recomp `ahead` | body-fat verdict `ahead` now **and** at the previous reading, lean mass held | re-plan from today (earlier date) · target −1 point |
@@ -138,7 +153,8 @@ option with one tap (or dismisses it).
 | bulk `behind` / `stalled` | gain < 0.5 × plan / ≤ 0.02 kg a week | raise calories · re-plan |
 
 A recomp never gets a proposal from weight alone. Without enough tape readings it only ever gets
-`reached`; the feedback line asks for a measurement instead. Proposals carry `deviationBfPts` and
+`reached`; the feedback line asks for a measurement instead. A new recomp proposal also needs a
+reading taken after the last answer, so a dismissed proposal is never re-made from the same evidence. Proposals carry `deviationBfPts` and
 `deviationLeanKg` for a recomp (null otherwise). `deviationKg` stays the weight-trend deviation.
 
 Only after a **21-day cool-down** from the plan (re)start or the last answer (first weeks are water
