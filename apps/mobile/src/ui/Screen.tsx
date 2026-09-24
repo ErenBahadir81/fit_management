@@ -1,6 +1,7 @@
 import React from "react";
-import { RefreshControl, ScrollView, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
+import { RefreshControl, StyleSheet, View, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import Animated, { interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme/ThemeProvider";
 import { spacing } from "../theme/tokens";
@@ -22,7 +23,16 @@ export interface ScreenProps extends Omit<ScrollViewProps, "style"> {
   contentStyle?: StyleProp<ViewStyle>;
 }
 
-/** Themed screen container: safe areas, gutters, pull-to-refresh, tab-bar clearance. */
+/** Height of the top bar that fades in behind the corner Floo once a tab screen scrolls. */
+export const SCREEN_TOP_BAR = 60;
+
+/**
+ * Themed screen container: safe areas, gutters, pull-to-refresh, tab-bar clearance.
+ *
+ * On scrolling tab screens a flat top bar (the page colour plus a hairline) fades in as soon as
+ * content moves, so rows never slide visibly underneath the corner Floo. At rest it is invisible:
+ * the large title owns the top of the page.
+ */
 export function Screen({ children, scroll = true, keyboard, refreshing, onRefresh, tabBar = true, edges = ["top"], style, contentStyle, testID, ...rest }: ScreenProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -38,26 +48,79 @@ export function Screen({ children, scroll = true, keyboard, refreshing, onRefres
       </View>
     );
   }
-  const Scroller = keyboard ? KeyboardAwareScrollView : ScrollView;
+  if (keyboard) {
+    return (
+      <KeyboardAwareScrollView
+        {...rest}
+        testID={testID}
+        style={[styles.flex, bg, style]}
+        contentContainerStyle={[styles.content, { paddingTop: padTop, paddingBottom: padBottom }, contentStyle]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        refreshControl={
+          onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} progressViewOffset={padTop} /> : undefined
+        }
+      >
+        {children}
+      </KeyboardAwareScrollView>
+    );
+  }
   return (
-    <Scroller
-      {...rest}
-      testID={testID}
-      style={[styles.flex, bg, style]}
-      contentContainerStyle={[styles.content, { paddingTop: padTop, paddingBottom: padBottom }, contentStyle]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      contentInsetAdjustmentBehavior="never"
-      refreshControl={
-        onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} progressViewOffset={padTop} /> : undefined
-      }
-    >
-      {children}
-    </Scroller>
+    <View style={[styles.flex, bg, style]}>
+      <ScrollBody {...rest} testID={testID} refreshing={refreshing} onRefresh={onRefresh} padTop={padTop} padBottom={padBottom} contentStyle={contentStyle} topBar={tabBar}>
+        {children}
+      </ScrollBody>
+    </View>
+  );
+}
+
+interface ScrollBodyProps extends Omit<ScreenProps, "scroll" | "keyboard" | "tabBar" | "edges" | "style"> {
+  padTop: number;
+  padBottom: number;
+  topBar: boolean;
+}
+
+function ScrollBody({ children, refreshing, onRefresh, padTop, padBottom, contentStyle, topBar, testID, ...rest }: ScrollBodyProps) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const y = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    y.set(e.contentOffset.y);
+  });
+  // 0 → 1 over the first 16 pt of scroll: quick enough that nothing is ever seen under Floo.
+  const bar = useAnimatedStyle(() => ({ opacity: interpolate(y.get(), [0, 16], [0, 1], "clamp") }));
+  return (
+    <>
+      <Animated.ScrollView
+        {...rest}
+        testID={testID}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        style={styles.flex}
+        contentContainerStyle={[styles.content, { paddingTop: padTop, paddingBottom: padBottom }, contentStyle]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        refreshControl={
+          onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} progressViewOffset={padTop} /> : undefined
+        }
+      >
+        {children}
+      </Animated.ScrollView>
+      {topBar ? (
+        <Animated.View
+          pointerEvents="none"
+          testID="screen-top-bar"
+          style={[styles.topBar, { height: insets.top + SCREEN_TOP_BAR, backgroundColor: colors.bg, borderBottomColor: colors.border }, bar]}
+        />
+      ) : null}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { paddingHorizontal: spacing.gutter, gap: spacing.lg },
+  topBar: { position: "absolute", top: 0, left: 0, right: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  content: { paddingHorizontal: spacing.gutter, gap: spacing.cardGap },
 });

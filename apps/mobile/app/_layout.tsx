@@ -13,6 +13,7 @@ import { needsOnboarding } from "../src/features/onboarding/api";
 import { AppQueryProvider } from "../src/lib/queryClient";
 import { ThemeProvider, useTheme } from "../src/theme";
 import { ToastProvider } from "../src/ui/Toast";
+import { FlooVoiceProvider } from "../src/mascot/voice";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -26,7 +27,9 @@ export default function RootLayout() {
             <AppQueryProvider>
               <BottomSheetModalProvider>
                 <ToastProvider>
-                  <RootNavigator />
+                  <FlooVoice>
+                    <RootNavigator />
+                  </FlooVoice>
                 </ToastProvider>
               </BottomSheetModalProvider>
             </AppQueryProvider>
@@ -35,6 +38,12 @@ export default function RootLayout() {
       </KeyboardProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** Floo's queue lives above every navigator; the user's "show Floo" switch turns it into toasts. */
+function FlooVoice({ children }: { children: React.ReactNode }) {
+  const mascotEnabled = useSession((s) => s.user?.mascotEnabled ?? true);
+  return <FlooVoiceProvider enabled={mascotEnabled}>{children}</FlooVoiceProvider>;
 }
 
 function RootNavigator() {

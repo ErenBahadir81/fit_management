@@ -1,7 +1,6 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Icon } from "../../../ui/Icon";
@@ -14,8 +13,7 @@ export function Fab({ onPress, bottom, testID = "nutrition-fab" }: { onPress: ()
   const { colors, shadows } = useTheme();
   return (
     <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(120)} pointerEvents="box-none" style={[styles.host, { bottom }]}>
-      <Pressable testID={testID} onPress={onPress} haptic="medium" minTarget={false} accessibilityLabel="Öğün ekle" style={[styles.fab, shadows.primary]}>
-        <LinearGradient colors={[...colors.gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <Pressable testID={testID} onPress={onPress} haptic="medium" minTarget={false} accessibilityLabel="Öğün ekle" style={[styles.fab, { backgroundColor: colors.primary }, shadows.primary]}>
         <View style={styles.center}>
           <Icon icon="add" size={30} color={colors.onPrimary} />
         </View>
@@ -26,6 +24,6 @@ export function Fab({ onPress, bottom, testID = "nutrition-fab" }: { onPress: ()
 
 const styles = StyleSheet.create({
   host: { position: "absolute", right: spacing.gutter },
-  fab: { width: FAB_SIZE, height: FAB_SIZE, borderRadius: radii.pill, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  fab: { width: FAB_SIZE, height: FAB_SIZE, borderRadius: radii.pill, alignItems: "center", justifyContent: "center" },
   center: { alignItems: "center", justifyContent: "center" },
 });

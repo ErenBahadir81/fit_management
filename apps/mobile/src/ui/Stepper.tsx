@@ -76,7 +76,7 @@ export function Stepper({ value, onChange, step = 1, min = -Infinity, max = Infi
       >
         <Icon icon="minus" size={20} color="ink" />
       </Pressable>
-      <Text variant={size === "sm" ? "title" : "heading"} tabular align="center" style={styles.value} accessibilityLiveRegion="polite">
+      <Text variant={size === "sm" ? "title" : "number"} tabular align="center" style={styles.value} accessibilityLiveRegion="polite">
         {display}
       </Text>
       <Pressable

@@ -14,7 +14,7 @@ export interface StatTileProps extends ViewProps {
   tone?: Tone;
 }
 
-/** Compact number tile (streaks, deltas). Value is tabular. */
+/** Compact number tile (streaks, deltas): flat `surfaceMuted` block, tabular 22 pt value. */
 export function StatTile({ label, value, hint, icon, tone, style, ...rest }: StatTileProps) {
   const { colors } = useTheme();
   return (
@@ -26,7 +26,7 @@ export function StatTile({ label, value, hint, icon, tone, style, ...rest }: Sta
         </Text>
       </View>
       <View style={styles.valueRow}>
-        <Text variant="heading" tabular tone={tone} numberOfLines={1}>
+        <Text variant="number" tabular tone={tone} numberOfLines={1}>
           {value}
         </Text>
         {hint ? (

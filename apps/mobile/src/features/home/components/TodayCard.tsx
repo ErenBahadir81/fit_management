@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { isBreakLog, type HomeDTO } from "@fitfloow/core";
 import { fmtDuration } from "../../../lib/format";
 import { useTheme } from "../../../theme/ThemeProvider";
-import { spacing } from "../../../theme/tokens";
+import { radii, spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { Card } from "../../../ui/Card";
 import { Chip } from "../../../ui/Chip";
@@ -57,7 +57,7 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
   if (log && isBreakLog(log)) {
     return (
       <Card variant="muted" onPress={onOpenProgram} style={styles.min} testID="home-today">
-        <Row icon="skip" eyebrow="Bugün" title="Bugün atlandı" body="Sorun değil — program kaldığı yerden devam eder." />
+        <Row icon="skip" eyebrow="Bugün" title="Bugün atlandı" body="Sorun değil, program kaldığı yerden devam eder." />
       </Card>
     );
   }
@@ -71,22 +71,27 @@ export function TodayCard({ today, onOpenProgram }: TodayCardProps) {
   const count = day.kind === "strength" ? `${day.exercises.length} hareket` : day.run ? `${day.run.targetKm} km` : day.swim ? `${day.swim.targetKm} km` : "";
   const est = day.kind === "strength" ? `~${Math.round(day.exercises.reduce((a, e) => a + e.targetSets, 0) * 2.6)} dk` : day.run ? `~${day.run.targetMin} dk` : "";
   return (
-    <Card variant="primary" style={styles.min} testID="home-today">
-      <Text variant="label" color="onPrimaryMuted">
-        Bugünün antrenmanı
-      </Text>
-      <Text variant="heading" color="onPrimary" style={styles.title} numberOfLines={1}>
-        {day.title}
-      </Text>
-      {day.focus ? (
-        <Text variant="body" color="onPrimaryMuted" numberOfLines={1}>
-          {day.focus}
-          {count ? ` · ${count}` : ""}
-          {est ? ` · ${est}` : ""}
-        </Text>
-      ) : null}
+    <Card style={styles.min} testID="home-today">
+      <View style={styles.rowWrap}>
+        <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
+          <Icon icon="workout" size={18} color="primary" />
+        </View>
+        <View style={styles.rowTexts}>
+          <Text variant="label" color="inkMuted">
+            Bugünün antrenmanı
+          </Text>
+          <Text variant="heading" numberOfLines={1}>
+            {day.title}
+          </Text>
+          {day.focus || count || est ? (
+            <Text variant="body" color="inkMuted" numberOfLines={1}>
+              {[day.focus, count, est].filter(Boolean).join(", ")}
+            </Text>
+          ) : null}
+        </View>
+      </View>
       <View style={styles.cta}>
-        <Button label="Antrenmana başla" onPress={onOpenProgram} variant="inverse" icon="start" testID="home-start-workout" />
+        <Button label="Antrenmana başla" onPress={onOpenProgram} icon="start" full testID="home-start-workout" />
       </View>
     </Card>
   );
@@ -115,10 +120,10 @@ function Row({ icon, eyebrow, title, body }: { icon: AppIcon; eyebrow: string; t
 const styles = StyleSheet.create({
   min: { minHeight: HOME_HEIGHTS.today, justifyContent: "center" },
   head: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  badge: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  badge: { width: 36, height: 36, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" },
   title: { marginTop: spacing.sm },
   chips: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.sm, flexWrap: "wrap" },
-  cta: { marginTop: spacing.lg, flexDirection: "row" },
+  cta: { marginTop: spacing.lg },
   rowWrap: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   rowTexts: { flex: 1, gap: spacing.xs },
 });

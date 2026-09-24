@@ -19,7 +19,7 @@ export function calorieRatio(eaten: number, target: number): number {
 }
 
 /**
- * Ring/number colour: calm violet while there is room, green in the ±10 % landing zone,
+ * Ring/number colour: calm blue while there is room, green in the ±10 % landing zone,
  * amber just over, red when the day is clearly blown.
  */
 export function calorieTone(eaten: number, target: number): Tone {

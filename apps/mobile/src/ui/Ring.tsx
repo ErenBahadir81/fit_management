@@ -29,7 +29,10 @@ export interface RingProps extends ViewProps {
   children?: React.ReactNode;
 }
 
-/** Progress ring (SVG) — the calorie / recovery / score hero. Animates on value change. */
+/**
+ * Progress ring (SVG), the calorie / recovery / score hero, round caps. Animates on value change.
+ * `tone="primary"` strokes with `colors.gradient`: the only gradient in the app, keep it here.
+ */
 export function Ring({ value, size = 120, stroke, tone = "primary", color, gradient = true, trackColor, children, style, ...rest }: RingProps) {
   const { colors } = useTheme();
   const reduce = useReducedMotion();
@@ -41,7 +44,7 @@ export function Ring({ value, size = 120, stroke, tone = "primary", color, gradi
   }, [dashOffset, reduce, offset]);
   const animatedProps = useAnimatedProps(() => ({ strokeDashoffset: offset.value }));
 
-  const toneColor = { primary: colors.primary, success: colors.success, warning: colors.warning, danger: colors.danger, neutral: colors.inkSubtle }[tone];
+  const toneColor = { primary: colors.primary, success: colors.success, warning: colors.warningFill, danger: colors.danger, neutral: colors.inkSubtle }[tone];
   const strokeColor = color ?? toneColor;
   const useGradient = gradient && !color && tone === "primary";
   const id = React.useId().replace(/[^a-zA-Z0-9]/g, "");

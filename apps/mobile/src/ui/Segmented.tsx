@@ -20,9 +20,13 @@ export interface SegmentedProps<T extends string> extends ViewProps {
 
 const PAD = 3;
 
-/** iOS-style segmented control with a spring-sliding pill. Selection haptic on switch. */
+/**
+ * Flat segmented control: a `surfaceMuted` track and a thumb that springs between segments. The
+ * thumb is a hairline-edged surface in light; in dark it is one step lighter than the track, since a
+ * surface-coloured thumb would read as a hole. Selection haptic on switch.
+ */
 export function Segmented<T extends string>({ options, value, onChange, size = "md", testID, style, ...rest }: SegmentedProps<T>) {
-  const { colors, shadows } = useTheme();
+  const { colors, isDark } = useTheme();
   const reduce = useReducedMotion();
   const [width, setWidth] = useState(0);
   const index = Math.max(
@@ -45,7 +49,11 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       style={[styles.track, { backgroundColor: colors.surfaceMuted, height: h + PAD * 2 }, style]}
     >
-      {segW > 0 && <Animated.View style={[styles.pill, { width: segW, height: h, backgroundColor: colors.surface }, shadows.card, pill]} />}
+      {segW > 0 && (
+        <Animated.View
+          style={[styles.pill, { width: segW, height: h, backgroundColor: isDark ? colors.borderStrong : colors.surface, borderColor: isDark ? colors.borderStrong : colors.border }, pill]}
+        />
+      )}
       {options.map((o) => {
         const selected = o.value === value;
         return (
@@ -74,6 +82,6 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
 
 const styles = StyleSheet.create({
   track: { flexDirection: "row", borderRadius: radii.control, padding: PAD, alignSelf: "stretch" },
-  pill: { position: "absolute", top: PAD, left: PAD, borderRadius: radii.control - 2 },
+  pill: { position: "absolute", top: PAD, left: PAD, borderRadius: radii.control - PAD, borderWidth: StyleSheet.hairlineWidth },
   seg: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
 });

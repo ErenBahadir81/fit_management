@@ -11,7 +11,7 @@ export interface MilestoneSpineProps {
   milestones: GoalMilestone[];
   /** Today's key, so passed milestones read as done rather than pending. */
   todayKey: string;
-  /** `compact` rides inside the violet plan card; `full` is the roadmap's own spine. */
+  /** `compact` rides inside the blue plan card; `full` is the roadmap's own spine. */
   variant?: "compact" | "full";
   testID?: string;
 }

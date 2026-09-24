@@ -5,7 +5,7 @@ import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
 import type { FoodDTO, Meal } from "@fitfloow/core";
 import { haptic } from "../../../lib/haptics";
 import { useTheme } from "../../../theme/ThemeProvider";
-import { absoluteFill, radii, spacing } from "../../../theme/tokens";
+import { absoluteFill, dark, radii, spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { EmptyState } from "../../../ui/EmptyState";
 import { Header } from "../../../ui/Header";
@@ -15,6 +15,9 @@ import { Floo } from "../../../mascot";
 import { BARCODE_TYPES, CAMERA_SUPPORTED } from "../scan/camera";
 import { useBarcodeLookup } from "../useNutrition";
 import { FoodDetail } from "./FoodDetail";
+
+/** Marks drawn over the camera / photo scrim: always light. `onPrimary` is navy in dark mode. */
+const ON_SCRIM = dark.ink;
 
 export interface BarcodeScannerProps {
   meal: Meal;
@@ -75,8 +78,8 @@ export function BarcodeScanner({ meal: initialMeal, onAdd, onManual, onClose, ad
 
           {phase.kind === "scanning" && CAMERA_SUPPORTED && permission?.granted ? (
             <Animated.View entering={FadeIn.duration(240)} style={styles.guideWrap} pointerEvents="none">
-              <View style={[styles.guide, { borderColor: colors.onPrimary }]} />
-              <Text variant="label" style={[styles.hint, { color: colors.onPrimary }]}>
+              <View style={[styles.guide, { borderColor: ON_SCRIM }]} />
+              <Text variant="label" style={[styles.hint, { color: ON_SCRIM }]}>
                 Barkodu çerçeveye al
               </Text>
             </Animated.View>

@@ -18,6 +18,12 @@ export interface ToastOptions {
 interface ToastApi {
   show: (opts: ToastOptions) => void;
   hide: () => void;
+  /**
+   * Let another channel claim toasts before they render. Floo registers here so that failures
+   * (`kind: "error"`) arrive as its warnings; the claimer returns `false` to leave a toast alone.
+   * Returns the unregister function.
+   */
+  route: (claim: (opts: ToastOptions) => boolean) => () => void;
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -28,6 +34,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<(ToastOptions & { id: number }) | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seq = useRef(0);
+  const claimer = useRef<((opts: ToastOptions) => boolean) | null>(null);
 
   const hide = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -37,6 +44,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const show = useCallback(
     (opts: ToastOptions) => {
+      if (claimer.current?.(opts)) return;
       if (timer.current) clearTimeout(timer.current);
       const kind = opts.kind ?? "info";
       setToast({ ...opts, kind, id: ++seq.current });
@@ -49,7 +57,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
 
-  const api = useMemo(() => ({ show, hide }), [show, hide]);
+  const route = useCallback((claim: (opts: ToastOptions) => boolean) => {
+    claimer.current = claim;
+    return () => {
+      if (claimer.current === claim) claimer.current = null;
+    };
+  }, []);
+  const api = useMemo(() => ({ show, hide, route }), [show, hide, route]);
   return (
     <ToastContext.Provider value={api}>
       {children}

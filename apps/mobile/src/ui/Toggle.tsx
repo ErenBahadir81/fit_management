@@ -14,9 +14,13 @@ const W = 51;
 const H = 31;
 const KNOB = 27;
 
-/** Animated switch (role=switch). */
+/**
+ * Animated switch (role=switch): primary track when on. The knob is the light ink of the scheme
+ * (white in light, near-white in dark), never `onPrimary`, which is navy in dark and would vanish on
+ * the off track.
+ */
 export function Toggle({ value, onChange, disabled, testID, ...rest }: ToggleProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const reduce = useReducedMotion();
   const p = useSharedValue(value ? 1 : 0);
   useEffect(() => {
@@ -38,7 +42,7 @@ export function Toggle({ value, onChange, disabled, testID, ...rest }: TogglePro
       style={styles.hit}
     >
       <Animated.View style={[styles.track, track]}>
-        <Animated.View style={[styles.knob, { backgroundColor: colors.onPrimary }, knob]} />
+        <Animated.View style={[styles.knob, { backgroundColor: isDark ? colors.ink : colors.surface }, knob]} />
       </Animated.View>
     </Pressable>
   );
@@ -47,5 +51,5 @@ export function Toggle({ value, onChange, disabled, testID, ...rest }: TogglePro
 const styles = StyleSheet.create({
   hit: { paddingVertical: 6 },
   track: { width: W, height: H, borderRadius: H / 2, padding: 2, justifyContent: "center" },
-  knob: { width: KNOB, height: KNOB, borderRadius: KNOB / 2, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  knob: { width: KNOB, height: KNOB, borderRadius: KNOB / 2, shadowColor: "#0D1B26", shadowOpacity: 0.18, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
 });

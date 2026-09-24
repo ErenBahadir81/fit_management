@@ -14,7 +14,7 @@ describe("useTheme", () => {
     const { result } = await renderHook(() => useTheme(), { wrapper });
     expect(result.current.mode).toBe("system");
     expect(result.current.scheme).toBe("light");
-    expect(result.current.colors.primary).toBe("#6D5DF6");
+    expect(result.current.colors.primary).toBe("#0A70B3"); // Floo blue, not violet
     expect(result.current.colors.bg).toBe(light.bg);
   });
 
@@ -34,10 +34,10 @@ describe("useTheme", () => {
 
   test("exposes spacing, radii, type scale and shadows", async () => {
     const { result } = await renderHook(() => useTheme(), { wrapper });
-    expect(result.current.spacing.gutter).toBe(20);
-    expect(result.current.radii.card).toBe(24);
-    expect(result.current.radii.control).toBe(14);
-    expect(result.current.type.hero.fontSize).toBe(40);
+    expect(result.current.spacing.gutter).toBe(16);
+    expect(result.current.radii.card).toBe(16);
+    expect(result.current.radii.control).toBe(12);
+    expect(result.current.type.hero.fontSize).toBe(44);
     expect(result.current.shadows.card).toBeDefined();
   });
 
