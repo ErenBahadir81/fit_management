@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { RefreshControl, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
@@ -37,27 +37,27 @@ export const InListContext = createContext(false);
 /**
  * Inside `<Screen scroll={false}>` on a tab screen: the handler that feeds a vertical scroller's
  * offset to the screen's top bar. `List` attaches it by itself; call it from any other scroller's
- * `onScroll`. `null` elsewhere, and on screens whose header stays put above the list.
+ * `onScroll` (and wrap that scroller's content in `<InListContext.Provider value>` if it holds a
+ * large `Header`). The scroller's offset is dropped when it unmounts, so the bar is never left up
+ * over content at rest. `null` elsewhere, and on screens whose header stays put above the list.
  */
-export function useScreenScroll(): ScrollHandler | null {
-  const report = useContext(ScreenOffsetContext);
+export function useScreenScroll(enabled = true): ScrollHandler | null {
+  const context = useContext(ScreenOffsetContext);
+  const report = enabled ? context : null;
+  useEffect(() => (report ? () => report(0) : undefined), [report]);
   return useMemo(() => (report ? (e: NativeSyntheticEvent<NativeScrollEvent>) => report(e.nativeEvent.contentOffset.y) : null), [report]);
-}
-
-/** The raw offset reporter, for `List` (it also resets the bar when it unmounts). */
-export function useScreenOffset(): ((y: number) => void) | null {
-  return useContext(ScreenOffsetContext);
 }
 
 /**
  * Called by `Header`. A large header rendered in a list screen but outside its list holds the top
  * of the screen still: rows start below it and can never reach Floo, so the bar would only hide
- * the title. While such a header is mounted the bar is off.
+ * the title. While such a header is mounted the bar is off. (Layout effect: decided before the
+ * first frame is painted, so the bar and the list's handler are never wired up for nothing.)
  */
 export function useStaticHead(active: boolean): void {
   const register = useContext(ScreenHeadContext);
   const inList = useContext(InListContext);
-  useEffect(() => (register && active && !inList ? register() : undefined), [register, active, inList]);
+  useLayoutEffect(() => (register && active && !inList ? register() : undefined), [register, active, inList]);
 }
 
 /**
@@ -177,7 +177,10 @@ function ScrollBody({ children, refreshing, onRefresh, padTop, padBottom, conten
           onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} progressViewOffset={padTop} /> : undefined
         }
       >
-        {children}
+        {/* A scrolling screen owns its bar: nothing inside it reports to a list screen around it. */}
+        <ScreenHeadContext.Provider value={null}>
+          <ScreenOffsetContext.Provider value={null}>{children}</ScreenOffsetContext.Provider>
+        </ScreenHeadContext.Provider>
       </Animated.ScrollView>
       {topBar ? <TopBar y={y} /> : null}
     </>

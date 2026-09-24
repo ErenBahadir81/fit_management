@@ -64,14 +64,19 @@ describe("Screen top bar", () => {
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 0 });
   });
 
-  test("a horizontal list does not drive the bar", async () => {
-    await renderUI(
+  test("a horizontal list does not drive the bar, not even when it goes away", async () => {
+    const page = <List key="page" testID="list" data={DATA} renderItem={row} />;
+    const { rerender } = await renderUI(
       <Screen scroll={false}>
-        <List testID="chips" horizontal data={DATA} renderItem={row} />
+        <List key="chips" testID="chips" horizontal data={DATA} renderItem={row} />
+        {page}
       </Screen>
     );
     await fireEvent.scroll(screen.getByTestId("chips"), scrollTo(40));
     expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 0 });
+    await fireEvent.scroll(screen.getByTestId("list"), scrollTo(400));
+    await rerender(<Screen scroll={false}>{page}</Screen>);
+    expect(screen.getByTestId("screen-top-bar")).toHaveAnimatedStyle({ opacity: 1 });
   });
 
   test("screens without the tab bar (modals) have no top bar", async () => {
