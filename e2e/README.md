@@ -19,7 +19,8 @@ node e2e/admin.e2e.mjs       # ADMIN_URL  (default http://127.0.0.1:3000)
 ```
 
 Environment: `CHROME_PATH`, `MOBILE_URL`, `ADMIN_URL`, `API_URL`, `E2E_USER`, `E2E_PASS`,
-`E2E_IGNORE_HTTPS_ERRORS=1` (sandboxes whose proxy re-signs TLS, so canvaskit.wasm loads from jsDelivr).
+`E2E_IGNORE_HTTPS_ERRORS=1` (sandboxes whose proxy re-signs TLS, so canvaskit.wasm loads from jsDelivr) and
+`E2E_CANVASKIT_DIR` (serve Skia's wasm from a local `canvaskit-wasm/bin/full` when the CDN is unreachable).
 
 ## Regressions these guard
 

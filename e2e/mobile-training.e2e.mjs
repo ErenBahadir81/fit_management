@@ -1,6 +1,7 @@
 /**
- * Mobile TRAINING end-to-end: the Program tab, the workout logger modal, recovery, history and the
- * program editor — driven the way a person drives them, in a real browser.
+ * Mobile TRAINING end-to-end: the Program tab (today, the days around it, weekly volume, "başka bir
+ * şey yaptım", rest day, break), history, recovery, the workout logger and the program editor —
+ * driven the way a person drives them, in a real browser.
  *
  * Why this file exists: every jest test in `apps/mobile` mocks the list, the sheet and the
  * navigator, so a button can be wired to nothing and a whole screen can render blank while the unit
@@ -15,6 +16,8 @@
  *     each other (`assertScreenHealthy` checks for that).
  *   - The horizontal pager in the logger must lay panes out one screen wide and auto-advance to the
  *     next exercise once the last set of the current one is logged.
+ *   - (T5) Logging another day, a rest day and the logger all go through `logDay`; the editor is a
+ *     full-screen route whose volume bars move with every set and whose warnings Floo says.
  *   - The pager dots only covered the exercises, so on a run/swim day nothing on screen said the
  *     cardio pane existed — the only way to find it was to swipe past the last exercise and hope.
  *
@@ -80,31 +83,33 @@ if (await loginMobile(h, rec)) {
   h.setWhere("training/program");
   await gotoProgram();
   await undoTodayIfLogged();
-  await assertScreenHealthy(h, rec, "training/program", { needles: ["Program", "Haftalık hacim", "Geçmiş"], minText: 300 });
-  expect("training/program", "week strip renders 7 days", (await page.locator('[data-testid^="week-day-"]').count()) === 7);
-  expect("training/program", "current day card renders", (await count("current-day-card")) === 1);
+  await assertScreenHealthy(h, rec, "training/program", { needles: ["Program", "Haftalık hacim", "Bugün"], minText: 300 });
+  expect("training/program", "today's card renders, big", (await count("current-day-card")) === 1 && (await text("today-title")).length > 0);
+  expect("training/program", "the pass label comes from cycleNumber", /\d+\. (döngü|hafta)/.test(await text("today-eyebrow")));
+  expect("training/program", "the days around today render 7 rows", (await page.locator('[data-testid^="upcoming-day-"]').count()) === 7);
   expect("training/program", "volume card renders", (await count("volume-card")) === 1);
   expect("training/program", "start action present", (await count("start-workout")) === 1);
 
-  h.setWhere("training/volume-toggle");
+  h.setWhere("training/volume");
+  const barCount = () => page.locator('[data-testid="volume-card"] [data-testid^="volume-"][data-testid$="-value"]').count();
+  const planBars = await barCount();
+  expect("training/volume", `the planned volume draws ${planBars} continuous bars`, planBars > 0);
   if (await count("volume-toggle")) {
-    const before = await page.locator('[data-testid^="volume-"]').count();
     await T("volume-toggle").click();
     await wait(600);
-    expect("training/volume-toggle", "expands the muscle list", (await page.locator('[data-testid^="volume-"]').count()) > before);
+    expect("training/volume", "expands to every muscle", (await barCount()) > planBars);
     await T("volume-toggle").click();
     await wait(400);
   }
-
-  h.setWhere("training/week-strip");
-  const stripDays = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="week-day-"]')].map((e) => e.dataset.testid));
-  await T(stripDays[3]).click();
-  await wait(800);
-  expect("training/week-strip", "selecting a day updates the caption", (await text("week-strip-caption")).length > 0);
+  await T("volume-source-done").click();
+  await wait(700);
+  expect("training/volume", "switches to the last 7 days", (await barCount()) > 0 && /önerilen aralıkta/.test(await text("volume-summary")));
+  await T("volume-source-plan").click();
+  await wait(400);
 
   /* ---------------------------- recovery segment ---------------------------- */
   h.setWhere("training/recovery");
-  await T("training-tabs").locator("text=Toparlanma").click();
+  await T("training-tabs-recovery").click();
   await wait(3000);
   await assertScreenHealthy(h, rec, "training/recovery", { needles: ["Genel toparlanma"], minText: 200 });
   const muscles = await page.evaluate(() =>
@@ -118,29 +123,113 @@ if (await loginMobile(h, rec)) {
     expect("training/recovery", "detail sheet draws the recovery curve", (await count("recovery-curve")) === 1);
     await closeSheet();
   }
-  await T("training-tabs").locator("text=Program").click();
+  await T("training-tabs-program").click();
   await wait(2500);
   expect("training/recovery", "segmented control switches back to the program pane", (await count("current-day-card")) === 1);
 
-  /* ------------------------------ jump / skip ------------------------------- */
+  /* ------------------- "Bugün başka bir şey yaptım" / jump ------------------- */
+  // react-native-web drops `accessibilityState.selected`, so the planned day is found by its label.
+  const otherDays = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid^="other-day-"]')]
+        .filter((e) => /^other-day-\d+$/.test(e.dataset.testid))
+        .map((e) => ({ id: e.dataset.testid, planned: /bugün planlanan/.test(e.getAttribute("aria-label") ?? ""), rest: /dinlenme günü/.test(e.getAttribute("aria-label") ?? "") }))
+    );
   h.setWhere("training/jump");
-  await T("jump-day").first().click();
+  const dayBefore = await text("today-title");
+  await T("other-day").first().click();
   await wait(1500);
-  expect("training/jump", "jump sheet lists the cycle days", (await page.locator('[data-testid^="jump-day-"]').count()) > 1);
-  const dayBefore = await text("current-day-card");
-  // Pick a day the pointer is not already on — and not a rest day, since the rest card has no
-  // "Antrenmana başla" and the logger block below needs one.
-  // react-native-web drops `accessibilityState.selected` here, so the current day is identified by
-  // the spoken label ("…, şu anki gün") instead of aria-selected.
-  const otherDay = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('[data-testid^="jump-day-"]')];
-    const usable = rows.filter((e) => !/şu anki gün/.test(e.getAttribute("aria-label") ?? "") && !/Dinlenme/.test(e.innerText));
-    return (usable[0] ?? rows[1] ?? rows[0]).dataset.testid;
-  });
-  await T(otherDay).click();
+  let choices = await otherDays();
+  expect("training/jump", "the sheet lists every day of the program", choices.length > 1 && choices.filter((c) => c.planned).length === 1);
+  const training = choices.find((c) => !c.planned && !c.rest) ?? choices.find((c) => !c.planned);
+  await T(training.id).click();
+  await wait(400);
+  await T("other-jump").click();
   await wait(3000);
-  expect("training/jump", "picking a day moves the program pointer", (await text("current-day-card")) !== dayBefore);
+  expect("training/jump", '"Kaydetmeden buradan devam et" moves the pointer and logs nothing', (await text("today-title")) !== dayBefore && (await count("start-workout")) === 1);
 
+  h.setWhere("training/other-day");
+  const plannedTitle = await text("today-title");
+  await T("other-day").first().click();
+  await wait(1500);
+  choices = await otherDays();
+  const other = choices.find((c) => !c.planned && !c.rest) ?? choices.find((c) => !c.planned);
+  await T(other.id).click();
+  await wait(400);
+  const canResume = (await count("resume-planned")) === 1;
+  if (canResume) {
+    await T("resume-planned").click();
+    await wait(300);
+  }
+  await T("other-log").click();
+  await wait(3500);
+  expect("training/other-day", "logging another day marks today done", /Bugün tamamlandı|Dinlenme tamam/.test(await text("current-day-card")));
+  const todayRow = page.locator('[data-testid^="upcoming-day-"]').first();
+  expect("training/other-day", "and the day list shows it done", /Tamamlandı/.test(await todayRow.innerText().catch(() => "")));
+  await undoTodayIfLogged();
+  expect("training/other-day", '"Geri al" puts the planned day back', (await text("today-title")) === plannedTitle);
+  if (canResume) rec.ok("training/other-day", '"İdmanı kaçırdım, sıraya geri koy" was offered for a cycle');
+
+  /* ------------------------------- rest day ------------------------------- */
+  h.setWhere("training/rest");
+  await T("other-day").first().click();
+  await wait(1500);
+  choices = await otherDays();
+  let restDay = choices.find((c) => c.rest && !c.planned);
+  let addedRest = false;
+  if (!restDay) {
+    // The seed program has no rest day: add one in the editor (which is also what a user would do).
+    await closeSheet();
+    await T("edit-program").click();
+    await wait(2000);
+    await T("editor-add-rest").click();
+    await wait(500);
+    await T("editor-save").click();
+    await wait(3500);
+    addedRest = true;
+    await T("other-day").first().click();
+    await wait(1500);
+    choices = await otherDays();
+    restDay = choices.find((c) => c.rest && !c.planned);
+  }
+  expect("training/rest", "the program has a rest day to test with", Boolean(restDay));
+  if (restDay) {
+    await T(restDay.id).click();
+    await wait(400);
+    expect("training/rest", "a rest day cannot be logged set by set", (await count("other-start")) === 0);
+    await T("other-jump").click();
+    await wait(3000);
+    expect("training/rest", "the rest day shows its own card with 'Dinlendim'", (await count("rest-done")) === 1 && (await count("start-workout")) === 0);
+    const restPointer = await text("today-eyebrow");
+    await T("rest-done").click();
+    await wait(3500);
+    expect("training/rest", '"Dinlendim" completes the rest day', /Dinlenme tamam/.test(await text("current-day-card")));
+    await undoTodayIfLogged();
+    expect("training/rest", '"Geri al" brings the rest day back', (await text("today-eyebrow")) === restPointer);
+    // Put the pointer back on the first day for the rest of the run.
+    await T("other-day").first().click();
+    await wait(1500);
+    choices = await otherDays();
+    await T(choices[0].id).click();
+    await wait(400);
+    if (await count("other-jump")) await T("other-jump").click();
+    else await closeSheet();
+    await wait(3000);
+  } else {
+    await closeSheet();
+  }
+  if (addedRest) {
+    await T("edit-program").click();
+    await wait(2000);
+    const lastRemove = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="editor-remove-day-"]')].map((e) => e.dataset.testid).pop());
+    await T(lastRemove).click();
+    await wait(400);
+    await T("editor-save").click();
+    await wait(3500);
+    expect("training/rest", "the added rest day is deleted again in the editor", (await count("current-day-card")) === 1);
+  }
+
+  /* ---------------------------------- break ---------------------------------- */
   h.setWhere("training/skip");
   await T("skip-day").first().click();
   await wait(1500);
@@ -155,10 +244,12 @@ if (await loginMobile(h, rec)) {
   await T("skip-confirm").click();
   await wait(3500);
   expect("training/skip", "today is marked as skipped", /Bugün atlandı/.test(await text("current-day-card")));
-  expect("training/skip", "the skip lands in the history list", (await page.locator('[data-testid^="history-row-"]').count()) > 0);
 
   /* --------------------- history row → sheet, swipe, undo -------------------- */
   h.setWhere("training/history");
+  await T("training-tabs-history").click();
+  await wait(2500);
+  expect("training/history", "the skip lands in the history list", (await page.locator('[data-testid^="history-row-"]').count()) > 0);
   const rows = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="history-row-"]')].map((e) => e.dataset.testid));
   await T(rows[0]).scrollIntoViewIfNeeded();
   await wait(400);
@@ -200,6 +291,8 @@ if (await loginMobile(h, rec)) {
   await T("undo-delete").click();
   await wait(2500);
   expect("training/sheet-delete", "and that delete is undoable too", (await page.locator('[data-testid^="history-row-"]').count()) > 0);
+  await T("training-tabs-program").click();
+  await wait(2500);
 
   h.setWhere("training/undo-today");
   await undoTodayIfLogged();
@@ -374,7 +467,12 @@ if (await loginMobile(h, rec)) {
   expect("training/logger-finish", "the logger closes itself back to the program", page.url().includes("/program"));
   await wait(2500);
   expect("training/logger-finish", "the session is persisted on the day card", /Bugün tamamlandı/.test(await text("current-day-card")));
+  expect("training/logger-finish", "the day list marks today done", /Tamamlandı/.test(await page.locator('[data-testid^="upcoming-day-"]').first().innerText().catch(() => "")));
+  await T("training-tabs-history").click();
+  await wait(2500);
   expect("training/logger-finish", "and appears in the history list", (await page.locator('[data-testid^="history-row-"]').count()) > 0);
+  await T("training-tabs-program").click();
+  await wait(2500);
 
   h.setWhere("training/logger-detail");
   await T("open-today-log").click();
@@ -393,7 +491,8 @@ if (await loginMobile(h, rec)) {
   h.setWhere("training/editor");
   await T("edit-program").click();
   await wait(2000);
-  expect("training/editor", "the editor sheet lists the cycle days", (await page.locator('[data-testid^="editor-day-"]').count()) > 1);
+  expect("training/editor", "the full-screen editor lists the program's days", (await page.locator('[data-testid^="editor-day-"]').count()) > 1);
+  expect("training/editor", "with the live weekly volume bars", (await page.locator('[data-testid="editor-bars"] [data-testid$="-value"]').count()) > 0);
 
   // "Vazgeç" must throw the local draft away, not quietly keep it for the next time.
   await T("editor-day-0").click();
@@ -457,13 +556,54 @@ if (await loginMobile(h, rec)) {
   // The PUT is the part that used to die in CORS preflight with no visible error at all.
   await T("editor-save").click();
   await wait(4000);
-  expect("training/editor", "saving closes the sheet", (await T("editor-sheet").isVisible().catch(() => false)) === false);
+  expect("training/editor", "saving closes the editor", (await count("editor-overview")) === 0 && (await count("current-day-card")) === 1);
   await coldBoot();
   expect("training/editor", "the reordered cycle survives a cold boot", (await count("current-day-card")) === 1);
   await T("edit-program").click();
   await wait(2000);
   expect("training/editor", "the saved order is what the server returns", (await text("editor-days")) !== orderBefore);
-  await closeSheet();
+
+  /* ------------------- live volume + Floo warning in the editor ------------------- */
+  h.setWhere("training/editor-volume");
+  await T("editor-day-0").click();
+  await wait(1200);
+  const dayBars = await text("editor-day-bars");
+  await T("editor-sets-0-inc").click();
+  await wait(700);
+  expect("training/editor-volume", "one more set moves the day's volume bars at once", (await text("editor-day-bars")) !== dayBars);
+  // Pile sets onto one exercise until its main muscle heads toward overuse: Floo has to say so.
+  for (let i = 0; i < 18; i++) await T("editor-sets-0-inc").click();
+  await wait(2200);
+  const bubble = (await T("floo-bubble").innerText().catch(() => "")).replace(/\s+/g, " ");
+  expect("training/editor-volume", `Floo warns about the volume ("${bubble.slice(0, 60)}")`, /haftada .* set/.test(bubble));
+  await T("editor-cancel").click();
+  await wait(2500);
+  expect("training/editor-volume", '"Vazgeç" leaves the editor without saving', (await count("current-day-card")) === 1);
+
+  /* ------------------------------ weekly mode ------------------------------ */
+  h.setWhere("training/weekly");
+  await T("edit-program").click();
+  await wait(2000);
+  const modeBefore = (await text("editor-mode")).length > 0;
+  await T("editor-mode-weekly").click();
+  await wait(700);
+  expect("training/weekly", "weekly mode lays the days out Monday → Sunday", modeBefore && (await page.locator('[data-testid^="editor-day-"]').count()) >= 7 && /Pazartesi/.test(await text("editor-days")));
+  // A cycle longer than a week: drop the extra days (the editor offers exactly that) until it fits.
+  for (let i = 0; i < 7 && (await count("editor-issues")) && (await page.locator('[data-testid^="editor-remove-day-"]').count()); i++) {
+    const last = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="editor-remove-day-"]')].map((e) => e.dataset.testid).pop());
+    await T(last).click();
+    await wait(400);
+  }
+  await T("editor-save").click();
+  await wait(3500);
+  expect("training/weekly", "a weekly program shows the calendar week", /Bu hafta/.test(await text("upcoming-days")) && /\d+\. hafta/.test(await text("today-eyebrow")));
+  await T("edit-program").click();
+  await wait(2000);
+  await T("editor-mode-cycle").click();
+  await wait(500);
+  await T("editor-save").click();
+  await wait(3500);
+  expect("training/weekly", "and back to a cycle", /Önümüzdeki 7 gün/.test(await text("upcoming-days")));
 
   /* ------------------------------ empty + error ----------------------------- */
   h.setWhere("training/empty");
@@ -478,7 +618,7 @@ if (await loginMobile(h, rec)) {
     await route.fulfill({ response: res, json: body });
   });
   await gotoProgram();
-  expect("training/empty", "a program with no days shows the empty state", (await count("no-program")) === 1);
+  expect("training/empty", "a program with no days shows the empty state", (await count("no-program")) === 1 && /Program oluştur/.test(await text("no-program")));
   expect("training/empty", "and hides the editor affordance", (await count("edit-program")) === 0);
 
   h.setWhere("training/workout-empty");

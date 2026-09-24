@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import type { ExerciseDTO } from "@fitfloow/core";
 import { fmtDuration, fmtInt } from "../../../lib/format";
 import { haptic } from "../../../lib/haptics";
-import { Floo } from "../../../mascot";
+import { Floo, flooBus } from "../../../mascot";
 import { SpeechBubble } from "../../../mascot/SpeechBubble";
 import { useMascot } from "../../../mascot/useMascot";
 import { useTheme } from "../../../theme/ThemeProvider";
@@ -37,7 +37,7 @@ import {
   totalSets,
   totalTonnage,
 } from "../lib/logger";
-import { useCompleteWorkout, useLastPerformances, useMuscles, useProgram, useWorkouts } from "../queries";
+import { useLastPerformances, useLogDay, useMuscles, useProgram, useWorkouts } from "../queries";
 import { AddExerciseSheet } from "./AddExerciseSheet";
 import { CardioPane } from "./CardioPane";
 import { ExercisePane, setLabel } from "./ExercisePane";
@@ -51,8 +51,19 @@ import { RestTimer, useRestController } from "./restBridge";
 const SAVED_MS = 2600;
 const NO_NAMES: string[] = [];
 
-/** Full-screen set-by-set logger. Route: `/(modals)/workout`. */
-export function WorkoutScreen() {
+export interface WorkoutScreenProps {
+  /** Log this program day instead of today's planned one ("Bugün başka bir şey yaptım"). */
+  dayId?: string | null;
+  /** With `dayId`: keep the planned day next in the cycle ("İdmanı kaçırdım, sıraya geri koy"). */
+  resumePlanned?: boolean;
+}
+
+/**
+ * Full-screen set-by-set logger. Route: `/(modals)/workout` (`?dayId=…&resumePlanned=1`).
+ * Finishing is one `logDay({ dayId })` — the same write as every other "I did this day" — so the
+ * pointer moves exactly as the server moves it.
+ */
+export function WorkoutScreen({ dayId = null, resumePlanned = false }: WorkoutScreenProps = {}) {
   const router = useRouter();
   const toast = useToast();
   const { colors } = useTheme();
@@ -61,10 +72,10 @@ export function WorkoutScreen() {
   const program = useProgram();
   const muscles = useMuscles();
   const history = useWorkouts({ limit: 60 });
-  const complete = useCompleteWorkout();
+  const logDay = useLogDay();
 
   const view = program.data ?? null;
-  const session = useWorkoutSession(view);
+  const session = useWorkoutSession(view, dayId);
   const { state, dispatch, now, restored } = session;
 
   const finishSheet = useSheet();
@@ -166,8 +177,15 @@ export function WorkoutScreen() {
   const completeSet = useCallback(() => {
     if (!state) return;
     void haptic.medium(); // one firm tap per set; the success buzz is saved for the finish
+    const target = nextPending(state);
     dispatch({ type: "complete-set", at: Date.now() });
     rest.start();
+    if (target) {
+      const ex = state.exercises[target.exercise];
+      const set = ex.sets[target.set];
+      // Floo's quiet nod for every set (low priority: the rest timer is the real feedback here).
+      flooBus.emit("setCompleted", { exercise: ex.name, reps: set.reps, kg: set.weightKg ?? 0, setIndex: target.set, metric: ex.metric });
+    }
   }, [dispatch, rest, state]);
 
   const addExercise = useCallback(
@@ -181,17 +199,22 @@ export function WorkoutScreen() {
     [addSheet, dispatch]
   );
 
+  const plannedId = view?.current?.day?.id ?? null;
   const finish = useCallback(() => {
     if (!state) return;
-    complete.mutate(toCompleteInput(state, Date.now()), {
-      onSuccess: () => {
+    // A draft written before day ids existed only knows its position: today's planned day.
+    const id = state.dayId ?? plannedId;
+    if (!id) return;
+    logDay.mutate({ dayId: id, resumePlanned: resumePlanned && Boolean(dayId), ...toCompleteInput(state, Date.now()) }, {
+      onSuccess: ({ log }) => {
+        flooBus.emit("workoutDone", { title: log.title, kind: log.kind, durationMin: log.durationMin });
         clearDraft();
         finishSheet.dismiss();
         setSaved(true);
         leaveTimer.current = setTimeout(() => router.back(), SAVED_MS);
       },
     });
-  }, [complete, finishSheet, router, state]);
+  }, [dayId, finishSheet, logDay, plannedId, resumePlanned, router, state]);
 
   const leave = useCallback(() => {
     if (state && hasAnything(state)) {
@@ -398,7 +421,7 @@ export function WorkoutScreen() {
         now={now}
         muscles={muscles.data ?? []}
         compare={summary}
-        saving={complete.isPending}
+        saving={logDay.isPending}
         onRpe={(value) => dispatch({ type: "set-rpe", value })}
         onNotes={(value) => dispatch({ type: "set-notes", value })}
         onFinish={finish}
@@ -444,7 +467,8 @@ function SavedState({ tonnageKg, sets, minutes, muscleCount, summaryTr }: { tonn
   return (
     <Screen tabBar={false} edges={["top", "bottom"]} contentStyle={styles.saved}>
       <Animated.View entering={FadeIn.duration(200)} style={styles.savedInner} testID="workout-saved">
-        <SuccessCheck size={88} />
+        {/* `useLogDay` already buzzed success when the write landed — one moment, one buzz. */}
+        <SuccessCheck size={88} withHaptic={false} />
         <Text variant="heading" align="center">
           Antrenman kaydedildi
         </Text>
