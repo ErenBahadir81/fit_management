@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -11,17 +11,20 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { isSkiaUnavailable } from "../../lib/skiaWeb";
 import { useTheme } from "../../theme/ThemeProvider";
 import { easeOutStrong, springs } from "../../theme/motion";
 import { radii, spacing } from "../../theme/tokens";
 import { Icon } from "../../ui/Icon";
 import { Pressable } from "../../ui/Pressable";
 import { Text } from "../../ui/Text";
-import { FlooV2 as Floo } from "../FlooV2";
+import { Floo as FlooLegacy } from "../Floo";
+import { FlooModel, type Mood as FlooMood } from "../model";
+import { toLegacyMood } from "../moodMap";
 import type { QueuedMessage } from "./queue";
-import { useFloo, useFlooPresence, type FlooPresence } from "./FlooVoiceProvider";
+import { useFloo, useFlooPresence, type FlooPresence, type FlooVoice } from "./FlooVoiceProvider";
 
-/** Floo's width in the corner. The model is 1.45× taller than wide. */
+/** Floo's width in the corner. At badge detail the model is cropped square, so this is its height too. */
 export const FLOO_CORNER_SIZE = 40;
 /** Horizontal room a header must leave free on its right so its title never runs under Floo. */
 export const FLOO_CORNER_INSET = FLOO_CORNER_SIZE + spacing.md;
@@ -45,6 +48,7 @@ export function FlooCornerHost({ presence: requested = "idle" }: { presence?: Ex
   const { presence, enabled } = voice;
   const current = active ? voice.current : null;
   const visible = active && enabled && presence !== "hidden" && (presence === "idle" || current != null);
+  const reaction = useOwnReaction(voice.reaction, active);
 
   // Slide in from the edge when a modal's Floo has something to say; out again when it is done.
   const shown = useSharedValue(visible ? 1 : 0);
@@ -72,13 +76,36 @@ export function FlooCornerHost({ presence: requested = "idle" }: { presence?: Ex
           testID="floo-corner"
           style={styles.flooBtn}
         >
-          <Floo mood={mood} size={FLOO_CORNER_SIZE} testID="floo-corner-model" />
+          <CornerFloo mood={mood} trigger={reaction} />
           {voice.pendingCount > 0 && current ? <PendingBadge count={voice.pendingCount} /> : null}
         </Pressable>
       </Animated.View>
       {current && visible ? <Bubble key={current.id} message={current} /> : null}
     </View>
   );
+}
+
+/**
+ * The reaction this host may play. The queue keeps one global "last reaction", but each host must
+ * only play the ones that fire while it is the host in charge: a modal's Floo that mounts after a
+ * beat, or the tabs' Floo coming back to the front when the modal closes, would otherwise replay a
+ * gesture the user has already seen. Keys only grow, so "newer than the last one I did not own" is
+ * the whole rule. (State adjusted during render: no effect, no extra frame.)
+ */
+function useOwnReaction(reaction: FlooVoice["reaction"], active: boolean): FlooVoice["reaction"] {
+  const key = reaction?.key ?? 0;
+  const [seen, setSeen] = useState(key);
+  if (!active && seen !== key) setSeen(key);
+  return active && reaction && reaction.key > seen ? reaction : null;
+}
+
+/**
+ * Floo 3 at badge detail: body, face and one hand, cropped square. On web, if CanvasKit never
+ * arrived, the v1 SVG Floo stands in (it has the face but no gestures).
+ */
+function CornerFloo({ mood, trigger }: { mood: FlooMood; trigger: FlooVoice["reaction"] }) {
+  if (isSkiaUnavailable()) return <FlooLegacy mood={toLegacyMood(mood)} size={FLOO_CORNER_SIZE} detail="simple" testID="floo-corner-model" />;
+  return <FlooModel lod="badge" size={FLOO_CORNER_SIZE} mood={mood} trigger={trigger} testID="floo-corner-model" />;
 }
 
 function PendingBadge({ count }: { count: number }) {

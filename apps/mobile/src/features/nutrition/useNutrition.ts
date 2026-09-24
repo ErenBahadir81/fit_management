@@ -178,17 +178,19 @@ function patchDay(qc: QueryClient, dateKey: string, fn: (day: NutritionDayView) 
 }
 
 /**
- * Floo: announce the logged food, and `overTarget` only on the write that *crosses* the daily
- * calorie target (prev ≤ target < now), so later snacks on an already-over day stay quiet.
+ * Floo: announce the logged food, and `overTarget` only on the write that *crosses* today's
+ * calorie target (prev ≤ target < now), so later snacks on an already-over day stay quiet. A meal
+ * filed under another day never sends `overTarget`: its lines and the home warning say "today".
  */
 function emitMealLogged(qc: QueryClient, dateKey: string, prev: NutritionDayView | undefined, entries: MealEntryDTO[]) {
   if (entries.length === 0) return;
   const kcal = Math.round(entries.reduce((a, e) => a + e.totals.kcal, 0));
   flooBus.emit("mealLogged", entries.length === 1 ? { kcal, name: entries[0]!.name } : { kcal, count: entries.length });
+  if (dateKey !== todayKey()) return;
   const day = qc.getQueryData<NutritionDayView>(nutritionDayKey(dateKey));
   const target = day?.target.calories ?? 0;
   if (!prev || !day || target <= 0) return;
-  if (prev.totals.kcal <= target && day.totals.kcal > target) flooBus.emit("overTarget", { overKcal: Math.round(day.totals.kcal - target) });
+  if (prev.totals.kcal <= target && day.totals.kcal > target) flooBus.emit("overTarget", { overKcal: Math.round(day.totals.kcal - target), dateKey });
 }
 
 function useAfterWrite(dateKey: string) {

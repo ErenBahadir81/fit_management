@@ -22,6 +22,9 @@ from mathutils import Vector
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Brand palette. sRGB hex from the app's FLOO_COLORS, converted to linear for Cycles.
+# The committed floo-body.png was rendered violet and then recoloured to Floo blue with the same
+# HSL transform FLOO_COLORS went through (see `src/mascot/moods.ts`); a fresh render from these
+# values is the same character in the same blue, give or take the shading of the transform.
 # ─────────────────────────────────────────────────────────────────────────────
 
 def srgb_to_linear(c: float) -> float:
@@ -34,9 +37,9 @@ def hex_rgba(h: str, a: float = 1.0):
     return (srgb_to_linear(r), srgb_to_linear(g), srgb_to_linear(b), a)
 
 
-BODY_LIGHT = hex_rgba("#A79AFF")
-BODY_MID = hex_rgba("#7E6DFA")
-BODY_DEEP = hex_rgba("#5A46D8")
+BODY_LIGHT = hex_rgba("#93D9F9")
+BODY_MID = hex_rgba("#69C8F1")
+BODY_DEEP = hex_rgba("#44A1CD")
 SCARF = hex_rgba("#F5A524")
 SCARF_ALT = hex_rgba("#FFF0D6")
 BOOT = hex_rgba("#F5A524")

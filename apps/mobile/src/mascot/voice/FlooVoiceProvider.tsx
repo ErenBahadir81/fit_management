@@ -2,8 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState } from "react-native";
 import { haptic } from "../../lib/haptics";
 import { useToast } from "../../ui/Toast";
-import type { FlooMood } from "../moods";
-import type { Trigger } from "../model/params";
+import type { Mood as FlooMood, Trigger as FlooTrigger } from "../model";
 import { EMPTY_QUEUE, advance, clear, enqueue, remove, replay, type FlooMessage, type QueueState, type QueuedMessage } from "./queue";
 
 /**
@@ -21,7 +20,7 @@ export interface FlooVoice {
   /** Dismiss one message (default: the one on screen). */
   dismiss: (id?: string) => void;
   /** A one-shot animation with no bubble: a completed set, a logged glass of water. */
-  react: (trigger: Trigger) => void;
+  react: (trigger: FlooTrigger) => void;
   /** Tap on an idle Floo: bring back the last line, or just wave. */
   poke: () => void;
   /** Hold the auto-dismiss timer (finger on the bubble) and let it go again. */
@@ -32,7 +31,7 @@ export interface FlooVoice {
   enabled: boolean;
   presence: FlooPresence;
   /** Last fired one-shot, keyed so the same trigger twice still fires twice. */
-  reaction: { name: Trigger; key: number } | null;
+  reaction: { name: FlooTrigger; key: number } | null;
   /** Face at rest (no bubble). */
   restingMood: FlooMood;
 }
@@ -118,15 +117,37 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
     [stopTimer]
   );
 
-  // A new message on screen: fire its beat, buzz for warnings, start its clock.
+  /** Id of the line whose arrival has played (sender told, beat, buzz, clock started). */
+  const arrived = useRef<string | null>(null);
+
+  // A line arrives: tell its sender, fire its beat, buzz for warnings, start its clock.
+  const arrive = useCallback(
+    (m: QueuedMessage) => {
+      arrived.current = m.id;
+      try {
+        m.onShow?.();
+      } catch (e) {
+        // The sender's bookkeeping must never leave a bubble without its clock.
+        if (__DEV__) console.warn("[floo] onShow threw", e);
+      }
+      if (m.trigger) setReaction({ name: m.trigger, key: ++reactKey.current });
+      if (m.tone === "warning") void haptic.warning();
+      else if (m.tone === "success") void haptic.success();
+      if (m.ttlMs != null && !held.current) startTimer(m.ttlMs);
+      else remaining.current = m.ttlMs;
+    },
+    [startTimer]
+  );
+
+  // A new message on screen. If the app is not in the foreground (backgrounded, or covered by the
+  // app switcher / Control Center) nobody sees it arrive, so the whole arrival waits for the
+  // foreground (below) instead of playing, and timing out, unseen.
   useEffect(() => {
     stopTimer();
+    arrived.current = null;
     if (!current) return;
-    if (current.trigger) setReaction({ name: current.trigger, key: ++reactKey.current });
-    if (current.tone === "warning") void haptic.warning();
-    else if (current.tone === "success") void haptic.success();
-    if (current.ttlMs != null && !held.current) startTimer(current.ttlMs);
-    else remaining.current = current.ttlMs;
+    const away = AppState.currentState === "background" || AppState.currentState === "inactive";
+    if (!away) arrive(current);
     return stopTimer;
     // Keyed on the id only: an in-place dedupe refresh must not restart the beat or the clock.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,7 +156,12 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
   // Backgrounded: freeze the clock so a line is not "read" while the phone is in a pocket.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (s) => {
-      if (!current || current.ttlMs == null) return;
+      if (!current) return;
+      if (s === "active" && arrived.current !== current.id) {
+        arrive(current);
+        return;
+      }
+      if (current.ttlMs == null) return;
       if (s !== "active") {
         if (timer.current) {
           remaining.current = Math.max(800, (remaining.current ?? 0) - (Date.now() - startedAt.current));
@@ -146,7 +172,7 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
       }
     });
     return () => sub.remove();
-  }, [current, startTimer, stopTimer]);
+  }, [current, arrive, startTimer, stopTimer]);
 
   // Mascot switched off mid-bubble: drop the queue rather than dumping it into toasts at once.
   useEffect(() => {
@@ -191,7 +217,7 @@ export function FlooVoiceProvider({ children, enabled = true, defaultPresence = 
     []
   );
 
-  const react = useCallback((trigger: Trigger) => {
+  const react = useCallback((trigger: FlooTrigger) => {
     setReaction({ name: trigger, key: ++reactKey.current });
   }, []);
 

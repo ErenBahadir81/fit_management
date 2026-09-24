@@ -78,13 +78,33 @@ export function useFlooEvents(handler: FlooListener): void {
 /* ------------------------------ copy + mood ------------------------------ */
 
 export interface FlooLine {
+  /** Dedupe key: a second line with the same key replaces the first instead of piling up. */
   key: string;
   text: string;
   mood: Mood;
   trigger: Trigger;
   priority: "low" | "normal" | "high";
+  /**
+   * `warning` only for what the user should act on (over target, too much or too little volume).
+   * Celebrations stay `neutral`: the mutation behind them already gave its own success haptic, and
+   * the bubble's tone is what decides whether it buzzes again.
+   */
+  tone: "neutral" | "warning";
+  /**
+   * A fact about a day rather than a moment (set with `key` naming the day). Said at most once per
+   * key, in the same memory `useFlooOnce` keeps, so a screen that notices the same state later does
+   * not repeat it.
+   */
+  once?: true;
   ttlMs: number;
 }
+
+/**
+ * The one key for "the day went over its calorie target", shared by the bus line and the home
+ * screen. It keeps the home screen's original `home:over:<day>` spelling, so a warning already
+ * shown before this key was shared still counts as shown.
+ */
+export const overTargetKey = (dateKey: string) => `home:over:${dateKey}`;
 
 export const FLOO_LINE_MAX_CHARS = 60;
 
@@ -279,8 +299,12 @@ export function describeFlooEvent(event: FlooEvent, opts: { now?: Date; rand?: (
     if (event.name === "volumeWarning" && p.band === "low") mood = "think";
   }
 
+  // Over target on a known day is a fact about that day: keyed by it, and said once.
+  const day = event.name === "overTarget" ? str(p.dateKey) : null;
   let key: string = event.name;
-  if (event.name === "volumeWarning") {
+  if (day) {
+    key = overTargetKey(day);
+  } else if (event.name === "volumeWarning") {
     const muscle = str(p.muscle);
     if (muscle) key = `${event.name}:${muscle}`;
   } else if (event.name === "goalHit") {
@@ -288,5 +312,15 @@ export function describeFlooEvent(event: FlooEvent, opts: { now?: Date; rand?: (
     if (what) key = `${event.name}:${what}`;
   }
 
-  return { key, text, mood, trigger: event.name, priority: PRIORITY[event.name], ttlMs: ttlFor(text) };
+  const warning = event.name === "overTarget" || (event.name === "volumeWarning" && p.band !== "low");
+  return {
+    key,
+    text,
+    mood,
+    trigger: event.name,
+    priority: PRIORITY[event.name],
+    tone: warning ? "warning" : "neutral",
+    ...(day ? { once: true as const } : {}),
+    ttlMs: ttlFor(text),
+  };
 }
