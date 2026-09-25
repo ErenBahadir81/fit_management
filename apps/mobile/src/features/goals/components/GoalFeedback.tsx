@@ -52,7 +52,7 @@ export function GoalFeedback() {
   const status = STATUS[feedback.status];
   const bars: { key: string; label: string; value: number | null; tone: Tone }[] = [
     { key: "goal", label: "Hedef", value: feedback.bars.goal, tone: "primary" },
-    { key: "time", label: "Süre", value: feedback.bars.time, tone: "neutral" },
+    { key: "time", label: "Geçen süre", value: feedback.bars.time, tone: "neutral" },
     { key: "fat", label: "Yağ", value: feedback.bars.fat, tone: "warning" },
     { key: "lean", label: "Kas", value: feedback.bars.lean, tone: "success" },
   ];
@@ -75,7 +75,7 @@ export function GoalFeedback() {
           .map((b) => (
             <ProgressBar key={b.key} value={(b.value ?? 0) / 100} tone={b.tone} height={6} label={b.label} valueLabel={`%${Math.round(b.value ?? 0)}`} testID={`goal-feedback-bar-${b.key}`} />
           ))}
-        {saved != null && Math.abs(saved) >= 1 ? (
+        {saved != null && Math.abs(saved) >= 1 && (feedback.status === "ahead" || feedback.status === "behind") ? (
           <Text variant="caption" color="inkMuted" tabular>
             {saved > 0 ? `Bu gidişle ${Math.round(saved)} hafta erken varıyorsun.` : `Bu gidişle ${Math.round(-saved)} hafta geç varıyorsun.`}
           </Text>

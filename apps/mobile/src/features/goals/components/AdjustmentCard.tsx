@@ -35,9 +35,10 @@ export interface AdjustmentCardProps {
  */
 export function AdjustmentCard({ proposal, onAccept, onDismiss, busy }: AdjustmentCardProps) {
   const recommended = proposal.options.find((o) => o.recommended) ?? proposal.options[0]!;
-  const [chosen, setChosen] = useState<GoalAdjustmentAction>(recommended.action);
-  // A new proposal (another id) starts from its own recommendation.
-  useEffect(() => setChosen(recommended.action), [proposal.id, recommended.action]);
+  // Keyed by proposal: a new proposal (another id) starts from its own recommendation.
+  const [pick, setPick] = useState<{ id: string; action: GoalAdjustmentAction } | null>(null);
+  const chosen = pick?.id === proposal.id ? pick.action : recommended.action;
+  const setChosen = (action: GoalAdjustmentAction) => setPick({ id: proposal.id, action });
   const option = proposal.options.find((o) => o.action === chosen) ?? recommended;
   const kind = KIND[proposal.kind];
 
@@ -47,7 +48,7 @@ export function AdjustmentCard({ proposal, onAccept, onDismiss, busy }: Adjustme
         <View style={styles.head}>
           <Icon icon="goal" size={18} color="primary" />
           <Text variant="label" color="inkMuted" style={styles.flex}>
-            Floo'nun önerisi
+            {"Floo'nun önerisi"}
           </Text>
           <Chip label={kind.label} tone={kind.tone} size="sm" />
         </View>
