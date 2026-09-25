@@ -5,6 +5,8 @@ export interface ExerciseDoc {
   _id: Types.ObjectId;
   name: string;
   nameKey: string; // lowercase for unique lookup
+  /** Stable id of the seed catalog row this exercise came from (activation data v1); null when admin-made. */
+  slug?: string | null;
   muscles: Array<{ key: string; load: number }>;
   defaultSets: number;
   defaultReps: number;
@@ -21,6 +23,7 @@ const ExerciseSchema = new Schema<ExerciseDoc>(
   {
     name: { type: String, required: true },
     nameKey: { type: String, required: true, unique: true },
+    slug: { type: String, default: null },
     muscles: { type: [{ key: String, load: { type: Number, default: 1 }, _id: false }], default: [] },
     defaultSets: { type: Number, default: 3 },
     defaultReps: { type: Number, default: 10 },

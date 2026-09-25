@@ -57,8 +57,12 @@ describe("FakeApi domain (core-backed goal / report fixtures)", () => {
     const api = createFakeApi({ latencyMs: 0, signedIn: true, today: () => TODAY });
     const view = await api.goals.current();
     expect(() => zGoalView.parse(view)).not.toThrow();
-    expect(view.progress?.onTrack).toBe("onTrack");
+    // The demo trend runs a little behind the plan, so the real engine proposes an adjustment.
+    expect(view.progress?.onTrack).toBe("behind");
     expect(view.progress?.percentComplete).toBeGreaterThan(20);
+    expect(view.feedback?.status).toBe("behind");
+    expect(view.adjustment?.kind).toBe("behind");
+    expect(view.adjustment?.options[0].recommended).toBe(true);
 
     const preview = await api.goals.preview({ targetBodyFatPct: 12, profile: "aggressive" });
     expect(() => zGoalPreview.parse(preview)).not.toThrow();

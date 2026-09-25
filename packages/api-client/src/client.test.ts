@@ -134,8 +134,55 @@ describe("api-client", () => {
     expect(res.sets[0].weightKg).toBe(60);
   });
 
+  it("admin.exercise GETs one exercise with its literature reference", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://api/admin/exercises/ex1");
+      expect(init?.method ?? "GET").toBe("GET");
+      return jsonResponse(200, { exercise: { id: "ex1", name: "Push-up" }, reference: null });
+    });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never });
+    const res = await api.admin.exercise("ex1");
+    expect(res.exercise.name).toBe("Push-up");
+    expect(res.reference).toBeNull();
+  });
+
   it("204 resolves to undefined", async () => {
     const api = createApiClient({ baseUrl: "http://api", fetch: (async () => new Response(null, { status: 204 })) as never });
     await expect(api.training.deleteWorkout("x")).resolves.toBeUndefined();
+  });
+  it("scan hands back each detection's alternatives untouched (T6)", async () => {
+    const food = { id: "f2", name: "Pide" };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://api/nutrition/scan");
+      expect(init?.body).toBeInstanceOf(FormData);
+      return jsonResponse(200, {
+        scanId: "s1",
+        imageUrl: null,
+        mock: false,
+        latencyMs: 1,
+        modelVersion: "m",
+        detections: [{ label: "lahmacun", labelTr: "Lahmacun", confidence: 0.4, food: null, suggestedGrams: 180, alternatives: [{ label: "pide", labelTr: "Pide", confidence: 0.3, food, suggestedGrams: 200 }] }],
+      });
+    });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never, tokens: memoryTokenStore({ accessToken: "a", refreshToken: "r" }) });
+    const res = await api.nutrition.scan(new Blob(["x"], { type: "image/jpeg" }) as never);
+    expect(res.detections[0].alternatives?.[0]).toMatchObject({ label: "pide", suggestedGrams: 200, food });
+  });
+
+  it("goal adjustments: accept and dismiss post the answer; a stale proposal surfaces as ADJUSTMENT_STALE", async () => {
+    const calls: string[] = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push(`${init?.method} ${url} ${String(init?.body)}`);
+      if (url.endsWith("/dismiss")) return jsonResponse(409, { error: { code: "ADJUSTMENT_STALE", message: "Bu öneri artık geçerli değil" } });
+      return jsonResponse(200, { goal: { id: "g" }, adjustment: { id: "adj", status: "accepted" } });
+    });
+    const api = createApiClient({ baseUrl: "http://api", fetch: fetchMock as never, tokens: memoryTokenStore({ accessToken: "a", refreshToken: "r" }) });
+    const res = await api.goals.acceptAdjustment({ id: "adj", action: "lowerCalories" });
+    expect(res.adjustment.status).toBe("accepted");
+    const err = await api.goals.dismissAdjustment({ id: "adj" }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiClientError);
+    expect(err).toMatchObject({ status: 409, code: "ADJUSTMENT_STALE" });
+    expect(calls[0]).toBe('POST http://api/goals/current/adjustment/accept {"id":"adj","action":"lowerCalories"}');
+    expect(calls[1]).toBe('POST http://api/goals/current/adjustment/dismiss {"id":"adj"}');
   });
 });

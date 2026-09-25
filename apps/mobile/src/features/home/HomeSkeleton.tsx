@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { useTheme } from "../../theme/ThemeProvider";
 import { radii, spacing } from "../../theme/tokens";
-import { Skeleton, SkeletonGroup, SkeletonText } from "../../ui/Skeleton";
+import { Skeleton, SkeletonGroup } from "../../ui/Skeleton";
 
 /** Mirrors HomeScreen's layout 1:1 (same card heights) so the crossfade has zero layout jump. */
 export const HOME_HEIGHTS = { goal: 176, calorie: 236, today: 168, recovery: 132, tile: 76 } as const;

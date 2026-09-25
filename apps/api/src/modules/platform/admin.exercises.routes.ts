@@ -5,16 +5,21 @@ import { Exercise, toExerciseDTO, type ExerciseDoc } from "../../models/exercise
 import { Muscle } from "../../models/muscle";
 import { AppError } from "../../lib/errors";
 import { escapeRegex, isDuplicateKeyError, toObjectId } from "./users.service";
+import { activationReferenceFor } from "./activationReference";
 
 const zIdParams = z.object({ id: zId });
 
 /** Case- and I/İ/ı-insensitive uniqueness key for exercise names (stored as `nameKey`, B8). */
 export { exerciseNameKey };
 
-/** Every referenced muscle key must exist in the catalog (active or not). */
+/** Every referenced muscle key must exist in the catalog (active or not), and appear once. */
 export async function assertMuscleKeys(muscles: MuscleLoad[] | undefined): Promise<void> {
   if (!muscles || muscles.length === 0) return;
   const keys = [...new Set(muscles.map((m) => m.key))];
+  if (keys.length !== muscles.length) {
+    const repeated = keys.filter((k) => muscles.filter((m) => m.key === k).length > 1);
+    throw AppError.validation("Bir kas bir harekette yalnızca bir kez yük alabilir", repeated);
+  }
   const found = await Muscle.find({ key: { $in: keys } }).select({ key: 1 }).lean();
   const known = new Set(found.map((m) => m.key));
   const unknown = keys.filter((k) => !known.has(k));
@@ -54,7 +59,8 @@ export async function adminExercisesRoutes(app: FastifyInstance) {
     const oid = toObjectId((req.params as { id: string }).id);
     const doc = oid ? await Exercise.findById(oid).lean<ExerciseDoc>() : null;
     if (!doc) throw AppError.notFound("Egzersiz");
-    return { exercise: toExerciseDTO(doc) };
+    // `reference`: the literature values it was seeded with (read-only in the panel), or null.
+    return { exercise: toExerciseDTO(doc), reference: activationReferenceFor(doc) };
   });
 
   app.patch("/admin/exercises/:id", { ...admin, schema: { params: zIdParams, body: zExerciseUpdate } }, async (req) => {

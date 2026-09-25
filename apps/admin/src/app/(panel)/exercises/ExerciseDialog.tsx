@@ -1,16 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { X } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { ExerciseDTO, ExerciseInput, MuscleDTO } from "@fitfloow/core";
-import { cx } from "@/lib/cx";
-import { num } from "@/lib/format";
-import { errorMessage, useSaveExercise } from "@/lib/queries";
+import { toMusclePayload } from "@/lib/muscleLoad";
+import { errorMessage, useExercise, useSaveExercise } from "@/lib/queries";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, NumberInput, Select, Switch, Textarea } from "@/components/ui/Field";
 import { Dialog } from "@/components/ui/Overlay";
 import { Callout } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
+import { MuscleLoadEditor, type ReferenceState } from "./MuscleLoadEditor";
 
 const METRIC_TR = { reps: "Tekrar", time: "Süre (sn)", stretch: "Mobilite" } as const;
 const KIND_TR = { strength: "Kuvvet", cardio: "Kardiyo", mobility: "Mobilite" } as const;
@@ -41,6 +40,17 @@ export function ExerciseDialog({
   );
   const [error, setError] = useState<string | null>(null);
 
+  // The literature values this exercise was seeded with (read-only; null for admin-made ones).
+  const detail = useExercise(exercise?.id ?? null);
+  const reference: ReferenceState = !exercise
+    ? { status: "none" }
+    : detail.isError
+      ? { status: "error" }
+      : detail.data
+        ? { status: "ready", reference: detail.data.reference }
+        : { status: "loading" };
+  const muscleOrder = useMemo(() => [...muscles].sort((a, b) => a.order - b.order).map((m) => m.key), [muscles]);
+
   const save = useSaveExercise({
     onDone: () => {
       toast.success(isEdit ? "Hareket güncellendi" : "Hareket eklendi", name);
@@ -49,10 +59,10 @@ export function ExerciseDialog({
     onFail: (e) => setError(errorMessage(e)),
   });
 
-  const setLoad = (key: string, value: number) =>
+  const setLoad = (key: string, value: number | null) =>
     setLoads((prev) => {
       const next = { ...prev };
-      if (value <= 0) delete next[key];
+      if (value === null || value <= 0) delete next[key];
       else next[key] = value;
       return next;
     });
@@ -79,7 +89,7 @@ export function ExerciseDialog({
     setError(null);
     const input: ExerciseInput = {
       name: name.trim(),
-      muscles: Object.entries(loads).map(([key, load]) => ({ key, load })),
+      muscles: toMusclePayload(loads, muscleOrder),
       defaultSets: setCount,
       defaultReps: repCount,
       metric,
@@ -94,14 +104,12 @@ export function ExerciseDialog({
     save.mutate({ id: exercise?.id ?? null, input });
   };
 
-  const selected = muscles.filter((m) => loads[m.key] !== undefined);
-
   return (
     <Dialog
       open={open}
       onClose={onClose}
       title={isEdit ? "Hareketi düzenle" : "Yeni hareket"}
-      description="Kas yükü 0 ile 1 arasında: 1 tam yük, 0,5 yarım. Haftalık hacim set × yük olarak hesaplanır."
+      description="Kas yükü 0 ile 1 arasında, 0,05 adımla: 1 tam set sayılır, 0,5 yarım set. Haftalık hacim set × yük olarak hesaplanır."
       size="lg"
       footer={
         <>
@@ -154,49 +162,7 @@ export function ExerciseDialog({
           <Input value={equipment} onChange={(e) => setEquipment(e.target.value)} placeholder="barbell, bench" />
         </Field>
 
-        <div>
-          <p className="mb-1.5 text-[13px] font-medium text-ink">Kas yükleri</p>
-          <p className="mb-3 text-xs text-muted">
-            {selected.length > 0
-              ? `${selected.length} kas seçili · toplam yük ${num(Object.values(loads).reduce((a, b) => a + b, 0), 2)}`
-              : "Henüz kas seçilmedi."}
-          </p>
-          <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            {muscles.map((m) => {
-              const value = loads[m.key] ?? 0;
-              const on = value > 0;
-              return (
-                <div key={m.key} className={cx("flex items-center gap-3 rounded-lg border px-2.5 py-2", on ? "border-brand-line bg-brand-soft/40" : "border-line")}>
-                  <button
-                    type="button"
-                    onClick={() => setLoad(m.key, on ? 0 : 1)}
-                    aria-pressed={on}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  >
-                    <span aria-hidden className="size-2.5 shrink-0 rounded-[3px]" style={{ background: m.color }} />
-                    <span className={cx("truncate text-[13px]", on ? "font-medium text-ink" : "text-muted")}>{m.name}</span>
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={value}
-                    aria-label={`${m.name} yükü`}
-                    onChange={(e) => setLoad(m.key, Number(e.target.value))}
-                    className="h-1 w-24 shrink-0 cursor-pointer appearance-none rounded-full bg-line accent-[var(--ff-brand)]"
-                  />
-                  <span className="w-7 shrink-0 text-right text-xs tnum text-muted">{value > 0 ? num(value, 1) : "—"}</span>
-                  {on && (
-                    <button type="button" aria-label={`${m.name} yükünü kaldır`} onClick={() => setLoad(m.key, 0)} className="text-subtle hover:text-ink">
-                      <X className="size-3.5" aria-hidden />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <MuscleLoadEditor muscles={muscles} loads={loads} onChange={setLoad} onReplaceAll={setLoads} reference={reference} />
 
         <Field label="Anlatım" hint="Mobil uygulamada hareket kartında gösterilir.">
           <Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={3} placeholder="Kürek kemiklerini sıkıştır…" />

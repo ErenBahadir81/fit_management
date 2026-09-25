@@ -5,13 +5,13 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { HydratedDocument, Types } from "mongoose";
-import { asUser, createTestApp, seedBasics, type TestApp } from "./harness";
+import { asUser, createTestApp, seedBasics, seedLoad, type TestApp } from "./harness";
 import { Program, type ProgramDoc } from "../src/models/program";
 import { WorkoutLog, WORKOUT_DAY_INDEX } from "../src/models/workoutLog";
 import { Exercise } from "../src/models/exercise";
 import { EREN_DAYS } from "../src/seed/data/index";
 import { ensureUniqueWorkoutDay, rekeyExercises } from "../src/modules/training/migrate";
-import { zProgramView, type DayDTO } from "@fitfloow/core";
+import { round, zProgramView, type DayDTO } from "@fitfloow/core";
 
 let t: TestApp;
 beforeAll(async () => {
@@ -311,9 +311,11 @@ describe("planned volume in the program view", () => {
     await givenProgram(user._id);
     const v = await view(headers);
     const chest = v.plannedVolume.muscles.find((m: { key: string }) => m.key === "chest");
-    // Push-up 4 sets per 3-day pass → 4 × 7 / 3 = 9.3 per week; catalog loads win over the snapshot.
+    // Push-up 4 sets per 3-day pass at the catalog's chest load (it wins over the snapshot's 1.0),
+    // scaled to a week: 4 × 0.8 = 3.2 per pass → 3.2 × 7 / 3 = 7.5 per week.
+    const perCycle = round(4 * seedLoad("Push-up", "chest"), 2);
     expect(v.plannedVolume.cycleLength).toBe(3);
-    expect(chest).toMatchObject({ perCycle: 4, weekly: 9.3, zone: "maintain", severity: "info" });
+    expect(chest).toMatchObject({ perCycle, weekly: round((perCycle * 7) / 3, 1), zone: "maintain", severity: "info" });
     expect(v.plannedVolume.advice.find((a: { key: string }) => a.key === "chest").message).toContain("Göğüs");
   });
 });

@@ -103,6 +103,8 @@ jest.mock("@shopify/flash-list", () => {
       keyboardShouldPersistTaps,
       showsVerticalScrollIndicator,
       showsHorizontalScrollIndicator,
+      onScroll,
+      scrollEventThrottle,
     } = props;
     React.useImperativeHandle(ref, () => ({ scrollToOffset: () => {}, scrollToIndex: () => {}, scrollToEnd: () => {}, scrollToTop: () => {} }), []);
     const Scroller = renderScrollComponent ?? ScrollView;
@@ -115,6 +117,8 @@ jest.mock("@shopify/flash-list", () => {
         showsVerticalScrollIndicator,
         showsHorizontalScrollIndicator,
         contentContainerStyle,
+        onScroll,
+        scrollEventThrottle,
         refreshControl: refreshControl ?? (onRefresh ? React.createElement(RefreshControl, { refreshing: Boolean(refreshing), onRefresh }) : undefined),
       },
       node(ListHeaderComponent),

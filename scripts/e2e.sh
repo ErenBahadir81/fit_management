@@ -35,7 +35,7 @@ status=0
 export MOBILE_URL="http://127.0.0.1:$MOBILE_PORT"
 export ADMIN_URL="http://127.0.0.1:$ADMIN_PORT"
 export API_URL="http://127.0.0.1:$API_PORT/api/v1"
-for spec in mobile mobile-training mobile-nutrition mobile-body admin admin-flows; do
+for spec in mobile mobile-training mobile-nutrition mobile-body admin admin-flows admin-activation; do
   echo "▶ $spec"
   node "$ROOT/e2e/$spec.e2e.mjs" || status=1
 done

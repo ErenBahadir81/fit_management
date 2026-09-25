@@ -7,12 +7,11 @@ import { MIN_PASSWORD } from "../model";
 import type { Onboarding } from "../useOnboarding";
 
 /**
- * Name, handle, password. Errors only appear once a field has been touched, so an empty form is
- * an invitation rather than a list of complaints.
+ * Stage 1b — handle and password. Errors only appear once a field has been touched, so an empty
+ * form is an invitation rather than a list of complaints. The password never leaves memory.
  */
 export function AccountStep({ o }: { o: Onboarding }) {
   const [touched, setTouched] = React.useState<Record<string, boolean>>({});
-  const userRef = useRef<TextInput>(null);
   const passRef = useRef<TextInput>(null);
   const show = (k: keyof typeof o.errors) => (touched[k] ? o.errors[k] : undefined);
   const touch = (k: string) => setTouched((t) => ({ ...t, [k]: true }));
@@ -20,22 +19,6 @@ export function AccountStep({ o }: { o: Onboarding }) {
   return (
     <View style={styles.stack}>
       <TextField
-        label="Adın"
-        value={o.draft.account.displayName}
-        onChangeText={(displayName) => o.patch((d) => ({ ...d, account: { ...d.account, displayName } }))}
-        onBlur={() => touch("displayName")}
-        error={show("displayName")}
-        hint="Floo sana böyle seslenecek."
-        icon="displayName"
-        autoCapitalize="words"
-        autoComplete="name"
-        textContentType="name"
-        returnKeyType="next"
-        onSubmitEditing={() => userRef.current?.focus()}
-        testID="ob-displayName"
-      />
-      <TextField
-        ref={userRef}
         label="Kullanıcı adı"
         value={o.draft.account.username}
         onChangeText={(username) => o.patch((d) => ({ ...d, account: { ...d.account, username } }))}
@@ -48,6 +31,7 @@ export function AccountStep({ o }: { o: Onboarding }) {
         autoComplete="username-new"
         textContentType="username"
         returnKeyType="next"
+        autoFocus
         onSubmitEditing={() => passRef.current?.focus()}
         testID="ob-username"
       />

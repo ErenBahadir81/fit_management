@@ -3,6 +3,9 @@ import { Types } from "mongoose";
 import { asAdmin, asUser, createTestApp, seedBasics, type TestApp } from "./harness";
 import { Muscle } from "../src/models/muscle";
 import { Exercise } from "../src/models/exercise";
+import { SEED_EXERCISES } from "../src/seed/data/index";
+import { EXERCISE_ACTIVATION_V1 } from "../src/seed/data/exerciseActivation.v1";
+import { zExerciseActivationReference } from "@fitfloow/core";
 
 let t: TestApp;
 beforeAll(async () => {
@@ -87,9 +90,10 @@ describe("admin muscles", () => {
     expect(used.json().error.message).toMatch(/pasif/i);
     expect(await Muscle.countDocuments({ key: "chest" })).toBe(1);
 
-    const unused = await t.app.inject({ method: "DELETE", url: `${API}/admin/muscles/forearms`, headers });
+    // Since the activation catalog, no exercise uses the retired v1 catch-all `legs` any more.
+    const unused = await t.app.inject({ method: "DELETE", url: `${API}/admin/muscles/legs`, headers });
     expect(unused.statusCode).toBe(204);
-    expect(await Muscle.countDocuments({ key: "forearms" })).toBe(0);
+    expect(await Muscle.countDocuments({ key: "legs" })).toBe(0);
   });
 
   it("reorders muscles by key list", async () => {
@@ -113,10 +117,14 @@ describe("admin exercises", () => {
   it("lists, filters by q and by muscle", async () => {
     const { headers } = await asAdmin(t);
     const all = await t.app.inject({ method: "GET", url: `${API}/admin/exercises`, headers });
-    expect(all.json().exercises).toHaveLength(20);
+    expect(all.json().exercises).toHaveLength(SEED_EXERCISES.length);
 
-    const q = await t.app.inject({ method: "GET", url: `${API}/admin/exercises?q=squat`, headers });
-    expect((q.json().exercises as Array<{ name: string }>).map((e) => e.name).sort()).toEqual(["Pistol Squat", "Squat"]);
+    const q = await t.app.inject({ method: "GET", url: `${API}/admin/exercises?q=pistol`, headers });
+    expect((q.json().exercises as Array<{ name: string }>).map((e) => e.name)).toEqual(["Pistol Squat"]);
+    const squats = await t.app.inject({ method: "GET", url: `${API}/admin/exercises?q=squat`, headers });
+    expect((squats.json().exercises as Array<{ name: string }>).map((e) => e.name)).toEqual(
+      expect.arrayContaining(["Barbell Back Squat", "Bulgarian Split Squat", "Pistol Squat", "Squat"])
+    );
 
     const byMuscle = await t.app.inject({ method: "GET", url: `${API}/admin/exercises?muscle=abs`, headers });
     const names = (byMuscle.json().exercises as Array<{ name: string }>).map((e) => e.name);
@@ -130,17 +138,20 @@ describe("admin exercises", () => {
       method: "POST",
       url: `${API}/admin/exercises`,
       headers,
-      payload: { name: "Face Pull", muscles: [{ key: "traps", load: 0.5 }], defaultSets: 3, defaultReps: 15 },
+      payload: { name: "Band Pull-Apart", muscles: [{ key: "rearDelt", load: 0.85 }, { key: "traps", load: 0.35 }], defaultSets: 3, defaultReps: 15 },
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json().exercise).toMatchObject({ name: "Face Pull", metric: "reps", kind: "strength", active: true });
-    expect(res.json().exercise.muscles).toEqual([{ key: "traps", load: 0.5 }]);
+    expect(res.json().exercise).toMatchObject({ name: "Band Pull-Apart", metric: "reps", kind: "strength", active: true });
+    expect(res.json().exercise.muscles).toEqual([
+      { key: "rearDelt", load: 0.85 },
+      { key: "traps", load: 0.35 },
+    ]);
 
     const dup = await t.app.inject({
       method: "POST",
       url: `${API}/admin/exercises`,
       headers,
-      payload: { name: "face pull", muscles: [], defaultSets: 3, defaultReps: 10 },
+      payload: { name: "band pull-apart", muscles: [], defaultSets: 3, defaultReps: 10 },
     });
     expect(dup.statusCode).toBe(409);
   });
@@ -193,6 +204,95 @@ describe("admin exercises", () => {
 
     const missing = await t.app.inject({ method: "GET", url: `${API}/admin/exercises/${new Types.ObjectId()}`, headers });
     expect(missing.statusCode).toBe(404);
+  });
+
+  it("returns the literature reference of a seeded exercise, by slug even after a rename", async () => {
+    const { headers } = await asAdmin(t);
+    const doc = await Exercise.findOne({ nameKey: "barbell bench press" }).lean();
+    const row = EXERCISE_ACTIVATION_V1.find((r) => r.slug === "barbell-bench-press")!;
+
+    const res = await t.app.inject({ method: "GET", url: `${API}/admin/exercises/${doc!._id}`, headers });
+    expect(res.statusCode).toBe(200);
+    const { exercise, reference } = res.json();
+    expect(exercise.name).toBe("Barbell Bench Press");
+    expect(() => zExerciseActivationReference.parse(reference)).not.toThrow();
+    expect(reference).toMatchObject({ version: "v1", slug: "barbell-bench-press", name: "Barbell Bench Press" });
+    expect(reference.muscles).toEqual(row.muscles); // load, confidence {level, n, spread}, source ids
+    const cited = [...new Set(row.muscles.flatMap((m) => m.sources))].sort();
+    expect((reference.sources as Array<{ id: string }>).map((x) => x.id).sort()).toEqual(cited);
+    for (const src of reference.sources) expect(src).toMatchObject({ title: expect.any(String), url: expect.stringMatching(/^https?:\/\//) });
+
+    // Renamed by an admin (who cannot touch the slug): the reference follows the slug.
+    const patch = await t.app.inject({
+      method: "PATCH",
+      url: `${API}/admin/exercises/${doc!._id}`,
+      headers,
+      payload: { name: "Bench Press", slug: "hacked" },
+    });
+    expect(patch.statusCode).toBe(200);
+    const again = (await t.app.inject({ method: "GET", url: `${API}/admin/exercises/${doc!._id}`, headers })).json();
+    expect(again.exercise.name).toBe("Bench Press");
+    expect(again.reference.slug).toBe("barbell-bench-press");
+    expect((await Exercise.findById(doc!._id).lean())!.slug).toBe("barbell-bench-press");
+  });
+
+  it("has no reference for an exercise an admin made up, even under a catalog name", async () => {
+    const { headers } = await asAdmin(t);
+    const created = await t.app.inject({
+      method: "POST",
+      url: `${API}/admin/exercises`,
+      headers,
+      payload: { name: "Kendi Hareketim", muscles: [{ key: "chest", load: 0.5 }], defaultSets: 3, defaultReps: 10 },
+    });
+    const res = await t.app.inject({ method: "GET", url: `${API}/admin/exercises/${created.json().exercise.id}`, headers });
+    expect(res.json().reference).toBeNull();
+
+    // The seeded Face Pull is deleted and an admin makes their own: it is not the literature row.
+    const seeded = await Exercise.findOne({ nameKey: "face pull" }).lean();
+    await t.app.inject({ method: "DELETE", url: `${API}/admin/exercises/${seeded!._id}`, headers });
+    const own = await t.app.inject({
+      method: "POST",
+      url: `${API}/admin/exercises`,
+      headers,
+      payload: { name: "Face Pull", muscles: [{ key: "rearDelt", load: 1 }], defaultSets: 3, defaultReps: 15 },
+    });
+    expect(own.statusCode).toBe(201);
+    const ownRes = await t.app.inject({ method: "GET", url: `${API}/admin/exercises/${own.json().exercise.id}`, headers });
+    expect(ownRes.json().reference).toBeNull();
+  });
+
+  it("accepts loads on the 0.05 grid for any of the 17 keys; rejects repeated keys and loads outside 0–1", async () => {
+    const { headers } = await asAdmin(t);
+    const doc = await Exercise.findOne({ nameKey: "push-up" }).lean();
+    const url = `${API}/admin/exercises/${doc!._id}`;
+    const muscles = [
+      { key: "chest", load: 0.35 },
+      { key: "triceps", load: 0.05 },
+      { key: "obliques", load: 1 },
+      { key: "adductors", load: 0.95 },
+    ];
+    const ok = await t.app.inject({ method: "PATCH", url, headers, payload: { muscles } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().exercise.muscles).toEqual(muscles);
+    expect((await Exercise.findById(doc!._id).lean())!.muscles.map((m) => ({ key: m.key, load: m.load }))).toEqual(muscles);
+
+    const repeated = await t.app.inject({ method: "PATCH", url, headers, payload: { muscles: [{ key: "chest", load: 0.5 }, { key: "chest", load: 0.4 }] } });
+    expect(repeated.statusCode).toBe(400);
+    expect(repeated.json().error.code).toBe("VALIDATION");
+    expect(JSON.stringify(repeated.json().error.details)).toContain("chest");
+    const created = await t.app.inject({
+      method: "POST",
+      url: `${API}/admin/exercises`,
+      headers,
+      payload: { name: "Tekrarlı", muscles: [{ key: "lats", load: 1 }, { key: "lats", load: 0.5 }], defaultSets: 3, defaultReps: 10 },
+    });
+    expect(created.statusCode).toBe(400);
+
+    for (const load of [1.05, -0.05]) {
+      const bad = await t.app.inject({ method: "PATCH", url, headers, payload: { muscles: [{ key: "chest", load }] } });
+      expect(bad.statusCode, String(load)).toBe(400);
+    }
+    expect((await Exercise.findById(doc!._id).lean())!.muscles.map((m) => ({ key: m.key, load: m.load }))).toEqual(muscles);
   });
 
   it("keeps public /exercises free of inactive entries", async () => {

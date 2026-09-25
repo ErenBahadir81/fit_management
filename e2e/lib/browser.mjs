@@ -18,6 +18,11 @@ export const MOBILE_URL = process.env.MOBILE_URL ?? "http://127.0.0.1:8082";
 export const ADMIN_URL = process.env.ADMIN_URL ?? "http://127.0.0.1:3000";
 export const API_URL = process.env.API_URL ?? "http://127.0.0.1:4000";
 export const USER = { username: process.env.E2E_USER ?? "eren", password: process.env.E2E_PASS ?? "Asd*123" };
+/**
+ * Sandboxes whose egress proxy re-signs TLS make Chromium reject the jsDelivr certificate, and the
+ * mobile web build fetches canvaskit.wasm from there. `E2E_IGNORE_HTTPS_ERRORS=1` lets it load.
+ */
+const IGNORE_HTTPS_ERRORS = process.env.E2E_IGNORE_HTTPS_ERRORS === "1";
 
 const IGNORED_CONSOLE = [/DevTools/i, /hmr/i, /Fast Refresh/i, /\[expo-notifications\]/i];
 
@@ -43,7 +48,16 @@ export function createRecorder() {
 /** Launches a browser and wires console/page/network failures into the recorder. */
 export async function open({ rec, viewport = { width: 420, height: 900 }, context = {} }) {
   const browser = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
-  const ctx = await browser.newContext({ viewport, ...context });
+  const ctx = await browser.newContext({ viewport, ...(IGNORE_HTTPS_ERRORS ? { ignoreHTTPSErrors: true } : {}), ...context });
+  // Where the CDN is out of reach (sandboxes, CI behind a TLS-inspecting proxy) Skia's wasm can be
+  // served from the local `canvaskit-wasm` package instead: E2E_CANVASKIT_DIR=node_modules/canvaskit-wasm/bin/full
+  if (process.env.E2E_CANVASKIT_DIR) {
+    const dir = process.env.E2E_CANVASKIT_DIR;
+    await ctx.route("https://cdn.jsdelivr.net/npm/canvaskit-wasm@*/bin/full/*", (route) => {
+      const file = route.request().url().split("/").pop();
+      return route.fulfill({ path: `${dir}/${file}`, contentType: file.endsWith(".wasm") ? "application/wasm" : "application/javascript" });
+    });
+  }
   const page = await ctx.newPage();
   const state = { where: "boot" };
   const at = () => state.where;

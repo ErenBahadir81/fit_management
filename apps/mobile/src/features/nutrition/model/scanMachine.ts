@@ -1,19 +1,18 @@
 /**
- * The scan flow as a pure state machine: camera → capturing → analyzing (with a floor on how fast
- * it may finish, so the "AI is thinking" theatre always completes) → results → saving → done.
+ * The scan flow as a pure state machine: camera → capturing → analyzing → results → saving → done.
+ *
+ * Analyzing lasts exactly as long as the request: no minimum duration, no scripted status steps.
+ * The screen shows the photo with a quiet "looking" state while the API works and the results as
+ * soon as they land.
  *
  * Nothing here touches React, the camera or the network: the screen dispatches events and renders
- * the state, which makes every timing rule (min duration, out-of-order answers, empty detections,
- * vision outage) testable without a device.
+ * the state, which makes every rule (out-of-order answers, empty detections, vision outage, the
+ * "Bunu mu demek istedin?" swap) testable without a device.
  */
-import { entryTotals, sumTotals, type Detection, type Meal, type Per100g, type ScanResultDTO, type Totals } from "@fitfloow/core";
+import { entryTotals, sumTotals, type Detection, type FoodDTO, type Meal, type Per100g, type ScanResultDTO, type Totals } from "@fitfloow/core";
 
-/** The overall analyze animation never finishes faster than this, however quick the API is. */
-export const MIN_ANALYZE_MS = 1800;
-/** Each status label is on screen for at least this long. */
-export const STATUS_STEP_MS = 600;
-
-export const SCAN_STATUS_LABELS = ["Görüntü analiz ediliyor…", "Yemekler tanınıyor…", "Besin değerleri hesaplanıyor…"] as const;
+/** Below this the model is unsure: the card asks "Bunu mu demek istedin?" with the alternatives. */
+export const UNSURE_BELOW = 0.5;
 
 export type ScanPhase = "camera" | "capturing" | "analyzing" | "results" | "saving" | "done" | "error";
 
@@ -23,7 +22,23 @@ export interface ScanError {
   message: string;
 }
 
-export interface ScanItem {
+/** Everything the portion presets need to know about a food. */
+export interface PortionInfo {
+  defaultServingG: number;
+  servings: FoodDTO["servings"];
+  category: string | null;
+}
+
+/** Another reading of the same photo, ready to swap in with one tap. */
+export interface ScanAlternative extends PortionInfo {
+  name: string;
+  confidence: number;
+  grams: number;
+  per100g: Per100g;
+  foodId: string;
+}
+
+export interface ScanItem extends PortionInfo {
   /** Stable key for lists and grams edits. */
   key: string;
   name: string;
@@ -32,58 +47,47 @@ export interface ScanItem {
   grams: number;
   per100g: Per100g;
   foodId: string | null;
+  /** Other candidates for this item, most likely first (empty for hand-added items). */
+  alternatives: ScanAlternative[];
+  /** The card asks "Bunu mu demek istedin?" until the user picks or confirms. */
+  unsure: boolean;
 }
 
 export interface ScanState {
   phase: ScanPhase;
   photoUri: string | null;
-  /** ms timestamp the analyze started (for the min-duration floor and the status label). */
-  startedAt: number | null;
-  minElapsed: boolean;
-  /** An API answer that arrived before the theatre finished. */
-  pending: { kind: "ok"; result: ScanResultDTO } | { kind: "error"; error: ScanError } | null;
   scanId: string | null;
   mock: boolean;
   /** True when the model recognised no food at all (a table, a cat, a blurry photo). */
   notFood: boolean;
   items: ScanItem[];
   meal: Meal;
-  statusIndex: number;
   error: ScanError | null;
 }
 
 export type ScanEvent =
   | { type: "shutter" }
-  | { type: "captured"; uri: string; at: number }
-  | { type: "minElapsed" }
-  | { type: "tick"; at: number }
+  | { type: "captured"; uri: string }
   | { type: "result"; result: ScanResultDTO }
   | { type: "failed"; error: ScanError }
   | { type: "setGrams"; key: string; grams: number }
   | { type: "removeItem"; key: string }
-  | { type: "addItem"; item: Omit<ScanItem, "key">; key?: string }
+  | { type: "addItem"; item: Omit<ScanItem, "key" | "alternatives" | "unsure" | keyof PortionInfo> & Partial<PortionInfo>; key?: string }
+  /** "Bunu mu demek istedin?" → this one: swap the item's food for alternative `index`. */
+  | { type: "pickAlternative"; key: string; index: number }
+  /** "Evet, bu" → keep the model's guess and stop asking. */
+  | { type: "confirmItem"; key: string }
   | { type: "setMeal"; meal: Meal }
   | { type: "save" }
   | { type: "saved" }
   | { type: "saveFailed"; message: string }
   | { type: "retake" }
+  /** The results sheet was swiped away: "not this photo", back to the camera. Ignored in any other phase. */
+  | { type: "resultsDismissed" }
   | { type: "dismissError" };
 
 export function initialScanState(meal: Meal): ScanState {
-  return {
-    phase: "camera",
-    photoUri: null,
-    startedAt: null,
-    minElapsed: false,
-    pending: null,
-    scanId: null,
-    mock: false,
-    notFood: false,
-    items: [],
-    meal,
-    statusIndex: 0,
-    error: null,
-  };
+  return { phase: "camera", photoUri: null, scanId: null, mock: false, notFood: false, items: [], meal, error: null };
 }
 
 let keySeq = 0;
@@ -91,18 +95,27 @@ function nextKey(prefix: string): string {
   return `${prefix}_${++keySeq}`;
 }
 
+const portionOf = (food: FoodDTO): PortionInfo => ({ defaultServingG: food.defaultServingG, servings: food.servings, category: food.category || null });
+const gramsOf = (suggested: number, food: FoodDTO) => Math.round(suggested > 0 ? suggested : food.defaultServingG);
+
 /** A detection becomes an editable item; detections the API could not map to a food are dropped. */
 export function itemsFromDetections(detections: readonly Detection[]): ScanItem[] {
   const out: ScanItem[] = [];
   for (const d of detections) {
     if (!d.food) continue;
+    const alternatives: ScanAlternative[] = (d.alternatives ?? [])
+      .filter((a) => a.food.id !== d.food?.id)
+      .map((a) => ({ name: a.labelTr || a.food.name, confidence: a.confidence, grams: gramsOf(a.suggestedGrams, a.food), per100g: a.food.per100g, foodId: a.food.id, ...portionOf(a.food) }));
     out.push({
       key: nextKey("det"),
       name: d.labelTr || d.food.name,
       confidence: d.confidence,
-      grams: Math.round(d.suggestedGrams > 0 ? d.suggestedGrams : d.food.defaultServingG),
+      grams: gramsOf(d.suggestedGrams, d.food),
       per100g: d.food.per100g,
       foodId: d.food.id,
+      ...portionOf(d.food),
+      alternatives,
+      unsure: d.confidence < UNSURE_BELOW && alternatives.length > 0,
     });
   }
   return out;
@@ -113,11 +126,40 @@ export function scanTotals(items: readonly ScanItem[]): Totals {
   return sumTotals(items.map((i) => entryTotals(i.grams, i.per100g)));
 }
 
-/** The label the theatre shows at `now`; holds on the last one when the API is slow. */
-export function statusIndexAt(startedAt: number | null, now: number): number {
-  if (startedAt == null) return 0;
-  const step = Math.floor(Math.max(0, now - startedAt) / STATUS_STEP_MS);
-  return Math.min(step, SCAN_STATUS_LABELS.length - 1);
+export interface PortionPreset {
+  key: string;
+  label: string;
+  grams: number;
+}
+
+/** A handful is a portion people actually think in for these; 30 g is the usual reference. */
+const HANDFUL_CATEGORIES = new Set(["kuruyemiş", "meyve", "kuru meyve", "atıştırmalık", "kahvaltı"]);
+export const HANDFUL_G = 30;
+const MAX_PRESETS = 5;
+
+/**
+ * One-tap portions for a food, in the order people reach for them: its default serving, half of
+ * it, 100 g, the food's own servings ("1 dilim", "1 avuç"…) and a handful where that is natural.
+ * Each gram amount appears once.
+ */
+export function portionPresets(food: PortionInfo): PortionPreset[] {
+  const serving = Math.round(food.defaultServingG);
+  const candidates: PortionPreset[] = [
+    { key: "serving", label: "1 porsiyon", grams: serving },
+    { key: "half", label: "½ porsiyon", grams: Math.round(serving / 2) },
+    { key: "100g", label: "100 g", grams: 100 },
+    ...food.servings.map((s, i) => ({ key: `s${i}`, label: s.label, grams: Math.round(s.grams) })),
+  ];
+  if (food.category && HANDFUL_CATEGORIES.has(food.category.toLocaleLowerCase("tr-TR"))) candidates.push({ key: "handful", label: "Avuç", grams: HANDFUL_G });
+  const seen = new Set<number>();
+  const out: PortionPreset[] = [];
+  for (const p of candidates) {
+    if (p.grams < 1 || seen.has(p.grams)) continue;
+    seen.add(p.grams);
+    out.push(p);
+    if (out.length >= MAX_PRESETS) break;
+  }
+  return out;
 }
 
 /** ApiClientError-shaped input → the state the UI explains to the user. Never throws. */
@@ -133,17 +175,11 @@ export function mapScanError(e: unknown): ScanError {
   return { kind: "unknown", message: "Fotoğrafı okuyamadım. Tekrar deneyelim mi?" };
 }
 
-/** Resolve a finished analyze once both the API and the minimum theatre duration are done. */
-function settle(state: ScanState, outcome: NonNullable<ScanState["pending"]>): ScanState {
-  if (outcome.kind === "error") {
-    return { ...state, phase: "error", pending: null, error: outcome.error };
-  }
-  const { result } = outcome;
+function withResult(state: ScanState, result: ScanResultDTO): ScanState {
   const items = itemsFromDetections(result.detections);
   return {
     ...state,
     phase: "results",
-    pending: null,
     error: null,
     scanId: result.scanId,
     mock: result.mock,
@@ -155,6 +191,30 @@ function settle(state: ScanState, outcome: NonNullable<ScanState["pending"]>): S
   };
 }
 
+/** Swap an item for one of its alternatives; the old guess becomes an alternative in its place. */
+function pickAlternative(item: ScanItem, index: number): ScanItem {
+  const alt = item.alternatives[index];
+  if (!alt) return item;
+  const previous: ScanAlternative | null =
+    item.foodId && item.confidence != null
+      ? { name: item.name, confidence: item.confidence, grams: item.grams, per100g: item.per100g, foodId: item.foodId, defaultServingG: item.defaultServingG, servings: item.servings, category: item.category }
+      : null;
+  const rest = item.alternatives.filter((_, i) => i !== index);
+  return {
+    ...item,
+    name: alt.name,
+    confidence: alt.confidence,
+    grams: alt.grams,
+    per100g: alt.per100g,
+    foodId: alt.foodId,
+    defaultServingG: alt.defaultServingG,
+    servings: alt.servings,
+    category: alt.category,
+    alternatives: previous ? [previous, ...rest] : rest,
+    unsure: false,
+  };
+}
+
 export function scanReducer(state: ScanState, event: ScanEvent): ScanState {
   switch (event.type) {
     case "shutter":
@@ -162,44 +222,42 @@ export function scanReducer(state: ScanState, event: ScanEvent): ScanState {
 
     case "captured":
       if (state.phase === "results" || state.phase === "saving" || state.phase === "done") return state;
-      return { ...state, phase: "analyzing", photoUri: event.uri, startedAt: event.at, minElapsed: false, pending: null, statusIndex: 0, error: null, notFood: false, items: [] };
+      return { ...state, phase: "analyzing", photoUri: event.uri, error: null, notFood: false, items: [] };
 
-    case "tick":
-      if (state.phase !== "analyzing") return state;
-      return { ...state, statusIndex: statusIndexAt(state.startedAt, event.at) };
+    case "result":
+      return state.phase === "analyzing" ? withResult(state, event.result) : state;
 
-    case "minElapsed": {
-      if (state.phase !== "analyzing") return state;
-      if (state.pending) return settle({ ...state, minElapsed: true }, state.pending);
-      return { ...state, minElapsed: true };
-    }
-
-    case "result": {
-      if (state.phase !== "analyzing") return state;
-      const outcome = { kind: "ok" as const, result: event.result };
-      return state.minElapsed ? settle(state, outcome) : { ...state, pending: outcome };
-    }
-
-    case "failed": {
-      if (state.phase !== "analyzing") return state;
-      const outcome = { kind: "error" as const, error: event.error };
-      return state.minElapsed ? settle(state, outcome) : { ...state, pending: outcome };
-    }
+    case "failed":
+      return state.phase === "analyzing" ? { ...state, phase: "error", error: event.error } : state;
 
     case "setGrams": {
       const grams = Math.max(1, Math.round(event.grams));
       return { ...state, items: state.items.map((i) => (i.key === event.key ? { ...i, grams } : i)) };
     }
 
-    case "removeItem": {
-      const items = state.items.filter((i) => i.key !== event.key);
-      return { ...state, items, notFood: state.notFood };
-    }
+    case "removeItem":
+      return { ...state, items: state.items.filter((i) => i.key !== event.key) };
+
+    case "pickAlternative":
+      return { ...state, items: state.items.map((i) => (i.key === event.key ? pickAlternative(i, event.index) : i)) };
+
+    case "confirmItem":
+      return { ...state, items: state.items.map((i) => (i.key === event.key ? { ...i, unsure: false } : i)) };
 
     case "addItem": {
       // Adding by hand also rescues the error state: there is something to save again.
       const phase = state.phase === "error" ? "results" : state.phase;
-      return { ...state, phase, error: state.phase === "error" ? null : state.error, notFood: false, items: [...state.items, { ...event.item, key: event.key ?? nextKey("add") }] };
+      const { item } = event;
+      const added: ScanItem = {
+        ...item,
+        key: event.key ?? nextKey("add"),
+        defaultServingG: item.defaultServingG ?? item.grams,
+        servings: item.servings ?? [],
+        category: item.category ?? null,
+        alternatives: [],
+        unsure: false,
+      };
+      return { ...state, phase, error: state.phase === "error" ? null : state.error, notFood: false, items: [...state.items, added] };
     }
 
     case "setMeal":
@@ -216,6 +274,9 @@ export function scanReducer(state: ScanState, event: ScanEvent): ScanState {
 
     case "retake":
       return { ...initialScanState(state.meal), phase: "camera" };
+
+    case "resultsDismissed":
+      return state.phase === "results" ? { ...initialScanState(state.meal), phase: "camera" } : state;
 
     case "dismissError":
       return state.error ? { ...state, error: null } : state;

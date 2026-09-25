@@ -44,7 +44,7 @@ describe("catalog (user facing)", () => {
   it("GET /exercises filters by q and returns only active ones", async () => {
     const { headers } = await asUser(t);
     const all = await t.app.inject({ method: "GET", url: `${API}/exercises`, headers });
-    expect(all.json().exercises.length).toBe(20);
+    expect(all.json().exercises.length).toBe(143);
 
     const q = await t.app.inject({ method: "GET", url: `${API}/exercises?q=push`, headers });
     const names = (q.json().exercises as Array<{ name: string }>).map((e) => e.name);

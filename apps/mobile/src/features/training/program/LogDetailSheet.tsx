@@ -14,7 +14,8 @@ export interface LogDetailSheetProps {
   sheetRef: React.RefObject<SheetRef | null>;
   log: WorkoutLogDTO | null;
   muscles: readonly MuscleDTO[];
-  onDelete: (log: WorkoutLogDTO) => void;
+  /** Omitted where deleting belongs to another screen (the plan pane: delete from "Geçmiş"). */
+  onDelete?: (log: WorkoutLogDTO) => void;
 }
 
 /** Everything about one logged session: chips, muscle load, set-by-set list. */
@@ -93,8 +94,12 @@ export function LogDetailSheet({ sheetRef, log, muscles, onDelete }: LogDetailSh
               </Text>
             ) : null}
 
-            <Divider />
-            <Button label="Kaydı sil" variant="danger" icon="delete" onPress={() => onDelete(log)} testID="log-delete" />
+            {onDelete ? (
+              <>
+                <Divider />
+                <Button label="Kaydı sil" variant="danger" icon="delete" onPress={() => onDelete(log)} testID="log-delete" />
+              </>
+            ) : null}
           </>
         ) : null}
       </View>

@@ -17,7 +17,7 @@ import { useBarcodeLookup } from "../useNutrition";
 import { FoodDetail } from "./FoodDetail";
 
 /** Marks drawn over the camera / photo scrim: always light. `onPrimary` is navy in dark mode. */
-const ON_SCRIM = dark.ink;
+const ON_SCRIM = dark.onScrim;
 
 export interface BarcodeScannerProps {
   meal: Meal;

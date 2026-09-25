@@ -14,10 +14,14 @@ import {
   buildWeeklyReport,
   computeGoalPlan,
   computeGoalProgress,
+  evaluateGoal,
+  goalDirectionOf,
   ewmaTrend,
   latestTrendWeight,
   pickRoadmapWeek,
+  planSnapshot,
   recalibrateTdee,
+  replanGoal,
   round,
   shiftKey,
   summarizeWeeklyReport,
@@ -26,13 +30,19 @@ import {
   type BodyPoint,
   type DayIntake,
   type EnergyDTO,
+  type GoalAdjustment,
+  type GoalAdjustmentAction,
+  type GoalAdjustmentProposal,
   type GoalDTO,
+  type GoalFeedback,
+  type GoalInput,
   type GoalPlan,
   type GoalProfile,
   type GoalProgress,
   type MealEntryDTO,
   type ProgramDTO,
   type Recalibration,
+  type ReplanBase,
   type UserDTO,
   type Weekday,
   type WeeklyReportDTO,
@@ -89,12 +99,12 @@ export function planFor(user: UserDTO, entry: BodyEntryDTO, targetBodyFatPct: nu
   });
 }
 
-/** Demo goal: %15 target, conservative pace, started 4 weeks ago on that week's measurement. */
+/** Demo goal: %15 target, optimal pace, started 4 weeks ago; the demo trend runs a little behind it, so Floo has an adjustment to propose. */
 export function goalFor(today: string, user: UserDTO, entries: BodyEntryDTO[]): GoalDTO {
   const startKey = shiftKey(today, -28);
   const start = [...entries].reverse().find((e) => e.dateKey <= startKey) ?? entries[0];
   const target = 15;
-  const profile: GoalProfile = "conservative";
+  const profile: GoalProfile = "optimal";
   return {
     id: "g_demo",
     status: "active",
@@ -113,7 +123,14 @@ export function goalFor(today: string, user: UserDTO, entries: BodyEntryDTO[]): 
   };
 }
 
-export function goalCreate(today: string, user: UserDTO, start: BodyEntryDTO, targetBodyFatPct: number, profile: GoalProfile): GoalDTO {
+export function goalCreate(
+  today: string,
+  user: UserDTO,
+  start: BodyEntryDTO,
+  targetBodyFatPct: number,
+  profile: GoalProfile,
+  plan: GoalPlan = planFor(user, start, targetBodyFatPct, profile, today)
+): GoalDTO {
   const now = new Date().toISOString();
   return {
     id: nextId("goal"),
@@ -125,11 +142,40 @@ export function goalCreate(today: string, user: UserDTO, start: BodyEntryDTO, ta
     targetBodyFatPct,
     profile,
     start: { dateKey: today, weightKg: start.weightKg, bodyFatPct: start.bodyFatPct, leanMassKg: start.leanMassKg, fatMassKg: start.fatMassKg, bodyEntryId: start.id },
-    plan: planFor(user, start, targetBodyFatPct, profile, today),
+    plan,
     tdeeOverride: null,
     createdAt: now,
     updatedAt: now,
     completedAt: null,
+  };
+}
+
+/** T8 — `POST /onboarding`'s goal in any direction (cut / bulk / recomp), through the real engine. */
+export function goalFromInput(today: string, user: UserDTO, start: BodyEntryDTO, input: GoalInput): GoalDTO {
+  const direction = goalDirectionOf(input);
+  const profile = input.profile ?? "optimal";
+  const plan = computeGoalPlan({
+    sex: user.gender,
+    weightKg: start.weightKg,
+    bodyFatPct: start.bodyFatPct,
+    heightCm: start.heightCm || user.heightCm || 175,
+    age: ageOf(user, today),
+    activityLevel: user.activityLevel,
+    direction,
+    targetBodyFatPct: input.targetBodyFatPct ?? null,
+    targetLeanGainKg: input.targetLeanGainKg ?? null,
+    trainingLevel: input.trainingLevel ?? null,
+    profile,
+    startDate: today,
+    settings: SETTINGS,
+  });
+  // Same rule as the API's `storedTarget`: a bulk stores the body fat its plan ends at.
+  const target = direction === "bulk" ? (plan.roadmap.at(-1)?.endBfPct ?? start.bodyFatPct) : (input.targetBodyFatPct ?? start.bodyFatPct);
+  return {
+    ...goalCreate(today, user, start, target, profile, plan),
+    direction,
+    targetLeanGainKg: direction === "bulk" ? (input.targetLeanGainKg ?? null) : null,
+    trainingLevel: input.trainingLevel ?? null,
   };
 }
 
@@ -167,6 +213,67 @@ function currentState(goal: GoalDTO, weighIns: WeighInDTO[], today: string): Bod
 
 export function progressFor(today: string, goal: GoalDTO, weighIns: WeighInDTO[], entries: BodyEntryDTO[], meals: MealEntryDTO[]): GoalProgress {
   return computeGoalProgress(goal, weightPoints(weighIns), bodyPoints(entries), dayIntakeFrom(meals), today, SETTINGS);
+}
+
+export interface GoalEvaluationView {
+  progress: GoalProgress;
+  feedback: GoalFeedback;
+  adjustment: GoalAdjustmentProposal | null;
+  replanBase: ReplanBase | null;
+}
+
+/**
+ * T7/T6 — the same `evaluateGoal` call the API makes for `GET /goals/current`: progress, Floo's
+ * line and any pending adjustment proposal, re-planned from the latest measurement.
+ */
+export function evaluateFor(today: string, user: UserDTO, goal: GoalDTO, weighIns: WeighInDTO[], entries: BodyEntryDTO[], meals: MealEntryDTO[]): GoalEvaluationView {
+  const latest = [...entries].filter((e) => e.dateKey <= today).sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1)).at(-1) ?? null;
+  const recalibration = recalibrateTdee({
+    startKey: goal.start.dateKey,
+    tdeeFormula: goal.plan.tdeeFormula,
+    tdeePrev: goal.tdeeOverride ?? goal.plan.tdeeFormula,
+    weighIns: weightPoints(weighIns),
+    dayIntake: dayIntakeFrom(meals),
+    todayKey: today,
+    settings: SETTINGS,
+  });
+  const replanBase: ReplanBase | null = latest
+    ? { sex: user.gender, weightKg: latest.weightKg, bodyFatPct: latest.bodyFatPct, heightCm: latest.heightCm || user.heightCm || 175, age: ageOf(user, today), activityLevel: user.activityLevel, settings: SETTINGS }
+    : null;
+  return evaluateGoal({ goal, weighIns: weightPoints(weighIns), bodyEntries: bodyPoints(entries), dayIntake: dayIntakeFrom(meals), todayKey: today, settings: SETTINGS, replanBase, recalibration });
+}
+
+/** One-tap answer to a proposal, exactly as the API stores it (`adjustments[]` + the re-plan). */
+export function answerAdjustment(
+  today: string,
+  goal: GoalDTO,
+  evaluation: GoalEvaluationView,
+  answer: { id: string; action?: GoalAdjustmentAction; dismiss?: boolean }
+): { goal: GoalDTO; adjustment: GoalAdjustment } | { error: "stale" | "option" } {
+  const proposal = evaluation.adjustment;
+  if (!proposal || proposal.id !== answer.id || goal.adjustments.some((a) => a.id === answer.id)) return { error: "stale" };
+  const at = new Date().toISOString();
+  if (answer.dismiss) {
+    const record: GoalAdjustment = { id: proposal.id, kind: proposal.kind, status: "dismissed", action: null, dateKey: today, at, before: proposal.before, after: null };
+    return { goal: { ...goal, adjustments: [...goal.adjustments, record], updatedAt: at }, adjustment: record };
+  }
+  const chosen = answer.action ? proposal.options.find((o) => o.action === answer.action) : (proposal.options.find((o) => o.recommended) ?? proposal.options[0]);
+  if (!chosen) return { error: "option" };
+  const record: GoalAdjustment = { id: proposal.id, kind: proposal.kind, status: "accepted", action: chosen.action, dateKey: today, at, before: proposal.before, after: chosen.after };
+  if (chosen.action === "complete" || !evaluation.replanBase) {
+    return { goal: { ...goal, status: "completed", completedAt: at, adjustments: [...goal.adjustments, record], updatedAt: at }, adjustment: record };
+  }
+  const plan = replanGoal(goal, chosen.change, evaluation.replanBase, today);
+  const next: GoalDTO = {
+    ...goal,
+    plan,
+    tdeeOverride: chosen.change.tdeeOverride !== undefined ? chosen.change.tdeeOverride : goal.tdeeOverride,
+    targetBodyFatPct: chosen.change.targetBodyFatPct ?? goal.targetBodyFatPct,
+    targetLeanGainKg: chosen.change.targetLeanGainKg ?? goal.targetLeanGainKg,
+    updatedAt: at,
+  };
+  const stored = { ...record, after: planSnapshot(plan, next) };
+  return { goal: { ...next, adjustments: [...goal.adjustments, stored] }, adjustment: stored };
 }
 
 /** Measured-TDEE recalibration: applies the observed TDEE and re-simulates the plan from today. */

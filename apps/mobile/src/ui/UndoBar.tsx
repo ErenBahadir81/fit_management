@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeInDown, FadeOutDown, useReducedMotion } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, FadeOut, FadeOutDown, useReducedMotion } from "react-native-reanimated";
 import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing } from "../theme/tokens";
 import { Chip } from "./Chip";
@@ -26,8 +26,8 @@ export function UndoBar({ message, onUndo, bottom, icon = "trash-outline", actio
   const reduce = useReducedMotion();
   return (
     <Animated.View
-      entering={reduce ? undefined : FadeInDown.springify().damping(18).stiffness(220)}
-      exiting={FadeOutDown.duration(reduce ? 100 : 160)}
+      entering={reduce ? FadeIn.duration(150) : FadeInDown.springify().damping(18).stiffness(220)}
+      exiting={reduce ? FadeOut.duration(150) : FadeOutDown.duration(160)}
       pointerEvents="box-none"
       style={[styles.host, { bottom }]}
       testID={testID}
