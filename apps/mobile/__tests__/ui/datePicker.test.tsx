@@ -55,4 +55,17 @@ describe("DatePicker", () => {
     await pick("day", 5);
     expect(onChange).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-05$/));
   });
+
+  test("with no value the resting date is marked as not chosen, and can be taken as is", async () => {
+    const onChange = jest.fn();
+    await renderUI(<DatePicker value={null} onChange={onChange} label="Doğum tarihi" testID="d" minYear={1990} maxYear={2000} />);
+    expect(screen.getByText("Henüz seçilmedi; tekerlekleri kaydır.")).toBeTruthy();
+    fireEvent.press(screen.getByTestId("d-accept"));
+    expect(onChange).toHaveBeenCalledWith("1995-01-01");
+  });
+
+  test("once a date is chosen the not-chosen line is gone", async () => {
+    await renderUI(<Harness initial="1994-04-12" />);
+    expect(screen.queryByTestId("d-pending")).toBeNull();
+  });
 });
