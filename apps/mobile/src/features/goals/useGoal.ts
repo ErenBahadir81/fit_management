@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { GoalDTO, GoalInput, GoalPreview, GoalProfile, GoalView, Recalibration } from "@fitfloow/core";
+import type { GoalAdjustment, GoalAdjustmentAnswer, GoalDTO, GoalInput, GoalPreview, GoalProfile, GoalView, Recalibration } from "@fitfloow/core";
 import { flooBus } from "../../mascot/events";
 import { getApi } from "../../lib/api";
 import { describeError } from "../../lib/errors";
@@ -144,5 +144,29 @@ export function useCompleteGoal() {
       flooBus.emit("goalHit", { goalId: goal.id });
     },
     onError: (e) => toast.show({ message: describeError(e, "İşlem yapılamadı. Tekrar dene."), kind: "error" }),
+  });
+}
+
+/**
+ * T7 — answer Floo's adjustment proposal. Accepting re-plans the goal (the engine already previewed
+ * the numbers on the card); dismissing only records the answer. Either way the proposal is gone
+ * from `/goals/current` until the situation changes, so it is cleared from the cache at once.
+ */
+export function useAnswerAdjustment() {
+  const toast = useToast();
+  const after = useGoalMutationEffects();
+  const qc = useQueryClient();
+  return useMutation<{ goal: GoalDTO; adjustment: GoalAdjustment }, unknown, GoalAdjustmentAnswer & { dismiss?: boolean }>({
+    mutationFn: ({ dismiss, ...answer }) => (dismiss ? getApi().goals.dismissAdjustment(answer) : getApi().goals.acceptAdjustment(answer)),
+    onSuccess: ({ goal, adjustment }) => {
+      if (adjustment.status === "accepted") void haptic.success();
+      else void haptic.select();
+      after(goal);
+    },
+    onError: (e) => {
+      // A stale proposal (already answered elsewhere) is not worth an error: just refresh.
+      void qc.invalidateQueries({ queryKey: GOAL_KEY });
+      toast.show({ message: describeError(e, "Öneri uygulanamadı. Tekrar dene."), kind: "error" });
+    },
   });
 }
