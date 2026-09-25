@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { List, type ListRenderItem } from "../../ui/List";
 import { useRouter } from "expo-router";
-import { shiftKey, type Meal, type MealEntryDTO } from "@fitfloow/core";
+import { shiftKey, type FoodDTO, type Meal, type MealEntryDTO } from "@fitfloow/core";
 import { Floo } from "../../mascot";
 import { fmtDate } from "../../lib/format";
 import { todayKey, trHour } from "../../lib/dates";
@@ -23,6 +23,7 @@ import { UndoBar } from "../../ui/UndoBar";
 import { CalorieHero } from "./components/CalorieHero";
 import { EnergyCard } from "./components/EnergyCard";
 import { NutritionGoalStrip } from "./components/NutritionGoalStrip";
+import { QuickAddBar } from "./components/QuickAddBar";
 import { WaterCard } from "./components/WaterCard";
 import { DayPager } from "./components/DayPager";
 import { Fab, FAB_SIZE } from "./components/Fab";
@@ -156,6 +157,15 @@ export function NutritionScreen() {
     [addEntries, toast]
   );
 
+  /* Quick add: one usual serving of a recent food into the meal of the hour. */
+  const onQuickAdd = useCallback(
+    (food: FoodDTO, meal: Meal) => {
+      void haptic.success();
+      addEntry.mutate({ meal, grams: food.defaultServingG, food, source: "recent" }, { onSuccess: () => toast.show({ message: `${food.name} eklendi`, kind: "success" }) });
+    },
+    [addEntry, toast]
+  );
+
   const onEditEntry = useCallback((entry: MealEntryDTO) => setSheet({ kind: "grams", entry }), []);
 
   /* Delete leaves at once (optimistic); the undo bar re-adds the same food and grams. */
@@ -207,16 +217,19 @@ export function NutritionScreen() {
           </Entry>
           <View style={styles.heroGap} />
           <Entry index={2}>
+            <QuickAddBar meal={defaultMeal} onAdd={onQuickAdd} />
+          </Entry>
+          <Entry index={3}>
             <WaterCard dateKey={dateKey} />
           </Entry>
           <View style={styles.heroGap} />
-          <Entry index={3}>
+          <Entry index={4}>
             <EnergyCard onSetGoal={goSetGoal} onAddMeasurement={goBody} />
           </Entry>
           <View style={styles.heroGap} />
         </View>
       ) : null,
-    [day.data, dateKey, goBody, goRoadmap, goSetGoal, openTarget, today]
+    [day.data, dateKey, defaultMeal, goBody, goRoadmap, goSetGoal, onQuickAdd, openTarget, today]
   );
 
   if (day.isError && !day.data) {
