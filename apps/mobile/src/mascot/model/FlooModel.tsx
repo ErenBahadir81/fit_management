@@ -3,6 +3,7 @@ import { View, type StyleProp, type ViewStyle } from "react-native";
 import { Blur, Canvas, Circle, Group, Oval, Path, Rect } from "@shopify/react-native-skia";
 import {
   Easing,
+  ReduceMotion,
   runOnJS,
   useAnimatedReaction,
   useDerivedValue,
@@ -305,8 +306,12 @@ export function FlooModel({
     const p: FlooParams = MOOD_PARAMS[mood];
     // Reduced motion: a cross-fade, eased at both ends — the face over ≈ ¼ s, the body's shape
     // a little slower, so nothing about the silhouette changes in one frame.
-    const soft = (v: number) => (reduce ? withTiming(v, { duration: 240, easing: Easing.inOut(Easing.quad) }) : withSpring(v, springs.gentle));
-    const body = (v: number) => (reduce ? withTiming(v, { duration: 360, easing: Easing.inOut(Easing.quad) }) : withSpring(v, springs.bouncy));
+    // `ReduceMotion.Never`: Reanimated would otherwise jump straight to the end under the system
+    // setting, and these fades are the reduced-motion version already.
+    const soft = (v: number) =>
+      reduce ? withTiming(v, { duration: 240, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.Never }) : withSpring(v, springs.gentle);
+    const body = (v: number) =>
+      reduce ? withTiming(v, { duration: 360, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.Never }) : withSpring(v, springs.bouncy);
     squash.set(body(p.squash));
     lean.set(body(p.lean));
     hop.set(body(p.hop));
@@ -321,8 +326,10 @@ export function FlooModel({
     mouthCurve.set(soft(p.mouthCurve));
     mouthOpen.set(soft(p.mouthOpen));
     mouthWidth.set(soft(p.mouthWidth));
-    blush.set(withTiming(p.blush, { duration: 320, easing: Easing.out(Easing.cubic) }));
-    brightness.set(withTiming(p.brightness, { duration: 320, easing: Easing.out(Easing.cubic) }));
+    // Colour changes touch every pixel of the body, so under reduced motion they ease in too.
+    const tint = { duration: 320, easing: reduce ? Easing.inOut(Easing.quad) : Easing.out(Easing.cubic), reduceMotion: ReduceMotion.Never };
+    blush.set(withTiming(p.blush, tint));
+    brightness.set(withTiming(p.brightness, tint));
     tempo.set(withTiming(p.tempo, { duration: 320, easing: Easing.out(Easing.cubic) }));
     browWeight.set(withTiming(MOOD_BROW_WEIGHT[mood], { duration: 320, easing: Easing.out(Easing.cubic) }));
     moodRig.set(MOOD_RIG[mood]);
