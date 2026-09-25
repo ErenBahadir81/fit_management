@@ -41,8 +41,10 @@ export function GoalFeedback() {
   const reduce = useReducedMotion();
   useEffect(() => {
     const since = awaiting.current;
-    if (since == null || updatedAt <= since || !feedback) return;
+    if (since == null || updatedAt <= since) return;
     awaiting.current = null;
+    // Only the refetch the measurement caused; a late one (the first failed) is not a reaction.
+    if (!feedback || updatedAt - since > 15_000) return;
     say({ text: feedback.textTr, mood: toFlooMood(feedback.mood), priority: "high", tone: feedback.tone === "attention" ? "warning" : feedback.tone === "positive" ? "success" : "neutral", dedupeKey: `goal:feedback:${updatedAt}` });
     if (!reduce) bump.value = withSequence(withTiming(1.04, { duration: 140 }), withSpring(1, springs.bouncy));
   }, [updatedAt, feedback, say, bump, reduce]);

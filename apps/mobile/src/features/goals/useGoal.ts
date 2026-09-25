@@ -166,6 +166,7 @@ export function useAnswerAdjustment() {
     onError: (e) => {
       // A stale proposal (already answered elsewhere) is not worth an error: just refresh.
       void qc.invalidateQueries({ queryKey: GOAL_KEY });
+      if ((e as { code?: string } | null)?.code === "ADJUSTMENT_STALE") return;
       toast.show({ message: describeError(e, "Öneri uygulanamadı. Tekrar dene."), kind: "error" });
     },
   });
