@@ -582,11 +582,11 @@ export const SPRING = (() => {
 
 /**
  * Reduced motion: every channel on the same critically damped spring. It starts from rest, so a
- * pose change eases in and out over ≈ 250 ms, and it never overshoots — a cross-fade between poses
+ * pose change eases in and out over ≈ 350 ms, and it never overshoots — a cross-fade between poses
  * with no travel past the target, no bounce and no whip.
  */
 export const SPRING_REDUCED = {
-  k: new Array<number>(CHANNEL_COUNT).fill(520),
+  k: new Array<number>(CHANNEL_COUNT).fill(150),
   z: new Array<number>(CHANNEL_COUNT).fill(1),
 };
 
