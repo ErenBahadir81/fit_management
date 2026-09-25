@@ -19,6 +19,7 @@ import { Text } from "../../ui/Text";
 import { useToast } from "../../ui/Toast";
 import { UndoBar } from "../../ui/UndoBar";
 import { useSession } from "../auth/session";
+import { GoalFeedback } from "../goals/components/GoalFeedback";
 import { useGoalView } from "../goals/useGoal";
 import { CURRENT_WEEK, useWeeklyReport } from "../reports/useReport";
 import { weighInDefault } from "./bodyMath";
@@ -149,6 +150,9 @@ function BodyHeader({ summary, trendsData, goal, report, entries, rowCount, onAd
       </Entry>
       <Entry index={1}>
         <QuickWeighIn summary={summary} />
+      </Entry>
+      <Entry index={2}>
+        <GoalFeedback />
       </Entry>
       <Entry index={2}>
         <TrendsCard goalWeightKg={goalWeight} />
