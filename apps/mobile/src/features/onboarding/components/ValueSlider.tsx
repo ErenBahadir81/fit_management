@@ -8,6 +8,7 @@ import { useTheme } from "../../../theme/ThemeProvider";
 import { springs, timing } from "../../../theme/motion";
 import { radii, spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
+import { BOING, usePop } from "./Juice";
 
 export interface ValueSliderProps {
   value: number;
@@ -80,20 +81,22 @@ export const ValueSlider = forwardRef<View, ValueSliderProps>(function ValueSlid
     .enabled(!disabled)
     .minDistance(0)
     .onBegin((e) => {
-      active.set(withSpring(1, springs.snappy));
+      active.set(reduce ? withTiming(1, timing.reduced) : withSpring(1, BOING));
       follow(e.x);
     })
     .onUpdate((e) => follow(e.x))
     .onFinalize(() => {
-      active.set(withSpring(0, springs.snappy));
+      active.set(reduce ? withTiming(0, timing.reduced) : withSpring(0, BOING));
       const target = ((last.get() - min) / range) * usable;
       x.set(reduce ? withTiming(target, timing.reduced) : withSpring(target, springs.snappy));
       runOnJS(release)();
     });
 
-  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }, { scale: 1 + active.get() * 0.18 }] }));
+  const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }, { scale: 1 + active.get() * 0.45 }] }));
   const fill = useAnimatedStyle(() => ({ width: x.get() + THUMB / 2 }));
-  const bubble = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() + THUMB / 2 }, { translateY: -active.get() * 6 }], opacity: 0.7 + active.get() * 0.3 }));
+  const bubble = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() + THUMB / 2 }, { translateY: -active.get() * 14 }, { scale: 1 + active.get() * 0.2 }], opacity: 0.7 + active.get() * 0.3 }));
+  // Every grid step the value bubble boings, so each tick is felt as well as heard.
+  const tickPop = usePop(value, { amount: 0.18 });
 
   const onAction = (e: AccessibilityActionEvent) => {
     const dir = e.nativeEvent.actionName === "increment" ? 1 : e.nativeEvent.actionName === "decrement" ? -1 : 0;
@@ -124,11 +127,11 @@ export const ValueSlider = forwardRef<View, ValueSliderProps>(function ValueSlid
     >
       <View style={styles.labelRow} pointerEvents="none">
         <Animated.View style={[styles.floating, bubble]}>
-          <View style={[styles.bubble, { backgroundColor: colors.ink }]}>
+          <Animated.View style={[styles.bubble, { backgroundColor: colors.ink }, tickPop]}>
             <Text variant="label" color="inkInverse" tabular testID={testID ? `${testID}-value` : undefined}>
               {format(value)}
             </Text>
-          </View>
+          </Animated.View>
         </Animated.View>
       </View>
       <GestureDetector gesture={pan}>
