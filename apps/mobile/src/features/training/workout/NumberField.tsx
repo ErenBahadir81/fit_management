@@ -4,6 +4,7 @@ import { clamp, round } from "@fitfloow/core";
 import { fmtNumber } from "../../../lib/format";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing, tabularNums } from "../../../theme/tokens";
+import { Pop } from "../../../ui/Juice";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
 
@@ -42,7 +43,8 @@ function display(value: number | null, decimals: number): string {
 /**
  * A number you type, not a number you tap towards. The digits *are* the target: one tap opens the
  * numeric pad with the value selected, so 8 → 12 is one gesture instead of four. The −/+ row stays
- * for the common nudge (one plate, one rep) but it is never the only way in.
+ * for the common nudge (one plate, one rep) but it is never the only way in. Every new value
+ * boings the box.
  */
 export function NumberField({ value, onChange, unit, label, min = 0, max = 9999, step, decimals = 1, size = "lg", emphasis, style, testID }: NumberFieldProps) {
   const { colors, type } = useTheme();
@@ -82,45 +84,57 @@ export function NumberField({ value, onChange, unit, label, min = 0, max = 9999,
       <Text variant="caption" color="inkMuted">
         {label}
       </Text>
-      <Pressable
-        onPress={() => input.current?.focus()}
-        haptic="none"
-        minTarget={false}
-        // The box only widens the tap area; VoiceOver should land on the input itself.
-        accessible={false}
-        importantForAccessibility="no"
-        style={[
-          styles.box,
-          big ? styles.boxLg : styles.boxSm,
-          { backgroundColor: colors.surfaceMuted, borderColor: emphasis ? colors.primary : colors.border },
-        ]}
-      >
-        <TextInput
-          ref={input}
-          value={shown}
-          onChangeText={onChangeText}
-          onFocus={() => setDraft(display(value, decimals))}
-          onBlur={() => setDraft(null)}
-          keyboardType={decimals > 0 ? "decimal-pad" : "number-pad"}
-          inputMode={decimals > 0 ? "decimal" : "numeric"}
-          selectTextOnFocus
-          returnKeyType="done"
-          placeholder="—"
-          placeholderTextColor={colors.inkSubtle}
-          maxFontSizeMultiplier={1.2}
-          accessibilityLabel={spoken}
-          testID={testID ? `${testID}-input` : undefined}
-          style={[big ? type.hero : type.heading, tabularNums, styles.input, { color: colors.ink }]}
-        />
-        <Text variant={big ? "label" : "caption"} color="inkMuted">
-          {unit}
-        </Text>
-      </Pressable>
+      <Pop trigger={value} amount={0.06}>
+        <Pressable
+          onPress={() => input.current?.focus()}
+          haptic="none"
+          minTarget={false}
+          // The box only widens the tap area; VoiceOver should land on the input itself.
+          accessible={false}
+          importantForAccessibility="no"
+          style={[
+            styles.box,
+            big ? styles.boxLg : styles.boxSm,
+            { backgroundColor: colors.surfaceMuted, borderColor: emphasis ? colors.primary : colors.border },
+          ]}
+        >
+          <TextInput
+            ref={input}
+            value={shown}
+            onChangeText={onChangeText}
+            onFocus={() => setDraft(display(value, decimals))}
+            onBlur={() => setDraft(null)}
+            keyboardType={decimals > 0 ? "decimal-pad" : "number-pad"}
+            inputMode={decimals > 0 ? "decimal" : "numeric"}
+            selectTextOnFocus
+            returnKeyType="done"
+            placeholder="—"
+            placeholderTextColor={colors.inkSubtle}
+            maxFontSizeMultiplier={1.2}
+            accessibilityLabel={spoken}
+            testID={testID ? `${testID}-input` : undefined}
+            style={[big ? type.hero : type.heading, tabularNums, styles.input, { color: colors.ink }]}
+          />
+          <Text variant={big ? "label" : "caption"} color="inkMuted">
+            {unit}
+          </Text>
+        </Pressable>
+      </Pop>
 
       {step !== undefined ? (
         <View style={styles.nudges}>
-          <Nudge label={`−${fmtNumber(step, step % 1 === 0 ? 0 : 1)}`} spoken={`${label} azalt`} onPress={() => nudge(-1)} testID={testID ? `${testID}-dec` : undefined} />
-          <Nudge label={`+${fmtNumber(step, step % 1 === 0 ? 0 : 1)}`} spoken={`${label} artır`} onPress={() => nudge(1)} testID={testID ? `${testID}-inc` : undefined} />
+          <Nudge
+            label={`−${fmtNumber(step, step % 1 === 0 ? 0 : 1)}`}
+            spoken={`${label} azalt`}
+            onPress={() => nudge(-1)}
+            testID={testID ? `${testID}-dec` : undefined}
+          />
+          <Nudge
+            label={`+${fmtNumber(step, step % 1 === 0 ? 0 : 1)}`}
+            spoken={`${label} artır`}
+            onPress={() => nudge(1)}
+            testID={testID ? `${testID}-inc` : undefined}
+          />
         </View>
       ) : null}
     </View>
@@ -130,7 +144,13 @@ export function NumberField({ value, onChange, unit, label, min = 0, max = 9999,
 function Nudge({ label, spoken, onPress, testID }: { label: string; spoken: string; onPress: () => void; testID?: string }) {
   const { colors } = useTheme();
   return (
-    <Pressable onPress={onPress} haptic="select" accessibilityLabel={spoken} testID={testID} style={[styles.nudge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <Pressable
+      onPress={onPress}
+      haptic="select"
+      accessibilityLabel={spoken}
+      testID={testID}
+      style={[styles.nudge, { backgroundColor: colors.surface, borderColor: colors.border }]}
+    >
       <Text variant="label" color="inkMuted" tabular>
         {label}
       </Text>
@@ -140,7 +160,15 @@ function Nudge({ label, spoken, onPress, testID }: { label: string; spoken: stri
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
-  box: { flexDirection: "row", alignItems: "baseline", justifyContent: "center", gap: spacing.xs, borderRadius: radii.control, borderWidth: 1.5, paddingHorizontal: spacing.sm },
+  box: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: radii.control,
+    borderWidth: 1.5,
+    paddingHorizontal: spacing.sm,
+  },
   boxLg: { minHeight: 72 },
   boxSm: { minHeight: 52 },
   // `flex: 0` keeps the digits and the unit together in the middle instead of the input eating the row.

@@ -6,7 +6,7 @@ import { spacing } from "../../../theme/tokens";
 import { DatePicker } from "../../../ui/DatePicker";
 import { Stepper } from "../../../ui/Stepper";
 import { ChoiceList } from "../components/ChoiceList";
-import { Pop } from "../components/Juice";
+import { Pop } from "../../../ui/Juice";
 import { DEFAULT_HEIGHT_CM } from "../model";
 import type { Onboarding } from "../useOnboarding";
 import { Question } from "./Question";
