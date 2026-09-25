@@ -270,6 +270,7 @@ export function answerAdjustment(
     tdeeOverride: chosen.change.tdeeOverride !== undefined ? chosen.change.tdeeOverride : goal.tdeeOverride,
     targetBodyFatPct: chosen.change.targetBodyFatPct ?? goal.targetBodyFatPct,
     targetLeanGainKg: chosen.change.targetLeanGainKg ?? goal.targetLeanGainKg,
+    profile: chosen.change.profile ?? goal.profile,
     updatedAt: at,
   };
   const stored = { ...record, after: planSnapshot(plan, next) };
