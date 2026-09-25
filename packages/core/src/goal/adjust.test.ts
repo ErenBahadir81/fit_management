@@ -166,6 +166,23 @@ describe("proposeGoalAdjustment — cut", () => {
     expect(p.messageTr).toContain("gerisinde");
   });
 
+  it("behind on a cut: keepDate is offered only inside the safety limits, else Floo says so", () => {
+    const pts = weighIns(cutGoal, 35, (d) => Math.min(1.2, 0.05 * d));
+    const p = propose(cutGoal, pts, 35)!;
+    const keep = p.options.find((o) => o.action === "keepDate");
+    if (keep) {
+      expect(keep.recommended).toBe(false);
+      expect(keep.after!.targetDate <= p.before.targetDate).toBe(true);
+      expect(keep.change.profile).toBe(cutGoal.profile === "conservative" ? "optimal" : "aggressive");
+      expect(p.messageTr).toContain("tarihi koruyabiliriz");
+    } else {
+      expect(p.messageTr).toContain("güvenli sınırları aşar");
+    }
+    // Already at the fastest pace: never offered.
+    const fast = propose({ ...cutGoal, profile: "aggressive" }, pts, 35)!;
+    expect(fast.options.some((o) => o.action === "keepDate")).toBe(false);
+  });
+
   it("behind uses a measured TDEE when an applied recalibration found a lower one", () => {
     const pts = weighIns(cutGoal, 35, (d) => Math.min(1.2, 0.05 * d));
     const tdeeNow = tdeeAtDay(cutGoal, 35);

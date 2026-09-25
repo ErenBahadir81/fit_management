@@ -6,7 +6,8 @@ import { cx } from "@/lib/cx";
 
 /**
  * Floo — the FitFloow mascot (docs/plan/09-mascot.md).
- * A round violet flame-drop: body gradient #6D5DF6 → #8B7CFF, cheeks #FFB4C6, eyes #0F141C.
+ * A round blue drop in the mobile palette (FLOO_COLORS): body gradient #44A1CD → #93D9F9,
+ * limbs #52B6DE, cheeks #FF9DB4, eyes #141A26.
  * The admin panel renders him static-ish (a slow breathe that `prefers-reduced-motion` stops);
  * the expressive springs live on mobile.
  */
@@ -38,8 +39,8 @@ export function Floo({
     >
       <defs>
         <linearGradient id={bodyId} x1="20" y1="8" x2="86" y2="116" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#8B7CFF" />
-          <stop offset="1" stopColor="#6D5DF6" />
+          <stop offset="0" stopColor="#93D9F9" />
+          <stop offset="1" stopColor="#44A1CD" />
         </linearGradient>
         <radialGradient id={glowId} cx="0.32" cy="0.28" r="0.5">
           <stop offset="0" stopColor="#ffffff" stopOpacity="0.55" />
@@ -50,18 +51,18 @@ export function Floo({
       {/* arms */}
       {mood === "flex" ? (
         <>
-          <path d="M14 74 C 4 70, 2 58, 10 52 C 14 58, 18 64, 20 70 Z" fill="#5B4CE0" />
-          <path d="M86 74 C 96 70, 98 58, 90 52 C 86 58, 82 64, 80 70 Z" fill="#5B4CE0" />
+          <path d="M14 74 C 4 70, 2 58, 10 52 C 14 58, 18 64, 20 70 Z" fill="#52B6DE" />
+          <path d="M86 74 C 96 70, 98 58, 90 52 C 86 58, 82 64, 80 70 Z" fill="#52B6DE" />
         </>
       ) : mood === "cheer" ? (
         <>
-          <path d="M16 70 C 6 62, 6 50, 14 46 C 18 54, 20 62, 22 68 Z" fill="#5B4CE0" />
-          <path d="M84 70 C 94 62, 94 50, 86 46 C 82 54, 80 62, 78 68 Z" fill="#5B4CE0" />
+          <path d="M16 70 C 6 62, 6 50, 14 46 C 18 54, 20 62, 22 68 Z" fill="#52B6DE" />
+          <path d="M84 70 C 94 62, 94 50, 86 46 C 82 54, 80 62, 78 68 Z" fill="#52B6DE" />
         </>
       ) : (
         <>
-          <ellipse cx="12" cy="82" rx="7" ry="9" fill="#5B4CE0" />
-          <ellipse cx="88" cy="82" rx="7" ry="9" fill="#5B4CE0" />
+          <ellipse cx="12" cy="82" rx="7" ry="9" fill="#52B6DE" />
+          <ellipse cx="88" cy="82" rx="7" ry="9" fill="#52B6DE" />
         </>
       )}
 
@@ -76,8 +77,8 @@ export function Floo({
       />
 
       {/* cheeks */}
-      <ellipse cx="27" cy="88" rx="7" ry="4.5" fill="#FFB4C6" opacity={mood === "sleepy" ? 0.5 : 0.85} />
-      <ellipse cx="73" cy="88" rx="7" ry="4.5" fill="#FFB4C6" opacity={mood === "sleepy" ? 0.5 : 0.85} />
+      <ellipse cx="27" cy="88" rx="7" ry="4.5" fill="#FF9DB4" opacity={mood === "sleepy" ? 0.5 : 0.85} />
+      <ellipse cx="73" cy="88" rx="7" ry="4.5" fill="#FF9DB4" opacity={mood === "sleepy" ? 0.5 : 0.85} />
 
       <Eyes mood={mood} />
       <Mouth mood={mood} />
@@ -87,7 +88,7 @@ export function Floo({
 }
 
 function Eyes({ mood }: { mood: Mood }) {
-  const dark = "#0F141C";
+  const dark = "#141A26";
   if (mood === "cheer") {
     return (
       <g fill="none" stroke={dark} strokeWidth="4" strokeLinecap="round">
@@ -119,7 +120,7 @@ function Eyes({ mood }: { mood: Mood }) {
 }
 
 function Mouth({ mood }: { mood: Mood }) {
-  const dark = "#0F141C";
+  const dark = "#141A26";
   switch (mood) {
     case "cheer":
       return <path d="M42 92 q 8 10 16 0 q -8 4 -16 0 Z" fill={dark} />;
@@ -138,7 +139,7 @@ function Mouth({ mood }: { mood: Mood }) {
 
 function Brows({ mood }: { mood: Mood }) {
   if (mood !== "worried" && mood !== "think" && mood !== "flex") return null;
-  const stroke = "#0F141C";
+  const stroke = "#141A26";
   if (mood === "worried") {
     return (
       <g fill="none" stroke={stroke} strokeWidth="3" strokeLinecap="round" opacity="0.9">

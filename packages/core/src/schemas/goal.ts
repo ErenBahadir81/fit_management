@@ -134,6 +134,12 @@ export const zGoalAdjustmentAction = z.enum([
   "tighten",
   /** Lower daily calories (a bigger deficit on a cut, a smaller surplus on a bulk). */
   "lowerCalories",
+  /**
+   * Behind on a cut: re-plan at the next faster pace profile (and the measured TDEE) so the original
+   * date still holds. Offered only when that plan stays inside the safety limits (calorie floor,
+   * Alpert cap) and really keeps the date.
+   */
+  "keepDate",
   /** Raise daily calories (bigger surplus on a bulk, smaller deficit when a cut/recomp runs too fast). */
   "raiseCalories",
   /** Goal reached: close it. */
@@ -179,6 +185,8 @@ export const zGoalAdjustmentOption = z.object({
     tdeeOverride: z.number().nullable().optional(),
     targetBodyFatPct: z.number().optional(),
     targetLeanGainKg: z.number().optional(),
+    /** `keepDate`: the faster pace profile the plan switches to. */
+    profile: zGoalProfile.optional(),
   }),
 });
 export type GoalAdjustmentOption = z.infer<typeof zGoalAdjustmentOption>;
