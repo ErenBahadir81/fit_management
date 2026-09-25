@@ -18,7 +18,7 @@ import Animated, {
  *
  * Everything is driven by shared values from an effect, not by `entering` layout animations:
  * Reanimated implements those on web by switching the element to `position: absolute`, which
- * lifts these blocks out of flow and piles them on top of each other (see `ui/Entry`).
+ * lifts these blocks out of flow and piles them on top of each other (see `Entry`).
  */
 
 /** A loose, overshooting spring: the "boing" that ends each animation. */
@@ -63,15 +63,18 @@ export function DropIn({ index = 0, style, children, testID }: { index?: number;
   );
 }
 
-/** Spins and slams in on mount: for the check mark of a picked answer, or a result arriving. */
-export function SlamIn({ spin = true, style, children }: { spin?: boolean; style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+/**
+ * Spins and slams in on mount: for the check mark of a picked answer, or a result arriving. `peak`
+ * is how far past full size it overshoots (a whole row wants far less than an icon).
+ */
+export function SlamIn({ spin = true, peak = 1.4, style, children }: { spin?: boolean; peak?: number; style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
   const reduce = useReducedMotion();
   const s = useSharedValue(reduce ? 1 : 0);
   const o = useSharedValue(0);
   useEffect(() => {
     o.set(withTiming(1, { duration: reduce ? 150 : 90 }));
-    if (!reduce) s.set(withSequence(withTiming(1.4, { duration: 160, easing: out }), withSpring(1, BOING)));
-  }, [reduce, o, s]);
+    if (!reduce) s.set(withSequence(withTiming(peak, { duration: 160, easing: out }), withSpring(1, BOING)));
+  }, [reduce, peak, o, s]);
   const slam = useAnimatedStyle(() => ({
     opacity: o.get(),
     transform: [{ scale: s.get() }, { rotate: spin ? `${(1 - Math.min(s.get(), 1)) * -120}deg` : "0deg" }],

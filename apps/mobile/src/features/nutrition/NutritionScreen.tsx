@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { List, type ListRenderItem } from "../../ui/List";
 import { useRouter } from "expo-router";
-import type { Meal, MealEntryDTO } from "@fitfloow/core";
+import { shiftKey, type Meal, type MealEntryDTO } from "@fitfloow/core";
 import { Floo } from "../../mascot";
 import { fmtDate } from "../../lib/format";
 import { todayKey, trHour } from "../../lib/dates";
@@ -31,13 +31,13 @@ import { buildDayRows, type DayRow } from "./components/dayRows";
 import { NutritionSkeleton } from "./NutritionSkeleton";
 import { ProgressView } from "./ProgressView";
 import { WeekSkeleton, WeekView } from "./WeekView";
-import { mealForHour } from "./model/meals";
+import { MEAL_LABEL, mealForHour } from "./model/meals";
 import { AddSheet, type AddAction } from "./sheets/AddSheet";
 import { BarcodeScanner } from "./sheets/BarcodeScanner";
 import { GramsSheet } from "./sheets/GramsSheet";
 import { SearchSheet, type SearchAddInput } from "./sheets/SearchSheet";
 import { TargetSheet } from "./sheets/TargetSheet";
-import { useAddEntry, useDayRange, useDeleteEntry, useNutritionDay, useNutritionTarget, useNutritionWeek, useSetTarget, useUpdateEntry } from "./useNutrition";
+import { useAddEntries, useAddEntry, useDayRange, useDeleteEntry, useNutritionDay, useNutritionTarget, useNutritionWeek, useSetTarget, useUpdateEntry } from "./useNutrition";
 
 type SheetState =
   | null
@@ -69,19 +69,21 @@ export function NutritionScreen() {
   const lastY = useRef(0);
 
   const day = useNutritionDay(dateKey);
+  const previousDay = useNutritionDay(shiftKey(dateKey, -1));
   const week = useNutritionWeek(dateKey);
   const target = useNutritionTarget();
   const days = useDayRange(dateKey);
   const today = todayKey();
 
   const addEntry = useAddEntry(dateKey);
+  const addEntries = useAddEntries(dateKey);
   const updateEntry = useUpdateEntry(dateKey);
   const deleteEntry = useDeleteEntry(dateKey);
   const setTarget = useSetTarget();
   const undoWindow = useUndoWindow<MealEntryDTO>(noCommit);
 
   const loggedKeys = useMemo(() => new Set((week.data?.days ?? []).filter((d) => d.logged).map((d) => d.dateKey)), [week.data]);
-  const rows = useMemo(() => buildDayRows(day.data), [day.data]);
+  const rows = useMemo(() => buildDayRows(day.data, previousDay.data), [day.data, previousDay.data]);
   const defaultMeal = useMemo(() => mealForHour(trHour()), []);
 
   /**
@@ -136,6 +138,24 @@ export function NutritionScreen() {
     [addEntry, toast]
   );
 
+  /* "Dünkü gibi": the same foods and grams as that meal yesterday, in one tap. */
+  const onRepeatMeal = useCallback(
+    (meal: Meal, entries: MealEntryDTO[]) => {
+      if (entries.length === 0 || addEntries.isPending) return;
+      addEntries.mutate(
+        entries.map((e) => ({ meal, grams: e.grams, foodId: e.foodId, custom: { name: e.name, per100g: e.per100g }, source: "recent" as const })),
+        {
+          onSuccess: () => {
+            void haptic.success();
+            toast.show({ message: `Dünkü ${MEAL_LABEL[meal].toLocaleLowerCase("tr")} eklendi`, kind: "success" });
+          },
+          onError: () => toast.show({ message: "Ekleyemedim, tekrar dener misin?", kind: "error" }),
+        }
+      );
+    },
+    [addEntries, toast]
+  );
+
   const onEditEntry = useCallback((entry: MealEntryDTO) => setSheet({ kind: "grams", entry }), []);
 
   /* Delete leaves at once (optimistic); the undo bar re-adds the same food and grams. */
@@ -162,12 +182,12 @@ export function NutritionScreen() {
         case "entry":
           return <EntryRow entry={item.entry} onPress={onEditEntry} onDelete={onDeleteEntry} />;
         case "empty":
-          return <MealEmptyRow meal={item.meal} />;
+          return <MealEmptyRow meal={item.meal} repeat={item.repeat} onRepeat={onRepeatMeal} />;
         default:
           return <MealAddRow meal={item.meal} onPress={openAdd} />;
       }
     },
-    [onDeleteEntry, onEditEntry, openAdd]
+    [onDeleteEntry, onEditEntry, onRepeatMeal, openAdd]
   );
   const listStyle = useMemo(() => ({ paddingHorizontal: spacing.gutter, paddingTop: spacing.lg, paddingBottom: tabSpace + spacing.huge }), [tabSpace]);
   const weekStyle = useMemo(() => [styles.weekContent, { paddingBottom: tabSpace + spacing.huge }], [tabSpace]);

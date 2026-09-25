@@ -44,7 +44,8 @@ export function AdjustmentCard({ proposal, onAccept, onDismiss, busy }: Adjustme
 
   return (
     <Card style={styles.card} testID="goal-adjustment" accessibilityLabel={`${proposal.titleTr}. ${proposal.messageTr}`}>
-      <Pop>
+      {/* Keyed so a new proposal pops again. */}
+      <Pop key={proposal.id}>
         <View style={styles.head}>
           <Icon icon="goal" size={18} color="primary" />
           <Text variant="label" color="inkMuted" style={styles.flex}>

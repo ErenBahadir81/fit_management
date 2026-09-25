@@ -7,6 +7,7 @@ import { spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { Card } from "../../../ui/Card";
 import { Icon } from "../../../ui/Icon";
+import { Pop } from "../../../ui/Juice";
 import { Stepper } from "../../../ui/Stepper";
 import { Text } from "../../../ui/Text";
 import { weighInDefault } from "../bodyMath";
@@ -49,16 +50,21 @@ export function QuickWeighIn({ summary }: { summary: BodySummary }) {
         </Text>
       </View>
       <View style={styles.row}>
-        <Stepper value={value} onChange={setValue} step={0.1} min={25} max={400} format={fmtWeight} label="Kilo" testID="weighin-stepper" />
-        <Button
-          label={saved ? "Kaydedildi" : todays ? "Güncelle" : "Kaydet"}
-          icon={saved ? "checkmark" : undefined}
-          onPress={save}
-          loading={mutation.isPending}
-          disabled={saved}
-          testID="weighin-save"
-          style={styles.btn}
-        />
+        <Pop trigger={value} amount={0.06}>
+          <Stepper value={value} onChange={setValue} step={0.1} min={25} max={400} format={fmtWeight} label="Kilo" testID="weighin-stepper" />
+        </Pop>
+        {/* Saving boings the button as it turns into "Kaydedildi". */}
+        <Pop trigger={saved} when={saved} amount={0.14}>
+          <Button
+            label={saved ? "Kaydedildi" : todays ? "Güncelle" : "Kaydet"}
+            icon={saved ? "checkmark" : undefined}
+            onPress={save}
+            loading={mutation.isPending}
+            disabled={saved}
+            testID="weighin-save"
+            style={styles.btn}
+          />
+        </Pop>
       </View>
     </Card>
   );

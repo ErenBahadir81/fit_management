@@ -5,7 +5,7 @@ import { radii, spacing } from "../../../theme/tokens";
 import { Icon } from "../../../ui/Icon";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
-import { Pop, SlamIn } from "./Juice";
+import { Pop, SlamIn } from "../../../ui/Juice";
 
 export interface ChoiceOption<T extends string> {
   value: T;
