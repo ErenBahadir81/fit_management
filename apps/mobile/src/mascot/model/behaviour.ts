@@ -60,8 +60,9 @@ export const TRIGGER_PLAN: Record<Trigger, TriggerPlan> = {
   mealLogged: { mood: "happy", gesture: "bellyPat", effect: "hearts", hold: 1400 },
   goalHit: { mood: "celebrate", gesture: "cheer", effect: "confetti", hold: 1900 },
   streakUp: { mood: "celebrate", gesture: "fistPump", effect: "star", hold: 1600 },
-  // Falls, sits in it for a beat, gets back up. Never stays punished.
-  missedDay: { mood: "sad", gesture: "fallRecover", effect: null, hold: 1500, recover: "worried" },
+  // Falls, sits in it for a beat, gets back up. Never stays punished. The mood lifts to
+  // "worried" only once it is standing again (the get-up ends at ≈ 1.9 s).
+  missedDay: { mood: "sad", gesture: "fallRecover", effect: null, hold: 1900, recover: "worried" },
   overTarget: { mood: "worried", gesture: "whoa", effect: null, hold: 1500 },
   waterLogged: { mood: "happy", gesture: "drink", effect: "droplets", hold: 1500, hydration: 0.15 },
   setCompleted: { mood: "energetic", gesture: "flex", effect: null, hold: 1300 },

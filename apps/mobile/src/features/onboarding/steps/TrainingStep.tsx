@@ -31,11 +31,11 @@ export function TrainingStep({ o }: { o: Onboarding }) {
 
   return (
     <View style={styles.stack}>
-      <Question title="Günün ne kadar hareketli?" why="Günlük kalori ihtiyacın buna göre ölçekleniyor.">
+      <Question index={0} title="Günün ne kadar hareketli?" why="Günlük kalori ihtiyacın buna göre ölçekleniyor.">
         <ChoiceList options={ACTIVITY} value={t.activityLevel} onChange={(activityLevel) => setTraining({ activityLevel })} label="Hareket düzeyi" columns={2} testID="ob-activity" />
       </Question>
 
-      <Question title="Haftada kaç gün antrenman?" why="İlk programın bu kadar günle kurulacak; sonra dilediğin gibi değiştirirsin.">
+      <Question index={1} title="Haftada kaç gün antrenman?" why="İlk programın bu kadar günle kurulacak; sonra dilediğin gibi değiştirirsin.">
         <View style={styles.days} accessibilityRole="radiogroup" accessibilityLabel="Haftalık antrenman günü" testID="ob-days">
           {DAY_OPTIONS.map((n) => (
             <Chip
@@ -51,7 +51,7 @@ export function TrainingStep({ o }: { o: Onboarding }) {
         </View>
       </Question>
 
-      <Question title="Ne zamandır antrenman yapıyorsun?" why="Kas kazanma hızını ve programın zorluğunu belirliyor.">
+      <Question index={2} title="Ne zamandır antrenman yapıyorsun?" why="Kas kazanma hızını ve programın zorluğunu belirliyor.">
         <ChoiceList options={EXPERIENCE} value={t.experience} onChange={(experience) => setTraining({ experience })} label="Antrenman deneyimi" columns={2} testID="ob-experience" />
       </Question>
     </View>

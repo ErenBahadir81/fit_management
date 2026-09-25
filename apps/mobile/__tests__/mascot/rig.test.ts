@@ -16,7 +16,10 @@ import {
   UPPER_ARM,
   applyGesture,
   applyWalk,
+  loopCurve,
   armGeometry,
+  resolveFront,
+  FRONT_AT_IK,
   trackIkTargets,
   wristInBody,
   bodyToWorld,
@@ -304,6 +307,22 @@ describe("pose library", () => {
   });
 });
 
+describe("rig — idle loops by phase", () => {
+  test("loopCurve spans −1…1, is continuous across the wrap, and rises over `rise` of the cycle", () => {
+    let prev = loopCurve(0, 0.47);
+    expect(prev).toBeCloseTo(-1, 6);
+    expect(loopCurve(0.47, 0.47)).toBeCloseTo(1, 6);
+    for (let i = 1; i <= 1000; i++) {
+      const v = loopCurve(i / 1000, 0.47);
+      expect(v).toBeGreaterThanOrEqual(-1);
+      expect(v).toBeLessThanOrEqual(1);
+      expect(Math.abs(v - prev)).toBeLessThan(0.02);
+      prev = v;
+    }
+    expect(loopCurve(1.25, 0.47)).toBeCloseTo(loopCurve(0.25, 0.47), 9);
+  });
+});
+
 describe("rig — IK targets follow the hand while unused", () => {
   test("wristInBody is the FK wrist of the shoulder and elbow angles", () => {
     const v = REST.slice();
@@ -360,6 +379,52 @@ describe("rig — IK targets follow the hand while unused", () => {
     trackIkTargets(x, vel, tgt);
     expect(tgt[b + A.ikX]).toBe(80);
     expect(tgt[b + A.ikY]).toBe(200);
+  });
+
+  test("a reaching arm moves in front of the body only once the weight has brought the hand in, and back out the same way", () => {
+    const b = ARM_BASE.L;
+    const tgt = REST.slice();
+    tgt[b + A.ik] = 1;
+    tgt[b + A.front] = 1;
+    const x = REST.slice();
+    x[b + A.ik] = FRONT_AT_IK - 0.1;
+    resolveFront(x, tgt);
+    expect(x[b + A.front]).toBe(0);
+    x[b + A.ik] = FRONT_AT_IK + 0.1;
+    resolveFront(x, tgt);
+    expect(x[b + A.front]).toBe(1);
+    // Letting go: the pose no longer asks for front, but the hand is still over the belly.
+    tgt[b + A.ik] = 0;
+    tgt[b + A.front] = 0;
+    x[b + A.ik] = 0.6;
+    resolveFront(x, tgt);
+    expect(x[b + A.front]).toBe(1);
+    x[b + A.ik] = FRONT_AT_IK - 0.05;
+    resolveFront(x, tgt);
+    expect(x[b + A.front]).toBe(0);
+    // An FK pose that asks for front gets it at once.
+    const fk = REST.slice();
+    const t2 = REST.slice();
+    t2[ARM_BASE.R + A.front] = 1;
+    resolveFront(fk, t2);
+    expect(fk[ARM_BASE.R + A.front]).toBe(1);
+  });
+
+  test("a partial-weight gesture (an idle fidget) scales the reach, never the goal's position", () => {
+    const c = COMPILED[GESTURE_INDEX.scratchHead];
+    const out = REST.slice();
+    applyGesture(c, 800, out, 0.55);
+    expect(out[CH.R_ikX]).toBeCloseTo(158, 5);
+    expect(out[CH.R_ik]).toBeCloseTo(0.55, 5);
+  });
+
+  test("letting go of a gesture's reach on a mood that reaches itself travels home to the mood's goal", () => {
+    const c = COMPILED[GESTURE_INDEX.point];
+    const base = MOOD_RIG.worried;
+    const end = base.slice();
+    applyGesture(c, c.duration - 1, end);
+    expect(Math.abs(end[CH.R_ikX] - base[CH.R_ikX])).toBeLessThan(2);
+    expect(Math.abs(end[CH.R_ikY] - base[CH.R_ikY])).toBeLessThan(2);
   });
 
   test("compiled IK goals hold their authored values instead of travelling from the base pose", () => {
@@ -427,6 +492,7 @@ function simulate(g: (typeof GESTURES)[number], mood: (typeof MOODS)[number], ms
     applyGesture(c, t, tgt, 1);
     trackIkTargets(x, v, tgt);
     stepSprings(x, v, tgt, 0.016, SPRING.k, SPRING.z, SPRING.vmax);
+    resolveFront(x, tgt);
     const wrist = (side: "L" | "R") => {
       const b = ARM_BASE[side];
       const target = x[b + A.ik] > 0.001 ? { x: x[b + A.ikX], y: x[b + A.ikY] } : null;

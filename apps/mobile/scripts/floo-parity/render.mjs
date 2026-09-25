@@ -13,6 +13,7 @@ await p.goto(url); await p.waitForSelector('[data-testid="mood-happy"]', { timeo
 await p.click('[data-testid="mood-idle"]'); await p.click('[data-testid="hydration-100"]'); await p.mouse.move(5, 5);
 await p.evaluate(() => { const el = document.querySelector('[data-testid="floo-stage"]'); if (el) { el.style.backgroundColor = "#A0BAC7"; el.style.borderColor = "#A0BAC7"; } });
 await p.waitForTimeout(2200);
-const box = await (await p.$('canvas')).boundingBox();
-await p.screenshot({ path: out, clip: box });
+// The model's own canvas (the effect layers are canvases too), shot as an element: clicking the
+// hydration chip scrolls the page, so a page-coordinate clip can land outside the viewport.
+await p.locator('[data-testid="floo-model"] canvas').screenshot({ path: out });
 if (errs.length) console.log("console errors:", errs); await b.close();

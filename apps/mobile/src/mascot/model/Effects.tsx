@@ -68,6 +68,15 @@ interface Piece {
   delay: number;
 }
 
+/**
+ * A fixed pseudo-random number in [0, 1) for piece `i`, draw `k`. Render must stay pure, and a
+ * burst that looks the same every time is fine: nobody sees two side by side.
+ */
+function jitter(i: number, k: number): number {
+  const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+}
+
 function Confetti({ layer }: { layer: "back" | "front" }) {
   const reduce = useReducedMotion();
   // 12 behind, 4 in front — the split is what gives the burst depth.
@@ -76,12 +85,12 @@ function Confetti({ layer }: { layer: "back" | "front" }) {
     () =>
       Array.from({ length: count }, (_, i) => ({
         // Thrown up and *outward* from over the crown, then pulled down by the gravity term.
-        angle: -Math.PI / 2 + (Math.random() - 0.5) * 3.2,
-        speed: 80 + Math.random() * 120,
-        spin: (Math.random() - 0.5) * 900,
+        angle: -Math.PI / 2 + (jitter(i + count, 1) - 0.5) * 3.2,
+        speed: 80 + jitter(i + count, 2) * 120,
+        spin: (jitter(i + count, 3) - 0.5) * 900,
         color: CONFETTI_COLORS[(i * 2 + (layer === "front" ? 1 : 0)) % CONFETTI_COLORS.length],
-        size: (layer === "front" ? 8 : 6) + Math.random() * 6,
-        delay: Math.random() * 90,
+        size: (layer === "front" ? 8 : 6) + jitter(i + count, 4) * 6,
+        delay: jitter(i + count, 5) * 90,
       })),
     [count, layer]
   );
@@ -136,7 +145,7 @@ function Heart({ index, reduce }: { index: number; reduce: boolean }) {
   const fade = useSharedValue(0);
   // Left, right, left — always outside the silhouette, above the eye line.
   const side = useMemo(() => (index === 1 ? 1 : -1), [index]);
-  const drift = useMemo(() => side * (FACE_CLEARANCE + Math.random() * 22), [side]);
+  const drift = useMemo(() => side * (FACE_CLEARANCE + jitter(index, 6) * 22), [side, index]);
   React.useEffect(() => {
     const delay = index * 130;
     t.set(withDelay(delay, withTiming(1, { duration: 1100, easing: Easing.out(Easing.cubic) })));
@@ -171,8 +180,8 @@ function Droplets() {
     () =>
       Array.from({ length: 6 }, (_, i) => ({
         angle: -Math.PI / 2 + ((i - 2.5) / 2.5) * 1.15,
-        speed: 60 + Math.random() * 60,
-        size: 7 + Math.random() * 5,
+        speed: 60 + jitter(i, 7) * 60,
+        size: 7 + jitter(i, 8) * 5,
         delay: i * 26,
       })),
     []
