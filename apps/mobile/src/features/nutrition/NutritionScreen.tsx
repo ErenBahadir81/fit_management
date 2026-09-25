@@ -22,6 +22,7 @@ import { useToast } from "../../ui/Toast";
 import { UndoBar } from "../../ui/UndoBar";
 import { CalorieHero } from "./components/CalorieHero";
 import { EnergyCard } from "./components/EnergyCard";
+import { NutritionGoalStrip } from "./components/NutritionGoalStrip";
 import { WaterCard } from "./components/WaterCard";
 import { DayPager } from "./components/DayPager";
 import { Fab, FAB_SIZE } from "./components/Fab";
@@ -155,26 +156,30 @@ export function NutritionScreen() {
   const weekStyle = useMemo(() => [styles.weekContent, { paddingBottom: tabSpace + spacing.huge }], [tabSpace]);
   const goSetGoal = useCallback(() => router.push("/(modals)/goal/setup"), [router]);
   const goBody = useCallback(() => router.push("/(tabs)/body"), [router]);
-  /* The ring says how much is left today; the energy card says where that number came from. */
+  const goRoadmap = useCallback(() => router.push("/(modals)/goal/roadmap"), [router]);
+  /* The goal strip says what the calories are for; the ring says how much is left today; the energy card says where that number came from. */
   const listHeader = useMemo(
     () =>
       day.data ? (
         <View>
           <Entry index={0}>
+            <NutritionGoalStrip todayKey={today} onOpenRoadmap={goRoadmap} />
+          </Entry>
+          <Entry index={1}>
             <CalorieHero day={day.data} onPressTarget={openTarget} />
           </Entry>
           <View style={styles.heroGap} />
-          <Entry index={1}>
+          <Entry index={2}>
             <WaterCard dateKey={dateKey} />
           </Entry>
           <View style={styles.heroGap} />
-          <Entry index={2}>
+          <Entry index={3}>
             <EnergyCard onSetGoal={goSetGoal} onAddMeasurement={goBody} />
           </Entry>
           <View style={styles.heroGap} />
         </View>
       ) : null,
-    [day.data, dateKey, goBody, goSetGoal, openTarget]
+    [day.data, dateKey, goBody, goRoadmap, goSetGoal, openTarget, today]
   );
 
   if (day.isError && !day.data) {
