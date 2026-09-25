@@ -333,3 +333,20 @@ export function hoursToFullLabel(muscle: MuscleReadiness): string {
 export function jumpDates(todayKey: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => shiftKey(todayKey, i));
 }
+
+/** A muscle counts as one the exercise works when it carries at least half a set per set. */
+export const KEY_MUSCLE_MIN_LOAD = 0.5;
+/** The chip row under an exercise name stays one glance long. */
+export const KEY_MUSCLE_MAX = 4;
+
+/**
+ * The muscles worth naming under an exercise: the literature-average activation lists every
+ * muscle that fires (a push-up touches nine), but the person wants the ones the movement trains.
+ * Heaviest first, at least half a set of load, at most four; the single heaviest when none clear
+ * the bar, so a chip row is never empty for an exercise that has muscles at all.
+ */
+export function keyMuscles<T extends { key: string; load: number }>(muscles: readonly T[]): T[] {
+  const sorted = [...muscles].sort((a, b) => b.load - a.load);
+  const key = sorted.filter((m) => m.load >= KEY_MUSCLE_MIN_LOAD).slice(0, KEY_MUSCLE_MAX);
+  return key.length > 0 ? key : sorted.slice(0, 1);
+}
