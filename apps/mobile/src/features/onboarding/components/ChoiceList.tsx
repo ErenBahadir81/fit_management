@@ -1,10 +1,12 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Icon } from "../../../ui/Icon";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
+import { checkIn, Pop } from "./Juice";
 
 export interface ChoiceOption<T extends string> {
   value: T;
@@ -31,10 +33,11 @@ export interface ChoiceListProps<T extends string> {
 /**
  * One question, a few big answers. Each answer is a card (a 44 pt target and then some) that reads
  * as a radio button; the selected one gets the primary edge and a check, so the state never rests
- * on colour alone.
+ * on colour alone. Picking one squashes and boings the card and spins the check in.
  */
 export function ChoiceList<T extends string>({ options, value, onChange, label, columns = 1, testID }: ChoiceListProps<T>) {
   const { colors } = useTheme();
+  const reduce = useReducedMotion();
   const grid = columns === 2;
   const chosenHint = grid ? options.find((o) => o.value === value)?.hint : undefined;
   const hasHints = grid && options.some((o) => o.hint);
@@ -45,43 +48,49 @@ export function ChoiceList<T extends string>({ options, value, onChange, label, 
         {options.map((o) => {
           const selected = o.value === value;
           return (
-            <Pressable
-              key={o.value}
-              onPress={() => onChange(o.value)}
-              haptic="select"
-              accessibilityRole="radio"
-              accessibilityState={{ selected, checked: selected }}
-              accessibilityLabel={o.hint ? `${o.label}. ${o.hint}` : o.label}
-              testID={`${testID}-${o.value}`}
-              style={[
-                styles.card,
-                grid && styles.half,
-                { backgroundColor: selected ? colors.primarySoft : colors.surface, borderColor: selected ? colors.primary : colors.border },
-              ]}
-            >
-              <View style={styles.texts}>
-                <View style={styles.titleRow}>
-                  <Text variant="title" style={styles.title}>
-                    {o.label}
-                  </Text>
-                  {o.badge ? (
-                    <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                      <Text variant="caption" style={{ color: colors.onPrimary }}>
-                        {o.badge}
-                      </Text>
-                    </View>
+            <Pop key={o.value} trigger={selected} when={selected} amount={0.08} style={grid && styles.half}>
+              <Pressable
+                onPress={() => onChange(o.value)}
+                haptic="select"
+                scaleTo={0.93}
+                accessibilityRole="radio"
+                accessibilityState={{ selected, checked: selected }}
+                accessibilityLabel={o.hint ? `${o.label}. ${o.hint}` : o.label}
+                testID={`${testID}-${o.value}`}
+                style={[
+                  styles.card,
+                  grid && styles.halfCard,
+                  { backgroundColor: selected ? colors.primarySoft : colors.surface, borderColor: selected ? colors.primary : colors.border },
+                ]}
+              >
+                <View style={styles.texts}>
+                  <View style={styles.titleRow}>
+                    <Text variant="title" style={styles.title}>
+                      {o.label}
+                    </Text>
+                    {o.badge ? (
+                      <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                        <Text variant="caption" style={{ color: colors.onPrimary }}>
+                          {o.badge}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {o.hint && !grid ? (
+                    <Text variant="caption" color="inkMuted">
+                      {o.hint}
+                    </Text>
                   ) : null}
                 </View>
-                {o.hint && !grid ? (
-                  <Text variant="caption" color="inkMuted">
-                    {o.hint}
-                  </Text>
-                ) : null}
-              </View>
-              <View style={[styles.check, { borderColor: selected ? colors.primary : colors.controlBorder, backgroundColor: selected ? colors.primary : "transparent" }]}>
-                {selected ? <Icon icon="check" size={14} color="onPrimary" /> : null}
-              </View>
-            </Pressable>
+                <View style={[styles.check, { borderColor: selected ? colors.primary : colors.controlBorder, backgroundColor: selected ? colors.primary : "transparent" }]}>
+                  {selected ? (
+                    <Animated.View entering={checkIn(reduce)}>
+                      <Icon icon="check" size={14} color="onPrimary" />
+                    </Animated.View>
+                  ) : null}
+                </View>
+              </Pressable>
+            </Pop>
           );
         })}
       </View>
@@ -107,7 +116,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1.5,
   },
-  half: { flexGrow: 1, flexBasis: "40%", minHeight: 52, paddingVertical: spacing.sm },
+  half: { flexGrow: 1, flexBasis: "40%" },
+  halfCard: { minHeight: 52, paddingVertical: spacing.sm },
   chosenHint: { minHeight: 32 },
   texts: { flex: 1, gap: 2 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },

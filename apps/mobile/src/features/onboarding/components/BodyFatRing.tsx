@@ -1,11 +1,12 @@
 import React, { forwardRef } from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeOut, useReducedMotion } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut, Keyframe, useReducedMotion } from "react-native-reanimated";
 import { BODY_FAT_CATEGORY_TR, bodyFatCategory, type Gender } from "@fitfloow/core";
 import { fmtPct } from "../../../lib/format";
 import { spacing } from "../../../theme/tokens";
 import { Ring } from "../../../ui/Ring";
 import { Text } from "../../../ui/Text";
+import { usePop } from "./Juice";
 
 export interface BodyFatRingProps {
   /** Measurements in and plausible so far. */
@@ -20,20 +21,30 @@ export interface BodyFatRingProps {
 /**
  * The ring beside Floo on the measurement step. Each plausible measurement fills its share, so the
  * tape measure visibly pays off; the last one completes it and the estimate appears in the middle.
- * The centre cross-fades between "2/3" and the percentage; nothing jumps.
+ * The whole ring boings with every measurement that lands, and the percentage slams in when the
+ * last one completes it.
  */
+
+/** The estimate arrives big and settles: it is the pay-off of the whole step. */
+const reveal = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 0.3 }] },
+  60: { opacity: 1, transform: [{ scale: 1.35 }] },
+  82: { opacity: 1, transform: [{ scale: 0.94 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }] },
+}).duration(520);
 export const BodyFatRing = forwardRef<View, BodyFatRingProps>(function BodyFatRing({ filled, total, bodyFatPct, gender, size = 104 }, ref) {
   const reduce = useReducedMotion();
   const done = bodyFatPct !== null && filled >= total;
   const category = done && gender ? BODY_FAT_CATEGORY_TR[bodyFatCategory(gender, bodyFatPct)] : null;
   const fade = reduce ? FadeIn.duration(150) : FadeIn.duration(220);
+  const pop = usePop(filled, { amount: done ? 0.2 : 0.12 });
   const label = done ? `Tahmini yağ oranın ${fmtPct(bodyFatPct)}, ${category}` : `${filled} / ${total} ölçü girildi`;
 
   return (
-    <View ref={ref} collapsable={false} style={styles.wrap} accessible accessibilityLabel={label} testID="ob-ring">
+    <Animated.View ref={ref} collapsable={false} style={[styles.wrap, pop]} accessible accessibilityLabel={label} testID="ob-ring">
       <Ring value={total > 0 ? filled / total : 0} size={size} accessibilityLabel={label}>
         {done ? (
-          <Animated.View key="pct" entering={fade} exiting={FadeOut.duration(120)} style={styles.center}>
+          <Animated.View key="pct" entering={reduce ? fade : reveal} exiting={FadeOut.duration(120)} style={styles.center}>
             <Text variant="number" tone="primary" tabular testID="ob-ring-pct">
               {fmtPct(bodyFatPct)}
             </Text>
@@ -55,7 +66,7 @@ export const BodyFatRing = forwardRef<View, BodyFatRingProps>(function BodyFatRi
       <Text variant="label" color={category ? "ink" : "inkSubtle"} align="center" testID="ob-ring-category" style={styles.caption}>
         {category ?? "Yağ oranı"}
       </Text>
-    </View>
+    </Animated.View>
   );
 });
 

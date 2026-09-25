@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from "react";
 import { StyleSheet, View, type TextInput } from "react-native";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 import { spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
 import { TextField } from "../../../ui/TextField";
+import { dropIn, Pop } from "../components/Juice";
 import { measurementFields, type MeasurementField } from "../model";
 import type { Onboarding } from "../useOnboarding";
 
@@ -30,7 +32,8 @@ export function parseMeasurement(text: string): number | null {
 /**
  * Stage 3 — the three (or four) numbers behind the body-fat estimate, each with how to take it.
  * Every value that settles is handed to Floo (`onMeasured`), who answers at once; the ring next
- * to him fills with each one.
+ * to him fills with each one. Fields drop in one after another, and each one boings the moment it
+ * holds a number.
  */
 export function MeasureStep({ o, onMeasured }: { o: Onboarding; onMeasured: (field: MeasurementField) => void }) {
   const [text, setText] = React.useState<Record<string, string>>(() => {
@@ -43,6 +46,7 @@ export function MeasureStep({ o, onMeasured }: { o: Onboarding; onMeasured: (fie
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => void (settle.current && clearTimeout(settle.current)), []);
 
+  const reduce = useReducedMotion();
   const fields = measurementFields(o.draft.profile.gender);
 
   const react = (field: MeasurementField, delay: number) => {
@@ -60,28 +64,32 @@ export function MeasureStep({ o, onMeasured }: { o: Onboarding; onMeasured: (fie
     <View style={styles.stack}>
       {fields.map((f, i) => {
         const last = i === fields.length - 1;
+        const filled = o.draft.measurement[f] !== null;
         return (
-          <TextField
-            key={f}
-            ref={(r) => {
-              refs.current[f] = r;
-            }}
-            label={LABEL[f]}
-            value={text[f] ?? ""}
-            onChangeText={(v) => set(f, v)}
-            onBlur={() => {
-              setTouched((t) => ({ ...t, [f]: true }));
-              if (text[f]) react(f, 0);
-            }}
-            error={touched[f] ? o.errors[f] : undefined}
-            hint={WHY[f]}
-            unit={UNIT[f]}
-            keyboardType="decimal-pad"
-            returnKeyType={last ? "done" : "next"}
-            autoFocus={i === 0 && !text[f]}
-            onSubmitEditing={() => (last ? o.next() : refs.current[fields[i + 1]]?.focus())}
-            testID={`ob-${f}`}
-          />
+          <Animated.View key={f} entering={dropIn(i, reduce)}>
+            <Pop trigger={filled} when={filled} amount={0.05}>
+              <TextField
+                ref={(r) => {
+                  refs.current[f] = r;
+                }}
+                label={LABEL[f]}
+                value={text[f] ?? ""}
+                onChangeText={(v) => set(f, v)}
+                onBlur={() => {
+                  setTouched((t) => ({ ...t, [f]: true }));
+                  if (text[f]) react(f, 0);
+                }}
+                error={touched[f] ? o.errors[f] : undefined}
+                hint={WHY[f]}
+                unit={UNIT[f]}
+                keyboardType="decimal-pad"
+                returnKeyType={last ? "done" : "next"}
+                autoFocus={i === 0 && !text[f]}
+                onSubmitEditing={() => (last ? o.next() : refs.current[fields[i + 1]]?.focus())}
+                testID={`ob-${f}`}
+              />
+            </Pop>
+          </Animated.View>
         );
       })}
       {o.bodyFatPct === null ? (
