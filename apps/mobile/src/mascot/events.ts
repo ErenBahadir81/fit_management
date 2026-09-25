@@ -294,7 +294,9 @@ export function describeFlooEvent(event: FlooEvent, opts: { now?: Date; rand?: (
     text = g.text;
     mood = g.mood;
   } else {
-    const candidates = COPY[event.name].map((v) => v(p)).filter((t): t is string => t != null && t.length > 0 && t.length <= FLOO_LINE_MAX_CHARS);
+    let candidates = COPY[event.name].map((v) => v(p)).filter((t): t is string => t != null && t.length > 0 && t.length <= FLOO_LINE_MAX_CHARS);
+    // The glass that reaches the day's water goal always says so, never a generic "glu glu".
+    if (event.name === "waterLogged" && num(p.goalMl) != null && num(p.totalMl) != null && num(p.totalMl)! >= num(p.goalMl)!) candidates = candidates.slice(0, 1);
     text = pick(candidates, rand);
     if (event.name === "volumeWarning" && p.band === "low") mood = "think";
   }

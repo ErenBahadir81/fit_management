@@ -10,6 +10,7 @@ import {
   pickVariant,
   renderTemplate,
   searchKey,
+  waterGoalMl,
   trDateKey,
   weekKeyFor,
   shiftKey,
@@ -82,6 +83,8 @@ export interface FakeState {
   pointerMeta: Record<string, LogPointerLike>;
   /** T8 — registered in this session and not yet onboarded: the one account a starter program may replace. */
   freshAccount?: boolean;
+  /** Water taps per day (ml each, oldest first). Optional so older saved states still load. */
+  water?: Record<string, number[]>;
 }
 
 export function createFakeState(today = trDateKey()): FakeState {
@@ -101,6 +104,7 @@ export function createFakeState(today = trDateKey()): FakeState {
     foods: [...fx.FOODS],
     sessions: new Set(),
     pointerMeta: {},
+    water: { [today]: [250, 250] },
   };
 }
 
@@ -695,6 +699,24 @@ export function createFakeFetch(opts: FakeFetchOptions = {}): FetchLike & { stat
     return ok({ scanId: fx.nextId("scan"), imageUrl: null, detections, mock: true, latencyMs: 420, modelVersion: "fake-1" });
   });
   on("GET", "/nutrition/week", ({ query }) => ok(fx.makeWeekNutrition(query.week ? weekKeyFor(query.week, md()) : weekKeyFor(today(), md()), state.mealEntries, state.target)));
+  const waterDay = (dateKey: string) => {
+    const taps = state.water?.[dateKey] ?? [];
+    const weight = state.bodyEntries.at(-1)?.weightKg ?? null;
+    return { dateKey, totalMl: taps.reduce((a, b) => a + b, 0), goalMl: waterGoalMl(weight), count: taps.length };
+  };
+  on("GET", "/nutrition/water", ({ query }) => ok(waterDay(query.date || today())));
+  on("POST", "/nutrition/water", ({ body }) => {
+    const ml = Number(body.ml);
+    if (!Number.isInteger(ml) || ml < 50 || ml > 2000) return err(400, "VALIDATION", "Geçersiz miktar");
+    const dateKey = (body.dateKey as string) || today();
+    state.water = { ...state.water, [dateKey]: [...(state.water?.[dateKey] ?? []), ml] };
+    return { status: 201, body: waterDay(dateKey) };
+  });
+  on("DELETE", "/nutrition/water/last", ({ query }) => {
+    const dateKey = query.date || today();
+    state.water = { ...state.water, [dateKey]: (state.water?.[dateKey] ?? []).slice(0, -1) };
+    return ok(waterDay(dateKey));
+  });
   on("GET", "/nutrition/target", () => ok(state.target));
   on("PUT", "/nutrition/target", ({ body }) => {
     if (body.mode === "auto") state.target = { ...fx.DEFAULT_TARGET };

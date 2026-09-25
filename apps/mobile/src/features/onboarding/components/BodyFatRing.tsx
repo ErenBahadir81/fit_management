@@ -6,7 +6,7 @@ import { fmtPct } from "../../../lib/format";
 import { spacing } from "../../../theme/tokens";
 import { Ring } from "../../../ui/Ring";
 import { Text } from "../../../ui/Text";
-import { SlamIn, usePop } from "./Juice";
+import { SlamIn, usePop } from "../../../ui/Juice";
 
 export interface BodyFatRingProps {
   /** Measurements in and plausible so far. */

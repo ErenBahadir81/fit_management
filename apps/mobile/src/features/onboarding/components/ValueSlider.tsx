@@ -8,7 +8,7 @@ import { useTheme } from "../../../theme/ThemeProvider";
 import { springs, timing } from "../../../theme/motion";
 import { radii, spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
-import { BOING, usePop } from "./Juice";
+import { BOING, usePop } from "../../../ui/Juice";
 
 export interface ValueSliderProps {
   value: number;

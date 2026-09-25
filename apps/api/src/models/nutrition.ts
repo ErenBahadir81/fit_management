@@ -192,3 +192,25 @@ const ScanSchema = new Schema<ScanDoc>(
   { timestamps: true }
 );
 export const Scan: Model<ScanDoc> = (mongoose.models.Scan as Model<ScanDoc>) || model<ScanDoc>("Scan", ScanSchema);
+
+/** One tap on the water button: a glass (or whatever size was sent) on a day. */
+export interface WaterLogDoc {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  dateKey: string;
+  ml: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const WaterLogSchema = new Schema<WaterLogDoc>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    dateKey: { type: String, required: true },
+    ml: { type: Number, required: true },
+  },
+  { timestamps: true }
+);
+WaterLogSchema.index({ userId: 1, dateKey: 1, createdAt: -1 });
+
+export const WaterLog: Model<WaterLogDoc> = (mongoose.models.WaterLog as Model<WaterLogDoc>) || model<WaterLogDoc>("WaterLog", WaterLogSchema);

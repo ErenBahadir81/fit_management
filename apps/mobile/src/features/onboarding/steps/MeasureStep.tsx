@@ -3,7 +3,7 @@ import { StyleSheet, View, type TextInput } from "react-native";
 import { spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
 import { TextField } from "../../../ui/TextField";
-import { DropIn, Pop } from "../components/Juice";
+import { DropIn, Pop } from "../../../ui/Juice";
 import { measurementFields, type MeasurementField } from "../model";
 import type { Onboarding } from "../useOnboarding";
 
