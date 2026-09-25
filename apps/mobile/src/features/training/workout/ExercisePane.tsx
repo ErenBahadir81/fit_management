@@ -12,7 +12,7 @@ import { Icon } from "../../../ui/Icon";
 import { SlamIn } from "../../../ui/Juice";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
-import { lastPerformanceLabel } from "../lib/present";
+import { keyMuscles, lastPerformanceLabel } from "../lib/present";
 import { WEIGHT_STEP_KG, activeSetIndex, exerciseTonnage, type LoggerExercise, type LoggerSet } from "../lib/logger";
 import { NumberField } from "./NumberField";
 
@@ -64,7 +64,7 @@ export function ExercisePane({ exercise, index, width, muscles, last, onSetReps,
           </Text>
           <View style={styles.chips}>
             {exercise.source === "extra" ? <Chip label="Ekstra" size="sm" tone="primary" /> : null}
-            {exercise.muscles.map((m) => (
+            {keyMuscles(exercise.muscles).map((m) => (
               <Chip key={m.key} label={nameOf(m.key)} size="sm" dot={colorOf(m.key)} />
             ))}
           </View>

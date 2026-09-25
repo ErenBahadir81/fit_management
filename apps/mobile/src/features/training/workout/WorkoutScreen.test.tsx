@@ -31,6 +31,9 @@ async function todaysDay() {
 
 const draft = () => getJSON<LoggerState>(WORKOUT_DRAFT_KEY)!;
 
+// Each test mounts the whole logger; under a loaded full-suite run a single mount can pass 5 s.
+jest.setTimeout(20_000);
+
 describe("WorkoutScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();

@@ -175,7 +175,7 @@ function RoadmapHeader({ goal, progress, chart, today, onRecalibrate, recalibrat
         <Card testID="roadmap-milestones">
           <View style={styles.sectionHead}>
             <Text variant="title">Duraklar</Text>
-            <Text variant="caption" color="inkMuted">
+            <Text variant="caption" color="inkMuted" align="right" style={styles.headNote}>
               yolun dörtte biri, yarısı, dörtte üçü, sonu
             </Text>
           </View>
@@ -206,7 +206,7 @@ function RoadmapHeader({ goal, progress, chart, today, onRecalibrate, recalibrat
       <Entry index={4}>
         <View style={styles.sectionHead}>
           <Text variant="title">Haftalar</Text>
-          <Text variant="caption" color="inkMuted">
+          <Text variant="caption" color="inkMuted" align="right" style={styles.headNote}>
             planlanan kalori · açık · beklenen kilo
           </Text>
         </View>
@@ -257,5 +257,7 @@ const styles = StyleSheet.create({
   recal: { minHeight: HEIGHTS.recal, flexDirection: "row", alignItems: "center", gap: spacing.md },
   recalTexts: { flex: 1, gap: 2 },
   sectionHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
+  /** The caption beside a section title wraps instead of running off the card on a phone. */
+  headNote: { flexShrink: 1 },
   spine: { marginTop: spacing.lg },
 });
