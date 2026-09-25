@@ -21,8 +21,23 @@ function nativeMock(overrides: Partial<NativeMock> = {}): NativeMock {
   };
 }
 
+/**
+ * `expo-notifications` may or may not be installed in node_modules (it is hoisted at the repo root
+ * today). A full-suite run once saw the real package leak past a `virtual` mock, so the mock is
+ * only virtual when the package is genuinely absent, and the registry is reset around every load.
+ */
+const NATIVE_IS_INSTALLED = (() => {
+  try {
+    require.resolve("expo-notifications");
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
 /** Fresh copy of the wrapper for every test — it memoises the module and the permission answer. */
 function load(native: NativeMock | null): Lib {
+  jest.resetModules();
   let lib!: Lib;
   jest.isolateModules(() => {
     jest.doMock(
@@ -31,7 +46,7 @@ function load(native: NativeMock | null): Lib {
         if (!native) throw new Error("Cannot find module 'expo-notifications'");
         return native;
       },
-      { virtual: true }
+      { virtual: !NATIVE_IS_INSTALLED }
     );
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- a fresh copy per test is the point.
     lib = require("../../src/lib/notifications") as Lib;
@@ -39,7 +54,15 @@ function load(native: NativeMock | null): Lib {
   return lib;
 }
 
-afterEach(() => jest.resetModules());
+beforeEach(() => {
+  jest.resetModules();
+  jest.useRealTimers();
+});
+
+afterEach(() => {
+  jest.dontMock("expo-notifications");
+  jest.resetModules();
+});
 
 describe("with expo-notifications installed", () => {
   test("reports itself available", () => {
