@@ -47,8 +47,8 @@ describe("theme tokens", () => {
     expect(systemDark).toEqual(light);
   });
 
-  it("keeps the brand violet as the light-theme primary", () => {
-    expect(block(":root {")).toContain("--ff-brand: #6d5df6");
+  it("keeps the brand blue (the mobile app's primary) as the light-theme primary", () => {
+    expect(block(":root {")).toContain("--ff-brand: #0a70b3");
   });
 
   it("exposes each token to Tailwind through an inline @theme mapping", () => {

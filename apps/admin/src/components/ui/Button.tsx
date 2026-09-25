@@ -9,7 +9,7 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "quie
 export type ButtonSize = "sm" | "md" | "lg";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  // Violet is reserved for the single primary action on a surface.
+  // Brand blue is reserved for the single primary action on a surface.
   primary: "bg-brand text-white border border-transparent hover:bg-brand-hover active:bg-brand-active disabled:bg-brand/50",
   secondary: "bg-surface text-ink border border-line hover:bg-surface-3 hover:border-line-strong",
   ghost: "bg-transparent text-muted border border-transparent hover:bg-surface-3 hover:text-ink",
