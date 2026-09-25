@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { spacing } from "../theme/tokens";
+import { Button } from "./Button";
 import { Text } from "./Text";
 import { WheelPicker, type WheelOption } from "./WheelPicker";
 
@@ -29,6 +30,10 @@ export interface DatePickerProps {
  * Day / month / year as three snapping wheels — the control people expect for a birthday, instead
  * of a text field that asks them to spell out `YYYY-AA-GG`. A day that does not exist in the new
  * month clamps to the last one, so the picker can never emit an impossible date.
+ *
+ * With no value yet the wheels still have to rest somewhere (1 Ocak of a default year), so they
+ * are dimmed and a line under them says nothing is chosen, with a button to take the shown date
+ * as is; otherwise the resting date looks picked while the form still counts it as empty.
  */
 export function DatePicker({ value, onChange, label, minYear = 1930, maxYear = new Date().getUTCFullYear(), testID }: DatePickerProps) {
   const fallbackYear = Math.min(Math.max(1995, minYear), maxYear);
@@ -51,9 +56,11 @@ export function DatePicker({ value, onChange, label, minYear = 1930, maxYear = n
     [onChange]
   );
 
+  const empty = value === null;
+
   return (
     <View accessibilityLabel={label} style={styles.wrap}>
-      <View style={styles.row}>
+      <View style={[styles.row, empty && styles.dim]}>
         <Column flex={2} caption="Gün">
           <WheelPicker options={days} value={Math.min(d, days.length)} onChange={(next) => emit(y, m, next)} label="Gün" testID={testID ? `${testID}-day` : undefined} />
         </Column>
@@ -64,6 +71,20 @@ export function DatePicker({ value, onChange, label, minYear = 1930, maxYear = n
           <WheelPicker options={years} value={y} onChange={(next) => emit(next, m, d)} label="Yıl" testID={testID ? `${testID}-year` : undefined} />
         </Column>
       </View>
+      {empty ? (
+        <View style={styles.pending} testID={testID ? `${testID}-pending` : undefined}>
+          <Text variant="caption" color="inkMuted" style={styles.pendingText} accessibilityLiveRegion="polite">
+            Henüz seçilmedi; tekerlekleri kaydır.
+          </Text>
+          <Button
+            label={`${d} ${MONTHS_TR[m - 1]} ${y} seç`}
+            onPress={() => emit(y, m, d)}
+            variant="secondary"
+            size="sm"
+            testID={testID ? `${testID}-accept` : undefined}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -83,4 +104,7 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
   row: { flexDirection: "row", gap: spacing.sm },
   caption: { marginBottom: spacing.xxs },
+  dim: { opacity: 0.5 },
+  pending: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  pendingText: { flex: 1 },
 });
