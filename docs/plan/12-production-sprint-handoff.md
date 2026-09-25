@@ -4,32 +4,39 @@ Bu belge, Claude Projects içinde yürütülen production sprint'ini **doğrudan
 Claude Code oturumuna** devretmek için yazıldı. Yeni oturum önce bu dosyayı, sonra `handoff/` altındaki
 hazırlık notlarını okur. Kalan işlerin kaynağı budur; Projects'teki thread'lere erişim yoktur.
 
-Kod tabanı: `main` @ `e853cbb` (PR #5 merge'ü). Sprint PR'larının hepsi main'de: #1, #2, #3, #4, #5, #6. Ürün dili Türkçe, mühendislik dili İngilizce (kod, test, doküman).
+Son güncelleme: 25.09.2026 ≈04:50Z. Sprint PR'larının hepsi main'de (#1–#23). Güncel durum §1 ve §1b, kalan işler §4; §5–§6 ve ek değişmedi. Ürün dili Türkçe, mühendislik dili İngilizce (kod, test, doküman).
 
 ---
 
-## 1. Durum özeti
+## 1. Durum özeti (25.09.2026)
 
-| İş paketi | Durum | PR | Kalan |
-|---|---|---|---|
-| T0 Prod güvenlik (Risk 1+3) + tasarım skill'leri | **bitti** | #1 merged | — |
-| T1 Tasarım sistemi (Floo-mavi, flat), Floo bildirim kuyruğu, yeni ana ekran | merged, açık uçlar var | #3 merged | bkz. §4.1 (≈2,5–3,5 s) |
-| T2 Floo 3 karakteri (iskelet, eller, poz kütüphanesi, event bus) | merged, **T1 entegrasyonu yapılmadı** | #5 merged | bkz. §4.2 (≈3–4 s) |
-| T3 Antrenman mantığı core+API (id tabanlı döngü, B1–B9, hacim bantları) | merged | #2 merged | bkz. §4.3 (≈2 s) |
-| T4 Hareket→kas aktivasyon verisi v1 (143 hareket, 689 çift, kaynaklı) | merged (veri seed'e bağlı değil) | #6 merged | bkz. §4.4 (≈1–1,5 s) |
-| T7 Kas kazanma motoru, FFMI, uyarlanan hedef (core+API) | merged | #4 merged | bkz. §4.5 (≈1 s) |
-| T5 Antrenman ekranları | **başlamadı** (hazırlık notu var) | — | bkz. §4.6 (≈3–4,5 s) |
-| T6 Beslenme ekranları | **başlamadı** (hazırlık notu var) | — | bkz. §4.7 (≈3–4,5 s) |
-| T8 Onboarding veri seansı | **başlamadı** (hazırlık notu var) | — | bkz. §4.8 (≈3–4,5 s) |
-| Entegrasyon QA (tüm akış tarayıcıda) | — | — | ≈1 s |
+**Plandaki 9 iş paketinin hepsi main'de.** Sıra: Projects sprint'i (PR #1–#7) → Eren'in doğrudan repo oturumu (PR #8, #9, #11; T1 açık uçları, Floo↔voice entegrasyonu, film şeridi 1. tur, T3+T4 seed senkronu, T7 rekomp, T5 program sekmesi + editör, T6 fotoğraf akışı, T8 onboarding seansı, e2e paketleri) → son saat (§1b).
 
-Kalan toplam ≈ **20–27 saat** (agent-saati; alt agent'lar paralel çalışırsa duvar saati ≈ 6–8 s).
-Süreler tahmindir.
+| İş paketi | Durum |
+|---|---|
+| T0 Prod güvenlik + skill'ler | bitti (#1) |
+| T1 Tasarım sistemi, Floo kuyruğu, ana ekran | bitti (#3, #9/#11: motion audit, onScrim, CountUp, README) |
+| T2 Floo 3 karakteri | bitti (#5, #11, #16, #21); açık hareket maddeleri §4.1 |
+| T3 Antrenman mantığı core+API | bitti (#2, #11 seed senkronu) |
+| T4 Aktivasyon verisi + admin düzenleme | bitti (#6, #11) |
+| T7 Kas kazanma motoru, FFMI, uyarlanan hedef | bitti (#4, #8); mobil UI #14/#22; açık madde §4.2 |
+| T5 Antrenman ekranları | bitti (#11); açık: hareket adları İngilizce §4.4 |
+| T6 Beslenme ekranları | bitti (#11 fotoğraf, #13 hedef şeridi, #18 ilerleme sekmesi, #15 su, #23 "Dünkü gibi") |
+| T8 Onboarding veri seansı | bitti (#11, #12, #17) |
+| Entegrasyon QA | yapıldı 25.09 (§1b), bulguların çoğu düzeltildi (#19) |
 
-Bağımlılık sırası: **T2↔T1 entegrasyonu (§4.2 madde 1) → (T1 açık uçları ‖ T3/T4 seed sync ‖ T7 küçük iş) → T5 ‖ T6 → T8 → entegrasyon QA.**
-Tasarım temeli (T1), karakter (T2) ve hedef motoru (T7) main'de; T5/T6/T8 doğrudan main'den dallanır. Sağ üst köşedeki Floo henüz eski `FlooV2`'yi çiziyor, önce entegrasyon.
+Bağımlılık kalmadı; §4'teki maddeler birbirinden bağımsız küçük işlerdir.
 
----
+### 1b. Son saat (25.09.2026 04:00–04:50Z, Projects thread'leri)
+Merge edilenler:
+- **#12, #17** Onboarding veri girişi: abartılı zıplayan animasyonlar; doğum tarihi "seçilmedi" durumu; review düzeltmeleri.
+- **#20** Aynı zıplayan giriş antrenman set kaydında, tartıda ve gram tuş takımı/porsiyonda.
+- **#13** Beslenme: üstte hedef şeridi + plan-vs-trend mini grafiği. **#18** İlerleme sekmesi (Floo yorumu, uyum, kilo/yağ/bel grafikleri); FAB kaydırınca gizleniyor. **#23** Boş öğüne "Dünkü gibi" tek dokunuş.
+- **#15** Su kaydı: tek dokunuş su kartı, günlük hedef kilodan (35 ml/kg, 1,5–4 L), `waterLogged` → Floo hidrasyonu.
+- **#14, #22** Uyarlanan hedef UI: Floo'nun öneri kartı (kabul/reddet), ölçüm sonrası geri bildirim + progress bar'lar, Vücut sekmesi Gidişat kartı; dürüst "tarih kayacak" metni.
+- **#16, #21** Floo: film şeridi 2. tur (IK ağırlıkları, celebrate dinlenme pozu, efekt jitter); reduced-motion geçişleri yumuşak.
+- **#19** QA düzeltmeleri: push-up kas çipleri süzülüyor, yol haritası açıklaması taşmıyor, logger test timeout.
+- Uçtan uca Chromium turu (390 px, gerçek API): kayıt, onboarding 7 adım, 5 sekme, antrenman kaydı, hedef kurulumu, yol haritası, editör; konsol/API hatası yok. Tam paket 88 suite / 981 test yeşil.
 
 ## 2. Eren'in kararları (bağlayıcı)
 
@@ -53,55 +60,31 @@ Tasarım temeli (T1), karakter (T2) ve hedef motoru (T7) main'de; T5/T6/T8 doğr
 
 ---
 
-## 4. Kalan işler (iş paketi başına)
+## 4. Kalan işler (25.09.2026, hepsi küçük ve bağımsız)
 
-### 4.1 T1 Tasarım sistemi (merged, PR #3) — ≈2,5–3,5 s
-Yapıldı: Floo-mavi token'lar (light/dark, AA), flat primitifler, `src/mascot/voice` (`useFloo().say` kuyruğu, `useFlooOnce`, `useFlooPresence`, `FlooCornerHost`), hata toast'ları Floo'ya yönlendirildi, docked tab bar, `Screen` scroll top bar, `Header` Floo için yer ayırır, yeni ana ekran (GoalStrip, CalorieCard, TodayCard, StreaksRow), `CountUp`.
-Kalan:
-- `design-motion-principles` ile motion audit; light/dark tam Chromium turu (modaller dahil); README bölümleri (voice/Screen/Header/TabBar/CountUp).
-- `CountUp` eslint hatası (effect içinde setState); `onScrim` token'ı ekle (scan ekranı `ON_SCRIM = dark.ink` geçici); Program ekranında sticky header kaydırınca Floo'nun üstüne biniyor; beslenme FAB'ı "−514" değerini kapatıyor (T6 ile çözülür).
-- Sağ üst Floo'yu T2'nin küçük karakterine bağla (§4.2 entegrasyon adımları; T2 PR'ında yapılır).
+### 4.1 Floo hareketleri (film şeridi, `node scripts/floo-filmstrip/filmstrip.mjs`)
+- Reduced motion açıkken celebrate/goalHit'e geçişte ilk karede sıçrama (kaynağı bulunamadı, #21 notu).
+- Tekrar kontrol edilmedi: wipeBrow, bellyPat, whoa, shrug, cheer, flex tek adımlı sıçramalar; fallRecover T-pozu; clap/wave kol düşüşü; point ≈800 ms geç başlıyor (#16'da kısmen düzeltildi, doğrulanmadı).
+- Parity hedefi ≥97 (son ölçüm 96,6; yüz 88).
 
-### 4.2 T2 Floo 3 karakteri (merged, PR #5) — ≈3–4 s
-Yapıldı: `rig.ts` (IK, rubber-hose uzuvlar, eller, botlar, spring'ler), `poses.ts` (9 mood pozu, 23 jest), `behaviour.ts` (tetikleyici planları, LOD/`flooBox`, ambientMood), `FlooLimbs.tsx`, `events.ts` (`flooBus`, nutrition/workout/body/goal mutasyonlarına bağlı), film şeridi aracı `scripts/floo-filmstrip`, parity aracı yolları düzeltildi. 646 mobil test geçiyor.
-Kalan:
-1. **T1 entegrasyonu (merge'de yapılmadı, ilk iş):** `<FlooEventBridge/>` T1'in `FlooVoiceProvider` sarmalayıcısına (`app/_layout.tsx`); `src/mascot/voice/FlooCorner.tsx` hâlâ `FlooV2` import ediyor, `<FlooModel lod="badge" trigger={voice.reaction} size={40}>` olmalı; `voice/queue.ts` tip importları `FlooMood`/`FlooTrigger` (`model/`'dan); `FlooV2` trigger/pointAt geçirir; `FLOO_COLORS` mavi. Doğrulama: Expo web'de sağ üst Floo'nun bir mutasyon sonrası jest yaptığı görülmeli.
-2. Film şeridi bulguları (`node scripts/floo-filmstrip/filmstrip.mjs` ile yeniden üret): idle fazla hareketli (fidget'lar seyrek ve küçük olsun); `point@864ms` gövde 6 px düşüyor; wipeBrow, bellyPat, whoa, shrug, cheer, flex tek adımlı zıplıyor; reduced motion ilk karede snap, tap'te hiçbir şey olmuyor; mealLogged ve goalHit sonrası kollar yukarıda kalıyor; fallRecover'da T-poz ve sonda pop; walk gerçek yürüme değil; clap'te kol düzleşiyor ve eller ağzı kapatıyor; wave kolu düz düşüyor; point ≈800 ms geç başlıyor.
-3. Parity 96,63 → hedef ≥97 (yüz bölgesi 88,1).
-4. T8 için `onGestureEnd` callback'i ekle (şimdilik `gestureDuration(name)` ile sıralanıyor).
-5. Su ve set mutasyonu yok: T5/T6 ekranları `flooBus.emit("waterLogged"|"setCompleted")` kendisi çağırır.
+### 4.2 Uyarlanan hedef
+- "Tarihi koru, daha çok kıs" seçeneği için motorun **sabit hedef tarihe göre** plan çizebilmesi gerekiyor; mevcut güvenlik sınırları (açık, hız) korunmalı, sınır içinde tutulamıyorsa Floo bunu söylemeli (#22 açık maddesi).
 
-### 4.3 T3 Antrenman mantığı (merged, PR #2) — ≈2 s
-Yapıldı: id tabanlı döngü pointer'ı, `POST /program/log-day`, weekly mod, B1–B9 düzeltmeleri, `core/training/volumeBands.ts`, 17 kas, mobil veri katmanı (`features/training/queries.ts`, `lib/fake`).
-Kalan:
-1. Seed katalog senkronu (T4 ile anlaşıldı): eksik hareketleri `nameKey` ile ekle; `muscles`'ı yalnızca tüm yükler 1 ve anahtarlar v1 kümesindeyse üzerine yaz.
-2. `templates.ts` kasları `SEED_EXERCISES`'tan isimle alsın ("legs" yok).
-3. Expo web'de gerçek tarayıcı turu.
+### 4.3 Beslenme
+- Hızlı ekleme: "Dünkü gibi" var (#23); favoriler / son yenenlerden tek dokunuş ekleme henüz yok.
+- Barkod web'de çalışmıyor (beklenen), cihazda doğrulanmalı.
 
-### 4.4 T4 Aktivasyon verisi (merged, PR #6) — ≈1–1,5 s
-Yapıldı: `apps/api/src/seed/data/exerciseActivation.v1.ts` (`EXERCISE_ACTIVATION_V1`, `ACTIVATION_SOURCES`; çift başına ortalama yük, 0,05'e yuvarlı, <0,1 atılır; `confidence {level,n,spread}` + kaynaklar), `exerciseActivation.v1.evidence.json` (218 kaynak), `apps/api/scripts/build-activation-seed.mjs`.
-Kalan:
-1. `exercises.ts` içindeki `SEED_EXERCISES`'ı `EXERCISE_ACTIVATION_V1`'den türet (20 eski isim veride var); hareket sayan seed testlerini güncelle.
-2. Şüpheli değerleri bağımsız doğrula: muscle-up chest 1,0; cable kickback hamstring yüksek; jump squat/box jump/sled push belki conditioning (`muscles: []`); Pallof press oblik payı; cable curl forearms 1,0. Burpee, kardiyo, Stretch/Mobility `muscles: []`.
-3. Admin panelde aktivasyon düzenleme (Eren salonla revize edecek).
+### 4.4 Antrenman
+- Hareket adları İngilizce (Push-up, Row…): katalog ve aktivasyon verisine `nameTr` eklenip UI'da kullanılmalı.
+- Kas çipi eşiği (#19'da seçildi) Eren'in salon revizyonundan sonra gözden geçirilebilir.
 
-### 4.5 T7 Kas kazanma motoru (merged, PR #4) — ≈1 s
-Yapıldı: `assessBody` (FFMI, bant, Türkçe yorum, öneri), üç yönlü plan (`cut`/`bulk`/`recomp`) aynı roadmap yapısında, kas kazanma hızı literatür ortalaması (Aragon/McDonald), uyarlanan hedef (ilk 3 hafta bekler; önde/geride/durmuş → Floo önerisi, accept/dismiss uçları), her ölçümde geri bildirim (`feedback {textTr, mood, trigger, bars}`); sözleşme `docs/plan/11-muscle-gain-engine.md`.
-Kalan: rekomp hedef ayarı yalnızca kiloya bakıyor; yağ oranı ölçümleri de hesaba katılmalı.
+### 4.5 Test ve ortam
+- `notifications.test.ts`: `isolateModules` kullanıyor, rastgele sırayla geçiyor ama tam paket koşusunda bir kez daha 8 test düştü (25.09 04:15Z); son tam koşuda geçti. Sıra bağımlılığı tam kapanmadı.
+- `e2e/mobile-nutrition` sandbox'ta canvaskit.wasm CDN'i yüzünden düşüyor (ortam sorunu, kod değil); Floo araçları gibi yerel servis edilmeli.
+- Admin panel tarayıcı turu (giriş, katalog + aktivasyon düzenleme, kullanıcılar) 25.09 04:24Z'de başladı; sonucu bu dokümana işlenmediyse tekrar yapılmalı.
 
-### 4.6 T5 Antrenman ekranları — ≈3–4,5 s (başlamadı)
-Hazırlık notu: `handoff/t5-workout-ui-prep.md` (T3 arayüzü, baseline script'leri). Kapsam (plan §3–4): program ekranı, program kurma/düzenleme (gün ekle/sil/yeniden adlandır, hareket sırası, ad-hoc hareket), bugünün günü + "bugün başka bir şey yaptım" seçimi (`logDay`), mola günü tamamlama, canlı kas hacmi çubukları ve Floo uyarıları (`programVolume` editörde canlı), logger'ın `logDay({dayId})`'ye geçişi (T5'in işi). `queries.ts` ve `lib/fake` T3'e ait; T5 yalnızca tüketir.
-
-### 4.7 T6 Beslenme ekranları — ≈3–4,5 s (başlamadı)
-Hazırlık notu: `handoff/t6-nutrition-prep.md` (T7 sözleşme cevabı). Kapsam (plan §5): üstte hedef şeridi + gidişat mini grafiği (plan çizgisi vs EWMA trendi), bugünün bütçesi ("Kalan" denklemi), kamera birincil hızlı ekleme çubuğu (sheet menüsü yok), öğünler (tek dokunuş tekrar, kaydırarak sil), ilerleme sekmesi (kilo/yağ/bel, plan vs gerçek, uyum, Floo'dan recalibrasyon/ayar önerisi + accept/dismiss). Fotoğraf: `MIN_ANALYZE_MS` yapay bekleme kaldırılır, porsiyon presetleri + gram klavyesi, düşük güvende "bunu mu demek istedin?" (API'den kalem başına top-3: `zDetection`'a alternatives, T6 alanı). Ölçüm yoksa yağ oranı akış içinde girilir.
-
-### 4.8 T8 Onboarding veri seansı — ≈3–4,5 s (başlamadı)
-Hazırlık notu: `handoff/t8-onboarding-prep.md` (T7 ve T2 API anlaşmaları). Kapsam (plan §7): 7 adımlı Floo'lu seans (isim; cinsiyet/doğum/boy; kilo/boyun/bel(/kalça) canlı yağ halkasıyla; aktivite + haftalık gün + antrenman deneyimi; "mevcut durum" kartı: yağ %, LBM, FFMI + yorum; Floo'nun hedef önerisi + kaydırıcı + canlı süre/haftalık hız; bitiş). Taslak MMKV'de, kaldığı yerden devam. `trainingLevel` (beginner/intermediate/advanced) T7 girişine gider; POST /onboarding zaten `createGoal` çağırıyor.
-
-### 4.9 Entegrasyon QA — ≈1 s
-Onboarding → ana ekran → program → antrenman kaydı → beslenme (kamera) → ölçüm → Floo geri bildirimi akışı Chromium'da baştan sona; light/dark; reduced motion.
-
----
+### 4.6 Cihaz kontrolü (Eren)
+- Tüm doğrulama Expo web + Chromium'da yapıldı. iOS/Android'de 60/120 fps hissi, haptik, kamera ve barkod akışı, reduced-motion ayarı cihazda denenmeli.
 
 ## 5. Repo haritası (yeni oturum için)
 
