@@ -1,10 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import { StyleSheet, View, type TextInput } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
 import { spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
 import { TextField } from "../../../ui/TextField";
-import { dropIn, Pop } from "../components/Juice";
+import { DropIn, Pop } from "../components/Juice";
 import { measurementFields, type MeasurementField } from "../model";
 import type { Onboarding } from "../useOnboarding";
 
@@ -46,7 +45,6 @@ export function MeasureStep({ o, onMeasured }: { o: Onboarding; onMeasured: (fie
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => void (settle.current && clearTimeout(settle.current)), []);
 
-  const reduce = useReducedMotion();
   const fields = measurementFields(o.draft.profile.gender);
 
   const react = (field: MeasurementField, delay: number) => {
@@ -66,7 +64,7 @@ export function MeasureStep({ o, onMeasured }: { o: Onboarding; onMeasured: (fie
         const last = i === fields.length - 1;
         const filled = o.draft.measurement[f] !== null;
         return (
-          <Animated.View key={f} entering={dropIn(i, reduce)}>
+          <DropIn key={f} index={i}>
             <Pop trigger={filled} when={filled} amount={0.05}>
               <TextField
                 ref={(r) => {
@@ -89,7 +87,7 @@ export function MeasureStep({ o, onMeasured }: { o: Onboarding; onMeasured: (fie
                 testID={`ob-${f}`}
               />
             </Pop>
-          </Animated.View>
+          </DropIn>
         );
       })}
       {o.bodyFatPct === null ? (

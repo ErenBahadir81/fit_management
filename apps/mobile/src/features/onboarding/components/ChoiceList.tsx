@@ -1,12 +1,11 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Icon } from "../../../ui/Icon";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
-import { checkIn, Pop } from "./Juice";
+import { Pop, SlamIn } from "./Juice";
 
 export interface ChoiceOption<T extends string> {
   value: T;
@@ -37,7 +36,6 @@ export interface ChoiceListProps<T extends string> {
  */
 export function ChoiceList<T extends string>({ options, value, onChange, label, columns = 1, testID }: ChoiceListProps<T>) {
   const { colors } = useTheme();
-  const reduce = useReducedMotion();
   const grid = columns === 2;
   const chosenHint = grid ? options.find((o) => o.value === value)?.hint : undefined;
   const hasHints = grid && options.some((o) => o.hint);
@@ -84,9 +82,9 @@ export function ChoiceList<T extends string>({ options, value, onChange, label, 
                 </View>
                 <View style={[styles.check, { borderColor: selected ? colors.primary : colors.controlBorder, backgroundColor: selected ? colors.primary : "transparent" }]}>
                   {selected ? (
-                    <Animated.View entering={checkIn(reduce)}>
+                    <SlamIn>
                       <Icon icon="check" size={14} color="onPrimary" />
-                    </Animated.View>
+                    </SlamIn>
                   ) : null}
                 </View>
               </Pressable>

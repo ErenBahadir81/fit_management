@@ -1,18 +1,18 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
-import { dropIn } from "../components/Juice";
+import { useDropIn } from "../components/Juice";
 
 /**
  * One question inside a step: what it is, why it is asked, the control, and what is wrong. The
  * `index`-th question of a step drops in after the ones above it.
  */
 export function Question({ title, why, error, index = 0, children }: { title: string; why?: string; error?: string; index?: number; children: React.ReactNode }) {
-  const reduce = useReducedMotion();
+  const drop = useDropIn(index);
   return (
-    <Animated.View entering={dropIn(index, reduce)} style={styles.block}>
+    <Animated.View style={[styles.block, drop]}>
       <Text variant="title" accessibilityRole="header">
         {title}
       </Text>

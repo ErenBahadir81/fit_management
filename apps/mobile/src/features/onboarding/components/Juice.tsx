@@ -1,57 +1,88 @@
 import React, { useEffect, useRef } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
-import Animated, { FadeIn, Keyframe, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
 /**
  * The onboarding's data entry is deliberately loud: every answer lands with a bounce, so filling
- * the form feels like a game rather than paperwork. Everything here collapses to a plain fade (or
- * nothing) under reduced motion.
+ * the form feels like a game rather than paperwork. Under reduced motion it is a plain fade (or
+ * nothing).
+ *
+ * Everything is driven by shared values from an effect, not by `entering` layout animations:
+ * Reanimated implements those on web by switching the element to `position: absolute`, which
+ * lifts these blocks out of flow and piles them on top of each other (see `ui/Entry`).
  */
 
-/** A loose, overshooting spring: the "boing" after each answer. */
-export const BOING = { damping: 7, stiffness: 320, mass: 0.8 } as const;
+/** A loose, overshooting spring: the "boing" that ends each animation. */
+export const BOING = { damping: 9, stiffness: 300, mass: 0.8 } as const;
 
 /** Gap between blocks dropping in, so a step assembles itself top to bottom. */
 export const DROP_STAGGER_MS = 90;
 
-/** A block falls in from below, overshoots a little and settles. */
-export function dropIn(index: number, reduce: boolean) {
-  if (reduce) return FadeIn.duration(150);
-  return new Keyframe({
-    0: {
-      opacity: 0,
-      transform: [{ translateY: 36 }, { scale: 0.86 }, { rotate: "-2deg" }],
-    },
-    55: {
-      opacity: 1,
-      transform: [{ translateY: -8 }, { scale: 1.04 }, { rotate: "1deg" }],
-    },
-    80: {
-      opacity: 1,
-      transform: [{ translateY: 3 }, { scale: 0.99 }, { rotate: "0deg" }],
-    },
-    100: {
-      opacity: 1,
-      transform: [{ translateY: 0 }, { scale: 1 }, { rotate: "0deg" }],
-    },
-  })
-    .duration(560)
-    .delay(Math.max(0, index) * DROP_STAGGER_MS);
+const out = Easing.out(Easing.cubic);
+
+/**
+ * A block falls in from below and boings into place, `index` blocks after the first. The style
+ * only uses transform and opacity, so the block keeps its place in the layout throughout.
+ */
+export function useDropIn(index: number) {
+  const reduce = useReducedMotion();
+  const p = useSharedValue(0);
+  const o = useSharedValue(0);
+
+  useEffect(() => {
+    const delay = Math.max(0, index) * DROP_STAGGER_MS;
+    o.set(withDelay(reduce ? 0 : delay, withTiming(1, { duration: reduce ? 150 : 180 })));
+    p.set(reduce ? 1 : withDelay(delay, withSpring(1, BOING)));
+  }, [index, reduce, o, p]);
+
+  return useAnimatedStyle(() => {
+    const v = p.get();
+    return {
+      opacity: o.get(),
+      transform: [{ translateY: (1 - v) * 36 }, { scale: 0.86 + v * 0.14 }, { rotate: `${(1 - v) * -3}deg` }],
+    };
+  });
 }
 
-/** The check mark spins and slams in when an answer is picked. */
-export function checkIn(reduce: boolean) {
-  if (reduce) return FadeIn.duration(150);
-  return new Keyframe({
-    0: { opacity: 0, transform: [{ scale: 0 }, { rotate: "-120deg" }] },
-    60: { opacity: 1, transform: [{ scale: 1.45 }, { rotate: "15deg" }] },
-    100: { opacity: 1, transform: [{ scale: 1 }, { rotate: "0deg" }] },
-  }).duration(420);
+/** A view that drops in on mount (see `useDropIn`). */
+export function DropIn({ index = 0, style, children, testID }: { index?: number; style?: StyleProp<ViewStyle>; children: React.ReactNode; testID?: string }) {
+  const drop = useDropIn(index);
+  return (
+    <Animated.View style={[style, drop]} testID={testID}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Spins and slams in on mount: for the check mark of a picked answer, or a result arriving. */
+export function SlamIn({ spin = true, style, children }: { spin?: boolean; style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
+  const reduce = useReducedMotion();
+  const s = useSharedValue(reduce ? 1 : 0);
+  const o = useSharedValue(0);
+  useEffect(() => {
+    o.set(withTiming(1, { duration: reduce ? 150 : 90 }));
+    if (!reduce) s.set(withSequence(withTiming(1.4, { duration: 160, easing: out }), withSpring(1, BOING)));
+  }, [reduce, o, s]);
+  const slam = useAnimatedStyle(() => ({
+    opacity: o.get(),
+    transform: [{ scale: s.get() }, { rotate: spin ? `${(1 - Math.min(s.get(), 1)) * -120}deg` : "0deg" }],
+  }));
+  return <Animated.View style={[style, slam]}>{children}</Animated.View>;
 }
 
 /**
- * Squash, then boing past full size: the style to put on whatever just received a value. Fires
- * each time `trigger` changes after mount (never on the first paint) and only while `when` holds.
+ * Squash, stretch past full size, boing back: the style to put on whatever just received a value.
+ * Fires each time `trigger` changes after mount (never on the first paint) and only while `when`
+ * holds.
  */
 export function usePop(trigger: unknown, { amount = 0.14, when = true }: { amount?: number; when?: boolean } = {}) {
   const reduce = useReducedMotion();
@@ -65,18 +96,22 @@ export function usePop(trigger: unknown, { amount = 0.14, when = true }: { amoun
       return;
     }
     if (reduce || !when) return;
-    scale.set(withSequence(withTiming(1 - amount * 0.6, { duration: 70 }), withSpring(1 + amount, { ...BOING, stiffness: 520 }), withSpring(1, BOING)));
-    tilt.set(withSequence(withTiming(-3, { duration: 70 }), withSpring(2, BOING), withSpring(0, BOING)));
+    scale.set(
+      withSequence(
+        withTiming(1 - amount * 0.5, { duration: 70, easing: out }),
+        withTiming(1 + amount, { duration: 110, easing: out }),
+        withSpring(1, BOING)
+      )
+    );
+    tilt.set(withSequence(withTiming(-2.5, { duration: 70, easing: out }), withTiming(1.5, { duration: 110, easing: out }), withSpring(0, BOING)));
     // `when` gates a single change; re-running on its own flip would pop twice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger]);
 
-  return useAnimatedStyle(() => ({
-    transform: [{ scale: scale.get() }, { rotate: `${tilt.get()}deg` }],
-  }));
+  return useAnimatedStyle(() => ({ transform: [{ scale: scale.get() }, { rotate: `${tilt.get()}deg` }] }));
 }
 
-/** A wrapper that pops whenever `trigger` changes. */
+/** A wrapper that pops whenever `trigger` changes (see `usePop`). */
 export function Pop({
   trigger,
   amount,
