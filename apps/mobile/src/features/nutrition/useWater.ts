@@ -13,6 +13,7 @@ import { hydrationFor, setFlooHydration } from "../../mascot/hydration";
 import { useToast } from "../../ui/Toast";
 
 export const nutritionWaterKey = (dateKey: string) => ["nutrition-water", dateKey] as const;
+const waterMutationKey = (dateKey: string) => ["water-write", dateKey] as const;
 
 export function useWaterDay(dateKey: string) {
   const q = useQuery<WaterDay>({ queryKey: nutritionWaterKey(dateKey), queryFn: () => getApi().nutrition.water(dateKey) });
@@ -45,7 +46,12 @@ export function useAddWater(dateKey: string) {
       qc.setQueryData(key, ctx?.prev);
       toast.show({ message: describeError(e, "Su kaydedilemedi"), kind: "error" });
     },
-    onSuccess: (day) => qc.setQueryData(key, day),
+    mutationKey: waterMutationKey(dateKey),
+    // Rapid taps: only the last write in flight may replace the optimistic total, or the count
+    // would step backwards while the later taps are still on their way.
+    onSuccess: (day) => {
+      if (qc.isMutating({ mutationKey: waterMutationKey(dateKey) }) <= 1) qc.setQueryData(key, day);
+    },
   });
 }
 
@@ -65,6 +71,11 @@ export function useUndoWater(dateKey: string) {
       qc.setQueryData(key, ctx?.prev);
       toast.show({ message: describeError(e, "Geri alınamadı"), kind: "error" });
     },
-    onSuccess: (day) => qc.setQueryData(key, day),
+    mutationKey: waterMutationKey(dateKey),
+    // Rapid taps: only the last write in flight may replace the optimistic total, or the count
+    // would step backwards while the later taps are still on their way.
+    onSuccess: (day) => {
+      if (qc.isMutating({ mutationKey: waterMutationKey(dateKey) }) <= 1) qc.setQueryData(key, day);
+    },
   });
 }
