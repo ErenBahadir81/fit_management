@@ -214,6 +214,26 @@ describe("NutritionScreen — day", () => {
     await waitFor(() => expect(screen.queryByTestId("jump-today")).toBeNull());
   });
 
+  test("an empty meal offers yesterday's same meal; one tap logs those foods again", async () => {
+    const api = await signedInApi();
+    const yesterday = shiftKey(today, -1);
+    const before = await api.nutrition.day(today);
+    const empty = (["breakfast", "lunch", "dinner", "snack"] as const).find((m) => (before.meals[m] ?? []).length === 0)!;
+    await api.nutrition.addEntry({ dateKey: yesterday, meal: empty, grams: 150, custom: { name: "Yayla çorbası", per100g: { kcal: 60, protein: 4, carbs: 9, fat: 1 } }, source: "manual" });
+    await api.nutrition.addEntry({ dateKey: yesterday, meal: empty, grams: 50, custom: { name: "Çavdar ekmeği", per100g: { kcal: 250, protein: 8, carbs: 50, fat: 2 } }, source: "manual" });
+
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId(`meal-repeat-${empty}`)).toBeTruthy());
+    const prev = (await api.nutrition.day(yesterday)).meals[empty] ?? [];
+    expect(screen.getByText(new RegExp(`^${prev.length} yiyecek · `))).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId(`meal-repeat-${empty}`));
+    await waitFor(async () => expect((await api.nutrition.day(today)).meals[empty]).toHaveLength(prev.length));
+    await waitFor(() => expect(screen.getAllByText("Yayla çorbası")).toHaveLength(1));
+    expect(screen.getAllByText("Çavdar ekmeği")).toHaveLength(1);
+    expect(screen.queryByTestId(`meal-repeat-${empty}`)).toBeNull();
+  });
+
   test("the FAB slides away while the day list scrolls down and comes back on the way up", async () => {
     await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
