@@ -385,7 +385,7 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
         ? ` Bu tempoyla ${before.estimatedWeeks} yerine ${o.after?.estimatedWeeks} haftada bitebilir; tarihi öne çekelim mi?`
         : " Planı bugünden yeniden çizelim mi?";
     };
-    /** Recommended calorie cut and a later date; at the calorie floor only the later date. Returns the sentence. */
+    /** Recommended calorie cut (the new date stays reachable) or just a re-plan; at the calorie floor only the re-plan. Returns the sentence. */
     const cutOrLater = (lateLabel: string, later: string) => {
       const o = lower();
       o.labelTr = kcalLabel(before, o);
@@ -394,7 +394,10 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
       if (atFloor) options.push(replan(lateLabel, true));
       else options.push(o, replan(lateLabel));
       const measured = lowerStep.measured ? "Ölçülen harcaman plandakinden düşük çıktı. " : "";
-      return (why: string) => (atFloor ? `${why} Kalori zaten güvenli tabanda; ${later}.` : `${measured}${why} ${cap(kcalLet(before, o))} ya da ${later}.`);
+      // Re-planning from today moves the date either way (the trend is behind); the calories decide
+      // whether the new date is reachable. So the copy never sells the cut as a way to keep the date.
+      return (why: string) =>
+        atFloor ? `${why} Kalori zaten güvenli tabanda; ${later}.` : `${measured}${why} Tarih biraz kayacak; yeni tarihe yetişmek için ${kcalLet(before, o)} mı?`;
     };
     const slowCopy = (titleTr: string, messageTr: string): Copy => ({
       mood: sit.kind === "stalled" ? "worried" : "think",
@@ -444,14 +447,14 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
             `Planın süresi doldu, hedefe ${pts(input.progress.bfToGo)} puan kaldı. Planı bugünden güncelleyip yeni bir tempo çizelim mi?`
           );
         } else {
-          const say = cutOrLater("Kaloriyi koru, tarihi güncelle", "planı bugünden güncelleyelim");
+          const say = cutOrLater("Sadece planı yenile", "planı bugünden güncelleyelim");
           copy = slowCopy(sit.kind === "stalled" ? "Yağ oranı yerinde sayıyor" : "Biraz geride kaldık", say(`${why}.`));
         }
       }
     } else if (sit.kind === "ahead") {
       copy = { mood: "cheer", trigger: "goal.adjust.ahead", titleTr: "Plandan öndesin!", messageTr: `Beklenenden ${d} kg öndesin!${earlier()}` };
     } else {
-      const say = cutOrLater("Kaloriyi koru, tarihi ötele", "tarihi öteleyelim");
+      const say = cutOrLater("Sadece tarihi ötele", "tarihi öteleyelim");
       copy = slowCopy(
         sit.kind === "stalled" ? "Trend yerinde sayıyor" : "Biraz geride kaldık",
         say(sit.kind === "stalled" ? "İki haftadır kilo düşmüyor." : `Trend planın ${d} kg gerisinde.`)
