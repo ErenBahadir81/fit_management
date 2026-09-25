@@ -9,6 +9,7 @@ import { radii, spacing } from "../../../theme/tokens";
 import { Button } from "../../../ui/Button";
 import { Chip } from "../../../ui/Chip";
 import { Icon } from "../../../ui/Icon";
+import { SlamIn } from "../../../ui/Juice";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
 import { lastPerformanceLabel } from "../lib/present";
@@ -102,27 +103,32 @@ export function ExercisePane({ exercise, index, width, muscles, last, onSetReps,
               {exercise.sets.map((set, i) =>
                 set.done ? (
                   <Animated.View key={i} layout={rowLayout} entering={FadeIn.duration(140)} exiting={FadeOut.duration(120)}>
-                    <Pressable
-                      onPress={() => onUndoSet(i)}
-                      haptic="select"
-                      testID={`set-done-${index}-${i}`}
-                      accessibilityLabel={`${i + 1}. set tamam, ${setLabel(set, unit)}${set.rir !== null ? `, RIR ${set.rir}` : ""}. Geri almak için dokun`}
-                      style={[styles.doneRow, { backgroundColor: colors.successSoft }]}
-                    >
-                      <View style={[styles.badge, { backgroundColor: colors.success }]}>
-                        <Icon icon="check" size={14} color="onPrimary" />
-                      </View>
-                      <Text variant="bodyStrong" tabular style={styles.grow}>
-                        {setLabel(set, unit)}
-                      </Text>
-                      {set.rir !== null ? (
-                        <Text variant="caption" color="inkMuted" tabular>
-                          RIR {set.rir}
+                    {/* A finished set lands: the row slams in and the check spins onto it. */}
+                    <SlamIn spin={false} peak={1.06}>
+                      <Pressable
+                        onPress={() => onUndoSet(i)}
+                        haptic="select"
+                        testID={`set-done-${index}-${i}`}
+                        accessibilityLabel={`${i + 1}. set tamam, ${setLabel(set, unit)}${set.rir !== null ? `, RIR ${set.rir}` : ""}. Geri almak için dokun`}
+                        style={[styles.doneRow, { backgroundColor: colors.successSoft }]}
+                      >
+                        <View style={[styles.badge, { backgroundColor: colors.success }]}>
+                          <SlamIn>
+                            <Icon icon="check" size={14} color="onPrimary" />
+                          </SlamIn>
+                        </View>
+                        <Text variant="bodyStrong" tabular style={styles.grow}>
+                          {setLabel(set, unit)}
                         </Text>
-                      ) : null}
-                      {/* The whole row undoes; the arrow is there so people know it can be undone. */}
-                      <Icon icon="undo" size={16} color="inkSubtle" />
-                    </Pressable>
+                        {set.rir !== null ? (
+                          <Text variant="caption" color="inkMuted" tabular>
+                            RIR {set.rir}
+                          </Text>
+                        ) : null}
+                        {/* The whole row undoes; the arrow is there so people know it can be undone. */}
+                        <Icon icon="undo" size={16} color="inkSubtle" />
+                      </Pressable>
+                    </SlamIn>
                   </Animated.View>
                 ) : i === active ? (
                   <Animated.View
@@ -199,7 +205,13 @@ export function ExercisePane({ exercise, index, width, muscles, last, onSetReps,
                         RIR
                       </Text>
                       {RIR_CHOICES.map((v) => (
-                        <RirChoice key={v} value={v} selected={set.rir === v} onPress={() => onSetRir(i, set.rir === v ? null : v)} testID={`rir-${index}-${v}`} />
+                        <RirChoice
+                          key={v}
+                          value={v}
+                          selected={set.rir === v}
+                          onPress={() => onSetRir(i, set.rir === v ? null : v)}
+                          testID={`rir-${index}-${v}`}
+                        />
                       ))}
                     </View>
                   </Animated.View>
@@ -257,10 +269,28 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: spacing.gutter, paddingBottom: spacing.xxl, gap: spacing.lg },
   head: { gap: spacing.sm },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  reference: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.sm, borderWidth: StyleSheet.hairlineWidth, borderStyle: "dashed" },
+  reference: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: "dashed",
+  },
   setList: { gap: spacing.sm },
   doneRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 52, paddingHorizontal: spacing.lg, borderRadius: radii.control },
-  pendingRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 52, paddingHorizontal: spacing.lg, borderRadius: radii.control, borderWidth: 1, borderStyle: "dashed" },
+  pendingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.control,
+    borderWidth: 1,
+    borderStyle: "dashed",
+  },
   activeCard: { gap: spacing.md, padding: spacing.lg, borderRadius: radii.card, borderWidth: 2 },
   fields: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   field: { flex: 1 },

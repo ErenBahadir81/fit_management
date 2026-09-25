@@ -20,6 +20,7 @@ import { Pressable } from "../../ui/Pressable";
 import { Text } from "../../ui/Text";
 import { Floo as FlooLegacy } from "../Floo";
 import { FlooModel, type Mood as FlooMood } from "../model";
+import { useFlooHydration } from "../hydration";
 import { toLegacyMood } from "../moodMap";
 import type { QueuedMessage } from "./queue";
 import { useFloo, useFlooPresence, type FlooPresence, type FlooVoice } from "./FlooVoiceProvider";
@@ -104,8 +105,9 @@ function useOwnReaction(reaction: FlooVoice["reaction"], active: boolean): FlooV
  * arrived, the v1 SVG Floo stands in (it has the face but no gestures).
  */
 function CornerFloo({ mood, trigger }: { mood: FlooMood; trigger: FlooVoice["reaction"] }) {
+  const hydration = useFlooHydration();
   if (isSkiaUnavailable()) return <FlooLegacy mood={toLegacyMood(mood)} size={FLOO_CORNER_SIZE} detail="simple" testID="floo-corner-model" />;
-  return <FlooModel lod="badge" size={FLOO_CORNER_SIZE} mood={mood} trigger={trigger} testID="floo-corner-model" />;
+  return <FlooModel lod="badge" size={FLOO_CORNER_SIZE} mood={mood} trigger={trigger} hydration={hydration ?? undefined} testID="floo-corner-model" />;
 }
 
 function PendingBadge({ count }: { count: number }) {

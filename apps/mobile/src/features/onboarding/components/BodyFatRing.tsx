@@ -6,7 +6,7 @@ import { fmtPct } from "../../../lib/format";
 import { spacing } from "../../../theme/tokens";
 import { Ring } from "../../../ui/Ring";
 import { Text } from "../../../ui/Text";
-import { SlamIn, usePop } from "./Juice";
+import { SlamIn, usePop } from "../../../ui/Juice";
 
 export interface BodyFatRingProps {
   /** Measurements in and plausible so far. */
@@ -33,34 +33,37 @@ export const BodyFatRing = forwardRef<View, BodyFatRingProps>(function BodyFatRi
   const label = done ? `Tahmini yağ oranın ${fmtPct(bodyFatPct)}, ${category}` : `${filled} / ${total} ölçü girildi`;
 
   return (
-    <Animated.View ref={ref} collapsable={false} style={[styles.wrap, pop]} accessible accessibilityLabel={label} testID="ob-ring">
-      <Ring value={total > 0 ? filled / total : 0} size={size} accessibilityLabel={label}>
-        {done ? (
-          <Animated.View key="pct" entering={fade} exiting={FadeOut.duration(120)} style={styles.center}>
-            <SlamIn spin={false} style={styles.center}>
-              <Text variant="number" tone="primary" tabular testID="ob-ring-pct">
-                {fmtPct(bodyFatPct)}
+    <View ref={ref} collapsable={false} style={styles.wrap} accessible accessibilityLabel={label} testID="ob-ring">
+      {/* The pop sits inside the ref'd view, so Floo measures the ring at rest when he points at it. */}
+      <Animated.View style={pop}>
+        <Ring value={total > 0 ? filled / total : 0} size={size} accessibilityLabel={label}>
+          {done ? (
+            <Animated.View key="pct" entering={fade} exiting={FadeOut.duration(120)} style={styles.center}>
+              <SlamIn spin={false} style={styles.center}>
+                <Text variant="number" tone="primary" tabular testID="ob-ring-pct">
+                  {fmtPct(bodyFatPct)}
+                </Text>
+                <Text variant="caption" color="inkMuted">
+                  yağ
+                </Text>
+              </SlamIn>
+            </Animated.View>
+          ) : (
+            <Animated.View key="count" entering={fade} exiting={FadeOut.duration(120)} style={styles.center}>
+              <Text variant="number" tabular testID="ob-ring-count">
+                {filled}/{total}
               </Text>
               <Text variant="caption" color="inkMuted">
-                yağ
+                ölçü
               </Text>
-            </SlamIn>
-          </Animated.View>
-        ) : (
-          <Animated.View key="count" entering={fade} exiting={FadeOut.duration(120)} style={styles.center}>
-            <Text variant="number" tabular testID="ob-ring-count">
-              {filled}/{total}
-            </Text>
-            <Text variant="caption" color="inkMuted">
-              ölçü
-            </Text>
-          </Animated.View>
-        )}
-      </Ring>
+            </Animated.View>
+          )}
+        </Ring>
+      </Animated.View>
       <Text variant="label" color={category ? "ink" : "inkSubtle"} align="center" testID="ob-ring-category" style={styles.caption}>
         {category ?? "Yağ oranı"}
       </Text>
-    </Animated.View>
+    </View>
   );
 });
 

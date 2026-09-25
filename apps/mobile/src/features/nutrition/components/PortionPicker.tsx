@@ -6,6 +6,7 @@ import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Chip } from "../../../ui/Chip";
 import { Icon } from "../../../ui/Icon";
+import { Pop } from "../../../ui/Juice";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
 import { portionPresets, type PortionInfo } from "../model/scanMachine";
@@ -46,20 +47,22 @@ export function PortionPicker({ food, grams, onChange, label, testID }: PortionP
             }}
           />
         ))}
-        <Pressable
-          testID={`${testID}-grams`}
-          onPress={() => setKeypad((k) => !k)}
-          haptic="select"
-          minTarget={false}
-          accessibilityLabel={`${label} miktarı ${fmtInt(grams)} gram. Gram girmek için dokun.`}
-          accessibilityState={{ expanded: keypad }}
-          style={[styles.amount, { borderColor: keypad ? colors.focus : colors.controlBorder, backgroundColor: colors.surface }]}
-        >
-          <Text variant="label" tabular testID={`${testID}-grams-value`}>
-            {fmtInt(grams)} g
-          </Text>
-          <Icon icon="edit" size={14} color="inkMuted" />
-        </Pressable>
+        <Pop trigger={grams} amount={0.12}>
+          <Pressable
+            testID={`${testID}-grams`}
+            onPress={() => setKeypad((k) => !k)}
+            haptic="select"
+            minTarget={false}
+            accessibilityLabel={`${label} miktarı ${fmtInt(grams)} gram. Gram girmek için dokun.`}
+            accessibilityState={{ expanded: keypad }}
+            style={[styles.amount, { borderColor: keypad ? colors.focus : colors.controlBorder, backgroundColor: colors.surface }]}
+          >
+            <Text variant="label" tabular testID={`${testID}-grams-value`}>
+              {fmtInt(grams)} g
+            </Text>
+            <Icon icon="edit" size={14} color="inkMuted" />
+          </Pressable>
+        </Pop>
       </View>
       {keypad ? (
         <Animated.View entering={reduce ? undefined : FadeIn.duration(150)}>

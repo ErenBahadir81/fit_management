@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { List, type ListRenderItem } from "../../ui/List";
 import { useRouter } from "expo-router";
 import type { Meal, MealEntryDTO } from "@fitfloow/core";
@@ -23,11 +23,13 @@ import { UndoBar } from "../../ui/UndoBar";
 import { CalorieHero } from "./components/CalorieHero";
 import { EnergyCard } from "./components/EnergyCard";
 import { NutritionGoalStrip } from "./components/NutritionGoalStrip";
+import { WaterCard } from "./components/WaterCard";
 import { DayPager } from "./components/DayPager";
 import { Fab, FAB_SIZE } from "./components/Fab";
 import { EntryRow, MealAddRow, MealEmptyRow, MealHeaderRow } from "./components/MealRows";
 import { buildDayRows, type DayRow } from "./components/dayRows";
 import { NutritionSkeleton } from "./NutritionSkeleton";
+import { ProgressView } from "./ProgressView";
 import { WeekSkeleton, WeekView } from "./WeekView";
 import { mealForHour } from "./model/meals";
 import { AddSheet, type AddAction } from "./sheets/AddSheet";
@@ -48,6 +50,7 @@ type SheetState =
 const TABS = [
   { value: "day" as const, label: "Gün" },
   { value: "week" as const, label: "Hafta" },
+  { value: "progress" as const, label: "İlerleme" },
 ];
 
 /** The delete already left optimistically; the undo window only remembers what to put back. */
@@ -59,9 +62,11 @@ export function NutritionScreen() {
   const toast = useToast();
   const tabSpace = useTabBarSpace();
 
-  const [tab, setTab] = useState<"day" | "week">("day");
+  const [tab, setTab] = useState<"day" | "week" | "progress">("day");
   const [dateKey, setDateKey] = useState(() => todayKey());
   const [sheet, setSheet] = useState<SheetState>(null);
+  const [fabHidden, setFabHidden] = useState(false);
+  const lastY = useRef(0);
 
   const day = useNutritionDay(dateKey);
   const week = useNutritionWeek(dateKey);
@@ -90,6 +95,19 @@ export function NutritionScreen() {
     void day.refetch();
     void week.refetch();
   }, [day, week]);
+
+  useEffect(() => {
+    lastY.current = 0;
+    setFabHidden(false);
+  }, [dateKey, tab]);
+  /* Down hides the FAB (it would cover the row being read), up or back at the top shows it. */
+  const onListScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const dy = y - lastY.current;
+    if (Math.abs(dy) < 8) return;
+    lastY.current = y;
+    setFabHidden(y > 24 && dy > 0);
+  }, []);
 
   const openAdd = useCallback((meal: Meal) => setSheet({ kind: "add", meal }), []);
   const openTarget = useCallback(() => setSheet({ kind: "target" }), []);
@@ -169,12 +187,16 @@ export function NutritionScreen() {
           </Entry>
           <View style={styles.heroGap} />
           <Entry index={2}>
+            <WaterCard dateKey={dateKey} />
+          </Entry>
+          <View style={styles.heroGap} />
+          <Entry index={3}>
             <EnergyCard onSetGoal={goSetGoal} onAddMeasurement={goBody} />
           </Entry>
           <View style={styles.heroGap} />
         </View>
       ) : null,
-    [day.data, goBody, goRoadmap, goSetGoal, openTarget, today]
+    [day.data, dateKey, goBody, goRoadmap, goSetGoal, openTarget, today]
   );
 
   if (day.isError && !day.data) {
@@ -217,11 +239,17 @@ export function NutritionScreen() {
             getItemType={typeOf}
             renderItem={renderItem}
             ListHeaderComponent={listHeader}
+            onScroll={onListScroll}
+            scrollEventThrottle={32}
             contentContainerStyle={listStyle}
             refreshControl={<ListRefreshControl refreshing={day.isRefetching && !day.isPending} onRefresh={refresh} />}
             showsVerticalScrollIndicator={false}
           />
         </Reveal>
+      ) : tab === "progress" ? (
+        <ScrollView testID="nutrition-progress-scroll" contentContainerStyle={weekStyle} showsVerticalScrollIndicator={false}>
+          <ProgressView todayKey={today} onOpenRoadmap={goRoadmap} onSetGoal={goSetGoal} onAddMeasurement={goBody} />
+        </ScrollView>
       ) : (
         <ScrollView testID="nutrition-week-scroll" contentContainerStyle={weekStyle} showsVerticalScrollIndicator={false} refreshControl={<ListRefreshControl refreshing={week.isRefetching && !week.isPending} onRefresh={refresh} />}>
           <Reveal ready={Boolean(week.data)} skeleton={<WeekSkeleton />}>
@@ -230,7 +258,7 @@ export function NutritionScreen() {
         </ScrollView>
       )}
 
-      {tab === "day" ? <Fab onPress={() => openAdd(defaultMeal)} bottom={tabSpace + spacing.md} /> : null}
+      {tab === "day" ? <Fab onPress={() => openAdd(defaultMeal)} bottom={tabSpace + spacing.md} hidden={fabHidden} /> : null}
       {pending ? <UndoBar message={`${pending.name} silindi`} onUndo={onUndoDelete} bottom={tabSpace + spacing.md + (tab === "day" ? FAB_SIZE + spacing.md : 0)} /> : null}
 
       {sheet?.kind === "add" ? <AddSheet meal={sheet.meal} onPick={onPickAction} onClose={() => closeKind("add")} /> : null}

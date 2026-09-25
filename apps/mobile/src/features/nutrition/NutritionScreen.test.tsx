@@ -214,6 +214,48 @@ describe("NutritionScreen — day", () => {
     await waitFor(() => expect(screen.queryByTestId("jump-today")).toBeNull());
   });
 
+  test("the FAB slides away while the day list scrolls down and comes back on the way up", async () => {
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
+    const list = screen.getByTestId("nutrition-day-list");
+    const host = () => screen.getByTestId("nutrition-fab-host");
+    const scrollTo = (y: number) => fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y }, contentSize: { width: 390, height: 2000 }, layoutMeasurement: { width: 390, height: 800 } } });
+
+    await act(async () => scrollTo(300));
+    await waitFor(() => expect(host().props.pointerEvents).toBe("none"));
+    await act(async () => scrollTo(120));
+    await waitFor(() => expect(host().props.pointerEvents).toBe("box-none"));
+  });
+
+  test("the progress tab: Floo's read, weekly adherence, plan vs trend, body fat and waist; the roadmap is one tap", async () => {
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId("nutrition-tabs-progress"));
+    await waitFor(() => expect(screen.getByTestId("nutrition-progress")).toBeTruthy());
+    expect(screen.getByTestId("progress-feedback-text")).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("progress-adherence")).toBeTruthy());
+    expect(screen.getByTestId("progress-plan-chart")).toBeTruthy();
+    expect(screen.getByTestId("progress-bf")).toBeTruthy();
+    expect(screen.getByTestId("progress-waist")).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId("progress-roadmap"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/(modals)/goal/roadmap");
+  });
+
+  test("the progress tab without a goal invites setting one instead of an empty plan chart", async () => {
+    const api = await signedInApi();
+    api.fake.goal = null;
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
+
+    await fireEvent.press(screen.getByTestId("nutrition-tabs-progress"));
+    await waitFor(() => expect(screen.getByTestId("nutrition-progress")).toBeTruthy());
+    expect(screen.queryByTestId("progress-plan")).toBeNull();
+    await fireEvent.press(screen.getByTestId("progress-set-goal"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/(modals)/goal/setup");
+  });
+
   test("the week tab shows the bars, the average and an adherence chip", async () => {
     await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());

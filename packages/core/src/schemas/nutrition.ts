@@ -159,3 +159,17 @@ export type ScanResultDTO = z.infer<typeof zScanResult>;
 
 export const zFoodSearchResponse = z.object({ foods: z.array(zFood), remote: z.array(zFood) });
 export type FoodSearchResponse = z.infer<typeof zFoodSearchResponse>;
+
+/** Water for one day: the running total, the goal it counts toward, and how many taps made it. */
+export const zWaterDay = z.object({
+  dateKey: z.string(),
+  totalMl: z.number().min(0),
+  goalMl: z.number().positive(),
+  count: z.number().int().min(0),
+});
+export type WaterDay = z.infer<typeof zWaterDay>;
+export const zAddWaterInput = z.object({
+  ml: z.number().int().min(50).max(2000),
+  dateKey: z.string().optional(),
+});
+export type AddWaterInput = z.infer<typeof zAddWaterInput>;
