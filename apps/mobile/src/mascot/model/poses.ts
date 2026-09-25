@@ -28,8 +28,10 @@ const both = (spec: Record<string, number>): PoseSpec => {
 
 export const MOOD_RIG_SPEC: Record<Mood, PoseSpec> = {
   idle: {},
-  happy: { ...both({ sh: 33, el: -9, wr: -6, curl: 0, spread: 0.4 }) },
-  celebrate: { ...both({ sh: 148, el: 14, wr: 0, curl: 0, spread: 0.85 }) },
+  happy: { ...both({ sh: 30, el: -12, wr: -6, curl: 0, spread: 0.4 }) },
+  // Arms open, hands down and out — the pose a cheer settles into. Not straight up: a mood is held for
+  // seconds, and arms held overhead read as a gesture that forgot to finish.
+  celebrate: { ...both({ sh: 38, el: 6, wr: 2, curl: 0, spread: 0.85 }) },
   sad: { ...both({ sh: 13, el: -6, wr: -4, curl: 0.35, spread: 0 }), L_fx: -1.5, R_fx: -1.5 },
   // Hands wrung together in front of the belly.
   worried: {
@@ -93,28 +95,37 @@ export const IDLE_GESTURES: readonly Gesture[] = ["scratchHead", "footTap", "loo
 const SPEC: Record<Gesture, GestureSpec> = {
   wave: {
     keys: [
-      { t: 110, pose: { R_sh: 18, R_el: -12, lean: 1 }, ease: "out" },
-      { t: 300, pose: { R_sh: 146, R_el: 22, R_wr: -4, R_curl: 0, R_spread: 0.9, lean: -2.5, lookX: 0.25 }, ease: "out" },
-      { t: 440, pose: { R_el: -8, R_wr: 8 } },
-      { t: 590, pose: { R_el: 30, R_wr: -10 } },
-      { t: 720, pose: { R_el: -4, R_wr: 6 } },
-      { t: 890, pose: { R_el: 26, R_wr: -6 } },
-      { t: 1080, pose: { R_el: 14, R_wr: 0, lean: -1.5 } },
-      { t: 1420, pose: {} },
+      { t: 110, pose: { R_sh: 18, R_el: -14, lean: 1 }, ease: "out" },
+      { t: 320, pose: { R_sh: 142, R_el: 26, R_wr: -4, R_curl: 0, R_spread: 0.9, lean: -2.5, lookX: 0.25 }, ease: "out" },
+      { t: 450, pose: { R_el: -6, R_wr: 10 } },
+      { t: 600, pose: { R_el: 30, R_wr: -10 } },
+      { t: 730, pose: { R_el: 0, R_wr: 6 } },
+      { t: 900, pose: { R_el: 24, R_wr: -6 } },
+      { t: 1060, pose: { R_sh: 146, R_el: 12, R_wr: 0, lean: -1.5 } },
+      // Down on an arc: the elbow folds in as the arm drops and the hand trails, instead of the
+      // whole straight arm swinging down like a signal post.
+      { t: 1270, pose: { R_sh: 84, R_el: -38, R_wr: 14, R_spread: 0.4, lean: 0, lookX: 0.1 } },
+      { t: 1430, pose: { R_sh: 40, R_el: -26, R_wr: -2 }, ease: "out" },
+      { t: 1620, pose: {} },
     ],
   },
+
   clap: {
+    // Hands meet in front of the belly, well below the chin, with the elbows bent: the arms are
+    // short (41.6 units), so a clap at the centre line with straight arms read as a flattened
+    // plank, and the old hand height put the mittens over the mouth.
     keys: [
-      { t: 140, pose: { L_ik: 1, R_ik: 1, L_front: 1, R_front: 1, L_ikX: 70, L_ikY: 194, R_ikX: 130, R_ikY: 193, L_wr: -58, R_wr: -58, L_spread: 0.1, R_spread: 0.1, L_curl: 0, R_curl: 0 }, ease: "out" },
-      { t: 240, pose: { L_ikX: 92, R_ikX: 108, squash: 0.03 }, ease: "in" },
-      { t: 360, pose: { L_ikX: 73, R_ikX: 127, squash: 0 }, ease: "out" },
-      { t: 450, pose: { L_ikX: 92, R_ikX: 108, squash: 0.03 }, ease: "in" },
-      { t: 590, pose: { L_ikX: 71, R_ikX: 129, squash: 0 }, ease: "out" },
-      { t: 700, pose: { L_ikX: 92.5, R_ikX: 107.5, squash: 0.035 }, ease: "in" },
-      { t: 900, pose: { L_ikX: 88, R_ikX: 112, squash: 0 } },
-      { t: 1200, pose: { L_ik: 0, R_ik: 0, L_front: 0, R_front: 0 } },
+      { t: 150, pose: { L_ik: 1, R_ik: 1, L_front: 1, R_front: 1, L_ikX: 65, L_ikY: 197, R_ikX: 135, R_ikY: 197, L_wr: 8, R_wr: 8, L_spread: 0.1, R_spread: 0.1, L_curl: 0, R_curl: 0, lookY: 0.15 }, ease: "out" },
+      { t: 260, pose: { L_ikX: 76.5, L_ikY: 201, R_ikX: 123.5, R_ikY: 201, L_wr: -18, R_wr: -18, squash: 0.03 }, ease: "in" },
+      { t: 380, pose: { L_ikX: 66, L_ikY: 197.5, R_ikX: 134, R_ikY: 197, L_wr: 6, R_wr: 6, squash: 0 }, ease: "out" },
+      { t: 480, pose: { L_ikX: 77, L_ikY: 201.5, R_ikX: 123, R_ikY: 201.5, L_wr: -18, R_wr: -18, squash: 0.03 }, ease: "in" },
+      { t: 620, pose: { L_ikX: 65.5, L_ikY: 197, R_ikX: 134.5, R_ikY: 197.5, L_wr: 8, R_wr: 8, squash: 0 }, ease: "out" },
+      { t: 740, pose: { L_ikX: 77.5, L_ikY: 202, R_ikX: 122.5, R_ikY: 202, L_wr: -20, R_wr: -20, squash: 0.035 }, ease: "in" },
+      { t: 960, pose: { L_ikX: 73, L_ikY: 200, R_ikX: 127, R_ikY: 200, L_wr: -10, R_wr: -10, squash: 0, lookY: 0 } },
+      { t: 1250, pose: { L_ik: 0, R_ik: 0, L_front: 0, R_front: 0 } },
     ],
   },
+
   fistPump: {
     keys: [
       { t: 120, pose: { R_sh: 16, R_el: 30, R_curl: 1, R_thumb: -1, squash: 0.06, hop: -1.5 }, ease: "out" },
@@ -127,24 +138,31 @@ const SPEC: Record<Gesture, GestureSpec> = {
   },
   cheer: {
     keys: [
-      { t: 120, pose: { L_sh: 10, R_sh: 12, L_el: 25, R_el: 25, L_curl: 1, R_curl: 1, L_thumb: -1, R_thumb: -1 }, ease: "out" },
-      { t: 300, pose: { L_sh: 158, R_sh: 164, L_el: 10, R_el: 6, L_wr: 0, R_wr: 0 }, ease: "out" },
-      { t: 470, pose: { L_sh: 138, R_sh: 150, L_el: 34, R_el: 22 } },
-      { t: 640, pose: { L_sh: 160, R_sh: 158, L_el: 8, R_el: 12 }, ease: "out" },
-      { t: 1100, pose: { L_sh: 150, R_sh: 152, L_el: 14, R_el: 14 } },
-      { t: 1450, pose: {} },
+      { t: 130, pose: { L_sh: 12, R_sh: 14, L_el: 30, R_el: 30, L_curl: 1, R_curl: 1, L_thumb: -1, R_thumb: -1, squash: 0.05 }, ease: "out" },
+      { t: 360, pose: { L_sh: 150, R_sh: 158, L_el: 16, R_el: 10, L_wr: 0, R_wr: 0, squash: -0.04 }, ease: "out" },
+      { t: 520, pose: { L_sh: 136, R_sh: 146, L_el: 36, R_el: 26, squash: 0 } },
+      { t: 680, pose: { L_sh: 156, R_sh: 152, L_el: 12, R_el: 18, squash: -0.03 }, ease: "out" },
+      { t: 1000, pose: { L_sh: 144, R_sh: 148, L_el: 22, R_el: 18 } },
+      // Arms come down bent, not as two straight poles, and land on the mood's own pose.
+      { t: 1260, pose: { L_sh: 64, R_sh: 60, L_el: 26, R_el: 22, L_curl: 0.5, R_curl: 0.5, L_thumb: 0, R_thumb: 0, squash: 0 } },
+      { t: 1500, pose: {} },
     ],
   },
+
   flex: {
+    // Upper arms out level, forearms up, fists beside the head — outside the silhouette, where the
+    // biceps can be seen (a deeper elbow tucked the fists behind the head).
     keys: [
-      { t: 150, pose: { L_sh: 58, R_sh: 62, L_el: 30, R_el: 34, L_curl: 1, R_curl: 1, L_thumb: -1, R_thumb: -1, squash: 0.05 }, ease: "out" },
-      { t: 380, pose: { L_sh: 86, R_sh: 90, L_el: 108, R_el: 112, L_wr: 6, R_wr: 6, squash: -0.05, L_fx: 3, R_fx: 3 }, ease: "out" },
-      { t: 560, pose: { L_el: 118, R_el: 104, squash: -0.03 } },
-      { t: 740, pose: { L_el: 104, R_el: 120, squash: -0.055 } },
-      { t: 1100, pose: { L_el: 110, R_el: 112 } },
-      { t: 1450, pose: {} },
+      { t: 150, pose: { L_sh: 50, R_sh: 54, L_el: 20, R_el: 24, L_curl: 1, R_curl: 1, L_thumb: -1, R_thumb: -1, squash: 0.05 }, ease: "out" },
+      { t: 400, pose: { L_sh: 88, R_sh: 92, L_el: 78, R_el: 82, L_wr: 8, R_wr: 8, squash: -0.05, L_fx: 3, R_fx: 3 }, ease: "out" },
+      { t: 580, pose: { L_el: 90, R_el: 74, squash: -0.03 } },
+      { t: 760, pose: { L_el: 76, R_el: 92, squash: -0.05 } },
+      { t: 1100, pose: { L_el: 82, R_el: 84, squash: -0.02 } },
+      { t: 1300, pose: { L_sh: 48, R_sh: 50, L_el: 22, R_el: 20, L_curl: 0.6, R_curl: 0.6, L_thumb: 0, R_thumb: 0, squash: 0, L_fx: 0, R_fx: 0 } },
+      { t: 1520, pose: {} },
     ],
   },
+
   point: {
     keys: [
       { t: 120, pose: { R_sh: 20, R_el: -10, R_curl: 0.6 }, ease: "out" },
@@ -207,15 +225,20 @@ const SPEC: Record<Gesture, GestureSpec> = {
     ],
   },
   fallRecover: {
+    // Tips, flails (elbows bent, hands up and in — never a T), sits down hard, stays down a beat,
+    // pushes off, gets up with a small overshoot and settles. No pose is held flat into the end.
     keys: [
-      { t: 140, pose: { lean: 7, squash: 0.08, hop: -1, ...both({ sh: 64, el: 30, spread: 1, curl: 0 }), L_fy: 4, L_fa: 20 }, ease: "out" },
-      { t: 420, pose: { lean: 13, squash: 0.16, hop: -6, ...both({ sh: 12, el: -8, curl: 0.45, spread: 0 }), L_fy: 0, L_fa: 0, lookY: 0.6, eye: 0.35 }, ease: "in" },
+      { t: 120, pose: { lean: 6, squash: 0.06, hop: -1, ...both({ sh: 38, el: -30, spread: 1, curl: 0 }), L_fy: 4, L_fa: 20, lookY: -0.2 }, ease: "out" },
+      { t: 270, pose: { lean: 10, squash: 0, hop: 1, ...both({ sh: 70, el: -52, spread: 1 }), eye: 0.1 }, ease: "out" },
+      { t: 450, pose: { lean: 13, squash: 0.16, hop: -6, ...both({ sh: 14, el: -10, curl: 0.45, spread: 0 }), L_fy: 0, L_fa: 0, lookY: 0.6, eye: 0.35 }, ease: "in" },
       { t: 1250, pose: { lean: 12, squash: 0.15, hop: -6 } },
-      { t: 1550, pose: { lean: -4, squash: -0.06, hop: 3, ...both({ sh: 40, el: 10, curl: 0.2 }), lookY: 0, eye: 0 }, ease: "out" },
-      { t: 1800, pose: { lean: 1, squash: 0.02, hop: 0 } },
-      { t: 2050, pose: {} },
+      { t: 1430, pose: { lean: 9, squash: 0.19, hop: -7, ...both({ sh: 22, el: 16, curl: 0.3 }), lookY: 0.2 }, ease: "inOut" },
+      { t: 1650, pose: { lean: -3, squash: -0.05, hop: 2, ...both({ sh: 34, el: -6, curl: 0.2 }), lookY: 0, eye: 0 }, ease: "out" },
+      { t: 1870, pose: { lean: 1, squash: 0.02, hop: 0 } },
+      { t: 2150, pose: {} },
     ],
   },
+
   bellyPat: {
     keys: [
       { t: 220, pose: { L_ik: 1, R_ik: 1, L_front: 1, R_front: 1, L_ikX: 72, L_ikY: 208, R_ikX: 126, R_ikY: 210, L_wr: -70, R_wr: -64, L_curl: 0.1, R_curl: 0.1 }, ease: "out" },
@@ -227,15 +250,19 @@ const SPEC: Record<Gesture, GestureSpec> = {
     ],
   },
   whoa: {
+    // Hands up beside the face — they stay outside the silhouette, so they are drawn behind the
+    // body like any raised arm (flipping both to the front layer at once was a one-frame jump).
     keys: [
       { t: 110, pose: { lean: 4, squash: 0.05, L_fx: 3, R_fy: 5 }, ease: "out" },
-      { t: 300, pose: { ...both({ sh: 44, el: 74, wr: -12, spread: 0.9, curl: 0, front: 1 }), lean: 6, R_fy: 0, R_fx: -2, squash: 0 }, ease: "out" },
+      { t: 300, pose: { ...both({ sh: 44, el: 74, wr: -12, spread: 0.9, curl: 0 }), lean: 6, R_fy: 0, R_fx: -2, squash: 0 }, ease: "out" },
       { t: 460, pose: { L_fy: 4, L_fx: -2 } },
       { t: 600, pose: { L_fy: 0 } },
       { t: 1050, pose: { lean: 3 } },
-      { t: 1350, pose: {} },
+      { t: 1260, pose: { ...both({ sh: 30, el: 22, wr: -6, spread: 0.5 }), lean: 1, L_fx: 0, R_fx: 0 } },
+      { t: 1460, pose: {} },
     ],
   },
+
   boop: {
     keys: [
       { t: 70, pose: { ...both({ sh: 70, el: 20, spread: 1, curl: 0 }), L_fy: 3, R_fy: 3, eye: 0.3 }, ease: "out" },
