@@ -6,3 +6,4 @@ export * from "./totals";
 export * from "./search";
 export * from "./targets";
 export * from "./food101";
+export * from "./water";

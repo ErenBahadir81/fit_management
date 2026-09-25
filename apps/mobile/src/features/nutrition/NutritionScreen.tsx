@@ -22,6 +22,7 @@ import { useToast } from "../../ui/Toast";
 import { UndoBar } from "../../ui/UndoBar";
 import { CalorieHero } from "./components/CalorieHero";
 import { EnergyCard } from "./components/EnergyCard";
+import { WaterCard } from "./components/WaterCard";
 import { DayPager } from "./components/DayPager";
 import { Fab, FAB_SIZE } from "./components/Fab";
 import { EntryRow, MealAddRow, MealEmptyRow, MealHeaderRow } from "./components/MealRows";
@@ -164,12 +165,16 @@ export function NutritionScreen() {
           </Entry>
           <View style={styles.heroGap} />
           <Entry index={1}>
+            <WaterCard dateKey={dateKey} />
+          </Entry>
+          <View style={styles.heroGap} />
+          <Entry index={2}>
             <EnergyCard onSetGoal={goSetGoal} onAddMeasurement={goBody} />
           </Entry>
           <View style={styles.heroGap} />
         </View>
       ) : null,
-    [day.data, goBody, goSetGoal, openTarget]
+    [day.data, dateKey, goBody, goSetGoal, openTarget]
   );
 
   if (day.isError && !day.data) {

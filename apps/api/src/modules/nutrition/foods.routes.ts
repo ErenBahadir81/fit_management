@@ -1,10 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { zCreateMealEntryInput, zDietTargetInput, zFoodInput, zUpdateMealEntryInput } from "@fitfloow/core";
+import { zAddWaterInput, zCreateMealEntryInput, zDietTargetInput, zFoodInput, zUpdateMealEntryInput } from "@fitfloow/core";
 import type { AppContext } from "../../context";
 import { MAX_SEARCH_LIMIT, createUserFood, findByBarcode, getFood, recentFoods, searchFoods } from "./foods.service";
 import { createEntry, dayView, deleteEntry, updateEntry, weekView } from "./entries.service";
 import { resolveTarget, setTarget } from "./target.service";
+import { addWater, undoWater, waterDay } from "./water.service";
 
 const zSearchQuery = z.object({
   q: z.string().max(80).default(""),
@@ -75,6 +76,23 @@ export async function foodsRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get("/nutrition/week", { ...auth, schema: { querystring: zWeekQuery } }, async (req) => {
     const { week } = req.query as z.infer<typeof zWeekQuery>;
     return weekView(ctx, req.auth.id, week);
+  });
+
+  /* -------------------------------- water ------------------------------- */
+
+  app.get("/nutrition/water", { ...auth, schema: { querystring: zDateQuery } }, async (req) => {
+    const { date } = req.query as z.infer<typeof zDateQuery>;
+    return waterDay(ctx, req.auth.id, date);
+  });
+
+  app.post("/nutrition/water", { ...auth, schema: { body: zAddWaterInput } }, async (req, reply) => {
+    const input = req.body as z.infer<typeof zAddWaterInput>;
+    return reply.status(201).send(await addWater(ctx, req.auth.id, input));
+  });
+
+  app.delete("/nutrition/water/last", { ...auth, schema: { querystring: zDateQuery } }, async (req) => {
+    const { date } = req.query as z.infer<typeof zDateQuery>;
+    return undoWater(ctx, req.auth.id, date);
   });
 
   /* -------------------------------- target ------------------------------ */

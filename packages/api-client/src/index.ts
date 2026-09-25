@@ -54,6 +54,7 @@ import type {
   TrainingStats,
   UpdateMeInput,
   UserDTO,
+  WaterDay,
   WeekNutrition,
   WeeklyReportDTO,
   WeeklyReportSummary,
@@ -221,6 +222,10 @@ export function createApiClient(options: ApiClientOptions) {
         return r<ScanResultDTO>("/nutrition/scan", { method: "POST", formData: fd, signal });
       },
       week: (week?: string) => r<WeekNutrition>("/nutrition/week", { query: { week } }),
+      /** Today's water (or `date`'s): total, goal and tap count. */
+      water: (date?: string) => r<WaterDay>("/nutrition/water", { query: { date } }),
+      addWater: (ml: number, dateKey?: string) => r<WaterDay>("/nutrition/water", { body: dateKey ? { ml, dateKey } : { ml } }),
+      undoWater: (date?: string) => r<WaterDay>("/nutrition/water/last", { method: "DELETE", query: { date } }),
       target: () => r<DietTargetDTO>("/nutrition/target"),
       setTarget: (input: { mode: "auto" | "manual"; calories?: number; protein?: number; carbs?: number; fat?: number }) =>
         r<DietTargetDTO>("/nutrition/target", { method: "PUT", body: input }),
