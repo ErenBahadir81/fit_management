@@ -4,7 +4,7 @@ Bu belge, Claude Projects içinde yürütülen production sprint'ini **doğrudan
 Claude Code oturumuna** devretmek için yazıldı. Yeni oturum önce bu dosyayı, sonra `handoff/` altındaki
 hazırlık notlarını okur. Kalan işlerin kaynağı budur; Projects'teki thread'lere erişim yoktur.
 
-Son güncelleme: 25.09.2026 ≈04:50Z. Sprint PR'larının hepsi main'de (#1–#23). Güncel durum §1 ve §1b, kalan işler §4; §5–§6 ve ek değişmedi. Ürün dili Türkçe, mühendislik dili İngilizce (kod, test, doküman).
+Son güncelleme: 25.09.2026 ≈04:50Z. Sprint PR'larının hepsi main'de (#1–#27). Güncel durum §1 ve §1b, kalan işler §4; §5–§6 ve ek değişmedi. Ürün dili Türkçe, mühendislik dili İngilizce (kod, test, doküman).
 
 ---
 
@@ -19,11 +19,11 @@ Son güncelleme: 25.09.2026 ≈04:50Z. Sprint PR'larının hepsi main'de (#1–#
 | T2 Floo 3 karakteri | bitti (#5, #11, #16, #21); açık hareket maddeleri §4.1 |
 | T3 Antrenman mantığı core+API | bitti (#2, #11 seed senkronu) |
 | T4 Aktivasyon verisi + admin düzenleme | bitti (#6, #11) |
-| T7 Kas kazanma motoru, FFMI, uyarlanan hedef | bitti (#4, #8); mobil UI #14/#22; açık madde §4.2 |
+| T7 Kas kazanma motoru, FFMI, uyarlanan hedef | bitti (#4, #8); mobil UI #14/#22/#26; açık madde §4.2 |
 | T5 Antrenman ekranları | bitti (#11); açık: hareket adları İngilizce §4.4 |
-| T6 Beslenme ekranları | bitti (#11 fotoğraf, #13 hedef şeridi, #18 ilerleme sekmesi, #15 su, #23 "Dünkü gibi") |
+| T6 Beslenme ekranları | bitti (#11 fotoğraf, #13 hedef şeridi, #18 ilerleme sekmesi, #15 su, #23 "Dünkü gibi", #24 son yenenler çubuğu) |
 | T8 Onboarding veri seansı | bitti (#11, #12, #17) |
-| Entegrasyon QA | yapıldı 25.09 (§1b), bulguların çoğu düzeltildi (#19) |
+| Entegrasyon QA | yapıldı 25.09 (§1b): mobil + admin, son main 516aee6 yeşil (#19) |
 
 Bağımlılık kalmadı; §4'teki maddeler birbirinden bağımsız küçük işlerdir.
 
@@ -31,12 +31,13 @@ Bağımlılık kalmadı; §4'teki maddeler birbirinden bağımsız küçük işl
 Merge edilenler:
 - **#12, #17** Onboarding veri girişi: abartılı zıplayan animasyonlar; doğum tarihi "seçilmedi" durumu; review düzeltmeleri.
 - **#20** Aynı zıplayan giriş antrenman set kaydında, tartıda ve gram tuş takımı/porsiyonda.
-- **#13** Beslenme: üstte hedef şeridi + plan-vs-trend mini grafiği. **#18** İlerleme sekmesi (Floo yorumu, uyum, kilo/yağ/bel grafikleri); FAB kaydırınca gizleniyor. **#23** Boş öğüne "Dünkü gibi" tek dokunuş.
+- **#13** Beslenme: üstte hedef şeridi + plan-vs-trend mini grafiği. **#18** İlerleme sekmesi (Floo yorumu, uyum, kilo/yağ/bel grafikleri); FAB kaydırınca gizleniyor. **#23** Boş öğüne "Dünkü gibi" tek dokunuş. **#24** Son yenenlerden hızlı ekleme çubuğu.
 - **#15** Su kaydı: tek dokunuş su kartı, günlük hedef kilodan (35 ml/kg, 1,5–4 L), `waterLogged` → Floo hidrasyonu.
-- **#14, #22** Uyarlanan hedef UI: Floo'nun öneri kartı (kabul/reddet), ölçüm sonrası geri bildirim + progress bar'lar, Vücut sekmesi Gidişat kartı; dürüst "tarih kayacak" metni.
+- **#14, #22, #26** Uyarlanan hedef UI: Floo'nun öneri kartı (kabul/reddet), ölçüm sonrası geri bildirim + progress bar'lar, Vücut sekmesi Gidişat kartı; dürüst "tarih kayacak" metni; geride kalan yağ verme hedefinde güvenlik sınırları içinde "tarihi koru" seçeneği.
 - **#16, #21** Floo: film şeridi 2. tur (IK ağırlıkları, celebrate dinlenme pozu, efekt jitter); reduced-motion geçişleri yumuşak.
-- **#19** QA düzeltmeleri: push-up kas çipleri süzülüyor, yol haritası açıklaması taşmıyor, logger test timeout.
-- Uçtan uca Chromium turu (390 px, gerçek API): kayıt, onboarding 7 adım, 5 sekme, antrenman kaydı, hedef kurulumu, yol haritası, editör; konsol/API hatası yok. Tam paket 88 suite / 981 test yeşil.
+- **#19** QA düzeltmeleri: kas çipleri süzülüyor (yük ≥ 0,5, en fazla 4), yol haritası açıklaması taşmıyor, WorkoutScreen test timeout, `notifications.test.ts` flake'inin kökü ("virtual" mock) düzeltildi.
+- **#25, #27** Admin panel: marka rengi ve Floo çizimi maviye; admin turu (giriş, tüm sayfalar, aktivasyon düzenleme kalıcı) temiz.
+- Uçtan uca Chromium turu (390 px, gerçek API): kayıt, onboarding 7 adım, 5 sekme, antrenman kaydı, hedef kurulumu, yol haritası, editör, admin girişi ve sayfaları; konsol/API hatası yok. Son main (516aee6): typecheck temiz; api 627, admin 462, client 15, core 110, mobile 986 test yeşil.
 
 ## 2. Eren'in kararları (bağlayıcı)
 
@@ -68,10 +69,12 @@ Merge edilenler:
 - Parity hedefi ≥97 (son ölçüm 96,6; yüz 88).
 
 ### 4.2 Uyarlanan hedef
-- "Tarihi koru, daha çok kıs" seçeneği için motorun **sabit hedef tarihe göre** plan çizebilmesi gerekiyor; mevcut güvenlik sınırları (açık, hız) korunmalı, sınır içinde tutulamıyorsa Floo bunu söylemeli (#22 açık maddesi).
+- "Tarihi koru" seçeneği #26 ile geldi (yalnızca geride kalan **cut** için). Bulk/recomp için aynı seçenek yok.
+- **Hedef düzenleme ekranı (`GoalSetupScreen`) sadece "yağ ver" yönünü tanıyor:** aktif hedef kas kazanma ise "Formunu korumak" seçili açılıyor ve buton "Hedefi bırak" diyor. Ekranın bulk ve recomp yönlerini baştan desteklemesi gerekiyor (QA bulgusu, küçük düzeltmeyle kapanmadı).
 
 ### 4.3 Beslenme
-- Hızlı ekleme: "Dünkü gibi" var (#23); favoriler / son yenenlerden tek dokunuş ekleme henüz yok.
+- Hızlı ekleme: "Dünkü gibi" (#23) ve son yenenler çubuğu (#24) var; favoriler yok.
+- Su kartı eklendikten sonra + butonu "Hedefinden" etiketinin üstüne biniyor (QA bulgusu, #18'deki gizlenme bunu kapsamıyor).
 - Barkod web'de çalışmıyor (beklenen), cihazda doğrulanmalı.
 
 ### 4.4 Antrenman
@@ -79,9 +82,7 @@ Merge edilenler:
 - Kas çipi eşiği (#19'da seçildi) Eren'in salon revizyonundan sonra gözden geçirilebilir.
 
 ### 4.5 Test ve ortam
-- `notifications.test.ts`: `isolateModules` kullanıyor, rastgele sırayla geçiyor ama tam paket koşusunda bir kez daha 8 test düştü (25.09 04:15Z); son tam koşuda geçti. Sıra bağımlılığı tam kapanmadı.
 - `e2e/mobile-nutrition` sandbox'ta canvaskit.wasm CDN'i yüzünden düşüyor (ortam sorunu, kod değil); Floo araçları gibi yerel servis edilmeli.
-- Admin panel tarayıcı turu (giriş, katalog + aktivasyon düzenleme, kullanıcılar) 25.09 04:24Z'de başladı; sonucu bu dokümana işlenmediyse tekrar yapılmalı.
 
 ### 4.6 Cihaz kontrolü (Eren)
 - Tüm doğrulama Expo web + Chromium'da yapıldı. iOS/Android'de 60/120 fps hissi, haptik, kamera ve barkod akışı, reduced-motion ayarı cihazda denenmeli.
