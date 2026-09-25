@@ -73,8 +73,8 @@ Merge edilenler:
 - **Hedef düzenleme ekranı (`GoalSetupScreen`) sadece "yağ ver" yönünü tanıyor:** aktif hedef kas kazanma ise "Formunu korumak" seçili açılıyor ve buton "Hedefi bırak" diyor. Ekranın bulk ve recomp yönlerini baştan desteklemesi gerekiyor (QA bulgusu, küçük düzeltmeyle kapanmadı).
 
 ### 4.3 Beslenme
-- Hızlı ekleme: "Dünkü gibi" (#23) ve son yenenler çubuğu (#24) var; favoriler yok.
-- Su kartı eklendikten sonra + butonu "Hedefinden" etiketinin üstüne biniyor (QA bulgusu, #18'deki gizlenme bunu kapsamıyor).
+- Hızlı ekleme: "Dünkü gibi" (#23) ve son yenenler çubuğu (#24) var; favoriler yok (veri modeli değişikliği gerekir).
+- Su kartı eklendikten sonra + butonu listenin en üstündeyken enerji kartının sağ üst "Hedefinden" etiketinin üstüne biniyor (#18'deki kaydırınca gizlenme bunu kapsamıyor; tek satırlık çözüm yok). Seçenekler: daha küçük hap biçimli + butonu, etiketi sola almak, ya da listenin altına boşluk ayırmak.
 - Barkod web'de çalışmıyor (beklenen), cihazda doğrulanmalı.
 
 ### 4.4 Antrenman
