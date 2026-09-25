@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   half: { flexGrow: 1, flexBasis: "40%" },
-  halfCard: { minHeight: 52, paddingVertical: spacing.sm },
+  halfCard: { flexGrow: 1, minHeight: 52, paddingVertical: spacing.sm },
   chosenHint: { minHeight: 32 },
   texts: { flex: 1, gap: 2 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
