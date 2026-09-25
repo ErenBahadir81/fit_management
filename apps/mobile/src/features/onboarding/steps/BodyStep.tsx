@@ -6,6 +6,7 @@ import { spacing } from "../../../theme/tokens";
 import { DatePicker } from "../../../ui/DatePicker";
 import { Stepper } from "../../../ui/Stepper";
 import { ChoiceList } from "../components/ChoiceList";
+import { Pop } from "../components/Juice";
 import { DEFAULT_HEIGHT_CM } from "../model";
 import type { Onboarding } from "../useOnboarding";
 import { Question } from "./Question";
@@ -25,18 +26,18 @@ export function BodyStep({ o }: { o: Onboarding }) {
 
   return (
     <View style={styles.stack}>
-      <Question title="Cinsiyet" why="Yağ oranı formülü kadın ve erkekte farklı çalışıyor.">
+      <Question index={0} title="Cinsiyet" why="Yağ oranı formülü kadın ve erkekte farklı çalışıyor.">
         <ChoiceList options={SEXES} value={p.gender} onChange={(gender) => setProfile({ gender })} label="Cinsiyet" columns={2} testID="ob-gender" />
       </Question>
 
-      <Question title="Doğum tarihi" why={age === null ? "Yaş, günlük kalori hesabını belirgin biçimde değiştiriyor." : `${age} yaşındasın.`} error={p.birthDate ? o.errors.birthDate : undefined}>
+      <Question index={1} title="Doğum tarihi" why={age === null ? "Yaş, günlük kalori hesabını belirgin biçimde değiştiriyor." : `${age} yaşındasın.`} error={p.birthDate ? o.errors.birthDate : undefined}>
         <DatePicker value={p.birthDate} onChange={(birthDate) => setProfile({ birthDate })} label="Doğum tarihi" minYear={THIS_YEAR - 100} maxYear={THIS_YEAR - 13} testID="ob-birth" />
       </Question>
 
-      <Question title="Boy" why="Hem yağ oranı hem kas kütlesi hesabına giriyor." error={o.errors.heightCm}>
-        <View style={styles.start}>
+      <Question index={2} title="Boy" why="Hem yağ oranı hem kas kütlesi hesabına giriyor." error={o.errors.heightCm}>
+        <Pop trigger={p.heightCm} amount={0.06} style={styles.start}>
           <Stepper value={p.heightCm ?? DEFAULT_HEIGHT_CM} min={100} max={250} step={1} format={(v) => `${v} cm`} onChange={(heightCm) => setProfile({ heightCm })} testID="ob-height" />
-        </View>
+        </Pop>
       </Question>
     </View>
   );

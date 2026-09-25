@@ -136,7 +136,7 @@ export function PlanTrendChart({ rows, targetWeightKg, todayKey, height = 200, t
               series={[
                 { values: data.map((d) => d.expected), color: colors.inkSubtle, width: 2, dashed: true, connectMissing: true },
                 { values: data.map((d) => d.raw), color: colors.primary, dots: true, dotRadius: 2.5, opacity: 0.3 },
-                { values: data.map((d) => d.actual), color: colors.primary, width: 2.5 },
+                { values: data.map((d) => d.actual), color: colors.primary, width: 2.5, connectMissing: true },
               ]}
               activeIndex={active}
               activeColor={colors.border}

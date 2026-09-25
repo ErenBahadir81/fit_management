@@ -6,6 +6,7 @@ import { Floo, overTargetKey, useFlooOnce } from "../../mascot";
 import { fmtInt } from "../../lib/format";
 import { spacing } from "../../theme/tokens";
 import { EmptyState } from "../../ui/EmptyState";
+import { GoalAdjustment } from "../goals/components/GoalAdjustment";
 import { Reveal } from "../../ui/Reveal";
 import { Screen } from "../../ui/Screen";
 import { HomeSkeleton } from "./HomeSkeleton";
@@ -82,6 +83,7 @@ function HomeContent({ data, onProgram, onNutrition, onBody, onRoadmap, onSetGoa
     <View style={styles.stack}>
       <HomeHeader data={data} />
       <GoalStrip goal={data.goal} today={data.today} targetBf={targetBf} onOpenRoadmap={onRoadmap} onSetGoal={onSetGoal} onWeighIn={onBody} />
+      <GoalAdjustment />
       <CalorieCard today={data.today} onPress={onNutrition} />
       <TodayCard today={data.today} onOpenProgram={onProgram} />
       <RecoveryStrip recovery={data.recovery} onPress={onProgram} />

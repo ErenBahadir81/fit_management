@@ -60,7 +60,7 @@ export const GoalStep = forwardRef<View, GoalStepProps>(function GoalStep({ o, o
 
   return (
     <View style={styles.stack}>
-      <Question title="Yön" why="Floo'nun önerisi en üstte; istersen değiştir.">
+      <Question index={0} title="Yön" why="Floo'nun önerisi en üstte; istersen değiştir.">
         <ChoiceList
           options={directions.map((d) => ({ value: d, label: DIRECTION_TR[d].label, hint: DIRECTION_TR[d].hint, badge: d === rec.direction ? "Floo önerisi" : undefined }))}
           value={c.direction}
@@ -73,7 +73,7 @@ export const GoalStep = forwardRef<View, GoalStepProps>(function GoalStep({ o, o
         />
       </Question>
 
-      <Question title={bulk ? "Ne kadar kas?" : "Hedef yağ oranı"} why={bulk ? "Yağsız kütleye eklenecek kilo." : `Şu an ${fmtPct(a.bodyFatPct)}.`}>
+      <Question index={1} title={bulk ? "Ne kadar kas?" : "Hedef yağ oranı"} why={bulk ? "Yağsız kütleye eklenecek kilo." : `Şu an ${fmtPct(a.bodyFatPct)}.`}>
         <ValueSlider
           ref={sliderRef}
           value={target}
@@ -89,7 +89,7 @@ export const GoalStep = forwardRef<View, GoalStepProps>(function GoalStep({ o, o
         />
       </Question>
 
-      <Question title="Tempo">
+      <Question index={2} title="Tempo">
         <Segmented<GoalProfile> options={PACES} value={o.draft.goal.profile} onChange={(profile) => o.patch((d) => ({ ...d, goal: { ...d.goal, profile } }))} testID="goal-pace" />
       </Question>
 
