@@ -65,6 +65,24 @@ describe("NutritionScreen — day", () => {
     expect(screen.getByTestId("nutrition-hero")).toBeTruthy();
   });
 
+  test("the goal strip sits above the ring: start → target body fat, weeks and verdict; a tap opens the roadmap", async () => {
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("nutrition-goal-strip")).toBeTruthy());
+    expect(screen.getByTestId("nutrition-goal-strip-route").props.children).toEqual(expect.arrayContaining([expect.stringMatching(/^%\d+ → %\d+$/)]));
+    expect(screen.getByTestId("nutrition-goal-strip-line").props.children).toMatch(/ ·  \d+ hafta · (plandan öndesin|yolundasın|biraz gerideyiz|trend durdu)$/);
+
+    await fireEvent.press(screen.getByTestId("nutrition-goal-strip"));
+    expect(mockRouter.push).toHaveBeenCalledWith("/(modals)/goal/roadmap");
+  });
+
+  test("without an active goal there is no strip; the ring still leads", async () => {
+    const api = await signedInApi();
+    api.fake.goal = null;
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
+    expect(screen.queryByTestId("nutrition-goal-strip")).toBeNull();
+  });
+
   test("the FAB opens the action sheet; 'Tara' routes to the scan modal with the date and meal", async () => {
     await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
     await waitFor(() => expect(screen.getByTestId("nutrition-hero")).toBeTruthy());
