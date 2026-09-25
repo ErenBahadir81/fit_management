@@ -349,7 +349,7 @@ export function gestureDuration(g: Gesture): number {
 /**
  * Reduced motion: a gesture collapses to one pose change. The rig eases to the pose the gesture
  * holds longest (its most readable moment — the raised hand of a wave, the pointing arm), stays
- * there for `hold` ms and eases back; the reduced springs make both changes ≈ 250 ms cross-fades
+ * there for `hold` ms and eases back; the reduced springs make both changes ≈ 350 ms cross-fades
  * with no travel past the target. `total` is when the gesture counts as finished.
  */
 export interface ReducedGesture {
