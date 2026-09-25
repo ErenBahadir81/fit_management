@@ -90,6 +90,8 @@ export interface GoalChange {
   tdeeOverride?: number | null;
   targetBodyFatPct?: number;
   targetLeanGainKg?: number;
+  /** A different pace profile (`keepDate`). */
+  profile?: GoalProfile;
 }
 
 export function planSnapshot(plan: GoalPlan, goal: Pick<AdaptiveGoal, "targetBodyFatPct" | "targetLeanGainKg">): GoalPlanSnapshot {
@@ -127,7 +129,7 @@ export function replanGoal(goal: AdaptiveGoal, change: GoalChange, replanBase: R
     targetBodyFatPct: change.targetBodyFatPct ?? goal.targetBodyFatPct,
     targetLeanGainKg: direction === "bulk" ? remainingLeanGain({ ...goal, targetLeanGainKg: change.targetLeanGainKg ?? goal.targetLeanGainKg }, replanBase) : null,
     trainingLevel: goal.trainingLevel ?? goal.plan.trainingLevel ?? null,
-    profile: goal.profile,
+    profile: change.profile ?? goal.profile,
     tdeeOverride: change.tdeeOverride === undefined ? goal.tdeeOverride : change.tdeeOverride,
     startDate: todayKey,
   });
@@ -306,6 +308,20 @@ function option(
   return { action, labelTr, recommended, after, change };
 }
 
+const FASTER: Partial<Record<GoalProfile, GoalProfile>> = { conservative: "optimal", optimal: "aggressive" };
+
+/** `keepDate` for a cut that fell behind, or null when no faster safe pace keeps the date. */
+function keepDateOption(input: AdjustmentInput, before: GoalPlanSnapshot, tdee: number): GoalAdjustmentOption | null {
+  const profile = FASTER[input.goal.profile ?? "optimal"];
+  if (!profile) return null;
+  const change: GoalChange = { tdeeOverride: tdee, profile };
+  const plan = replanGoal(input.goal, change, input.replanBase, input.todayKey);
+  if (plan.warnings.some((w) => w === "FLOOR_LIMITED" || w === "ALPERT_LIMITED")) return null;
+  if (plan.targetDate > before.targetDate) return null;
+  const after = planSnapshot(plan, { targetBodyFatPct: input.goal.targetBodyFatPct, targetLeanGainKg: null });
+  return { action: "keepDate", labelTr: `Tarihi koru, günde ${formatTrNumber(Math.round(after.dailyCalorieTarget))} kcal`, recommended: false, after, change };
+}
+
 /** "150" and whether the option raises calories, from the before/after snapshots. */
 function kcalDiff(before: GoalPlanSnapshot, o: GoalAdjustmentOption): { n: string; up: boolean } {
   const diff = (o.after?.dailyCalorieTarget ?? before.dailyCalorieTarget) - before.dailyCalorieTarget;
@@ -393,11 +409,16 @@ export function proposeGoalAdjustment(input: AdjustmentInput): GoalAdjustmentPro
       const atFloor = atCalorieFloor(o);
       if (atFloor) options.push(replan(lateLabel, true));
       else options.push(o, replan(lateLabel));
+      // "Keep the date": the next faster pace, only if it stays inside the safety limits and really
+      // lands on (or before) today's date. Otherwise Floo says the date cannot be kept safely.
+      const keep = !atFloor && direction === "cut" ? keepDateOption(input, before, lowerStep.tdee) : null;
+      if (keep) options.push(keep);
+      const keepNote = atFloor || direction !== "cut" ? "" : keep ? " İstersen tempoyu artırıp tarihi koruyabiliriz." : " Tarihi korumak güvenli sınırları aşar.";
       const measured = lowerStep.measured ? "Ölçülen harcaman plandakinden düşük çıktı. " : "";
       // Re-planning from today moves the date either way (the trend is behind); the calories decide
       // whether the new date is reachable. So the copy never sells the cut as a way to keep the date.
       return (why: string) =>
-        atFloor ? `${why} Kalori zaten güvenli tabanda; ${later}.` : `${measured}${why} Tarih biraz kayacak; yeni tarihe yetişmek için ${kcalLet(before, o)} mı?`;
+        atFloor ? `${why} Kalori zaten güvenli tabanda; ${later}.` : `${measured}${why} Tarih biraz kayacak; yeni tarihe yetişmek için ${kcalLet(before, o)} ${kcalDiff(before, o).up ? "mi" : "mı"}?${keepNote}`;
     };
     const slowCopy = (titleTr: string, messageTr: string): Copy => ({
       mood: sit.kind === "stalled" ? "worried" : "think",

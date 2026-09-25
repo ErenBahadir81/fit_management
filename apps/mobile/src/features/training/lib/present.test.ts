@@ -4,6 +4,7 @@ import {
   dayCounts,
   findLastSameDay,
   groupLogsByWeek,
+  keyMuscles,
   lastPerformanceLabel,
   logSummary,
   recoveryCurve,
@@ -372,5 +373,24 @@ describe("lastPerformanceLabel", () => {
   test("nothing logged → nothing to say", () => {
     expect(lastPerformanceLabel({ dateKey: null, sets: [] })).toBeNull();
     expect(lastPerformanceLabel(null)).toBeNull();
+  });
+});
+
+describe("keyMuscles", () => {
+  const m = (key: string, load: number) => ({ key, load });
+
+  test("keeps the muscles the movement trains, heaviest first", () => {
+    const pushUp = [m("triceps", 0.6), m("chest", 1), m("frontDelts", 0.7), m("biceps", 0.15), m("quads", 0.1), m("abs", 0.35)];
+    expect(keyMuscles(pushUp).map((x) => x.key)).toEqual(["chest", "frontDelts", "triceps"]);
+  });
+
+  test("never names more than four", () => {
+    const all = ["a", "b", "c", "d", "e", "f"].map((k) => m(k, 1));
+    expect(keyMuscles(all)).toHaveLength(4);
+  });
+
+  test("falls back to the single heaviest when nothing reaches half a set", () => {
+    expect(keyMuscles([m("abs", 0.3), m("obliques", 0.4)]).map((x) => x.key)).toEqual(["obliques"]);
+    expect(keyMuscles([])).toEqual([]);
   });
 });

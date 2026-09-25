@@ -28,6 +28,14 @@ jest.mock("expo-camera", () => {
 
 const today = todayKey();
 
+/** Text nodes of logged entries only: the quick-add bar repeats recent food names as chips. */
+function entryTexts(name: string) {
+  return screen.queryAllByText(name).filter((n) => {
+    for (let p = n.parent; p; p = p.parent) if (typeof p.props.testID === "string" && p.props.testID.startsWith("quick-add")) return false;
+    return true;
+  });
+}
+
 async function signedInApi(latencyMs = 0) {
   const api = createNutritionFakeApi({ latencyMs, signedIn: true });
   setApi(api);
@@ -110,7 +118,7 @@ describe("NutritionScreen — day", () => {
     await fireEvent.press(screen.getByTestId("search-detail-grams-inc")); // 130 g
     await fireEvent.press(screen.getByTestId("search-detail-submit"));
 
-    await waitFor(() => expect(screen.getByText("Muz")).toBeTruthy());
+    await waitFor(() => expect(entryTexts("Muz")).toHaveLength(1));
     expect(screen.getByText("130 g · P 1 · K 30 · Y 0")).toBeTruthy();
   });
 
@@ -130,10 +138,10 @@ describe("NutritionScreen — day", () => {
     await fireEvent.press(screen.getByTestId(`entry-${entry.id}`));
     await fireEvent.press(screen.getByTestId("grams-sheet-delete"));
     await waitFor(() => expect(screen.getByTestId("undo-delete")).toBeTruthy());
-    expect(screen.queryByText("Tavuk göğsü (ızgara)")).toBeNull();
+    expect(entryTexts("Tavuk göğsü (ızgara)")).toHaveLength(0);
 
     await fireEvent.press(screen.getByTestId("undo-delete"));
-    await waitFor(() => expect(screen.getByText("Tavuk göğsü (ızgara)")).toBeTruthy());
+    await waitFor(() => expect(entryTexts("Tavuk göğsü (ızgara)")).toHaveLength(1));
   });
 
   test("'Elle gir' logs a hand-typed food into the chosen meal", async () => {
@@ -212,6 +220,44 @@ describe("NutritionScreen — day", () => {
 
     await fireEvent.press(screen.getByTestId("jump-today"));
     await waitFor(() => expect(screen.queryByTestId("jump-today")).toBeNull());
+  });
+
+  test("the quick-add bar logs one usual serving of a recent food in one tap", async () => {
+    const api = await signedInApi();
+    const recent = (await api.nutrition.recent()).foods;
+    expect(recent.length).toBeGreaterThan(0);
+    const food = recent[0];
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId(`quick-add-${food.id}`)).toBeTruthy());
+    const before = Object.values((await api.nutrition.day(today)).meals).flat().length;
+
+    await fireEvent.press(screen.getByTestId(`quick-add-${food.id}`));
+    await waitFor(async () => {
+      const day = await api.nutrition.day(today);
+      const all = Object.values(day.meals).flat();
+      expect(all.length).toBe(before + 1);
+      expect(all.some((e) => e.foodId === food.id && e.grams === food.defaultServingG && e.source === "recent")).toBe(true);
+    });
+  });
+
+  test("an empty meal offers yesterday's same meal; one tap logs those foods again", async () => {
+    const api = await signedInApi();
+    const yesterday = shiftKey(today, -1);
+    const before = await api.nutrition.day(today);
+    const empty = (["breakfast", "lunch", "dinner", "snack"] as const).find((m) => (before.meals[m] ?? []).length === 0)!;
+    await api.nutrition.addEntry({ dateKey: yesterday, meal: empty, grams: 150, custom: { name: "Yayla çorbası", per100g: { kcal: 60, protein: 4, carbs: 9, fat: 1 } }, source: "manual" });
+    await api.nutrition.addEntry({ dateKey: yesterday, meal: empty, grams: 50, custom: { name: "Çavdar ekmeği", per100g: { kcal: 250, protein: 8, carbs: 50, fat: 2 } }, source: "manual" });
+
+    await renderUI(<NutritionScreen />, { queryClient: makeQueryClient() });
+    await waitFor(() => expect(screen.getByTestId(`meal-repeat-${empty}`)).toBeTruthy());
+    const prev = (await api.nutrition.day(yesterday)).meals[empty] ?? [];
+    expect(screen.getByText(new RegExp(`^${prev.length} yiyecek · `))).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId(`meal-repeat-${empty}`));
+    await waitFor(async () => expect((await api.nutrition.day(today)).meals[empty]).toHaveLength(prev.length));
+    await waitFor(() => expect(screen.getAllByText("Yayla çorbası")).toHaveLength(1));
+    expect(screen.getAllByText("Çavdar ekmeği")).toHaveLength(1);
+    expect(screen.queryByTestId(`meal-repeat-${empty}`)).toBeNull();
   });
 
   test("the FAB slides away while the day list scrolls down and comes back on the way up", async () => {

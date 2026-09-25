@@ -5,7 +5,7 @@
 
 /* ------------------------------------------------------------------------ *
  *  FitFloow Admin — design tokens
- *  A calm technical instrument: neutrals carry the UI, violet #6D5DF6 is
+ *  A calm technical instrument: neutrals carry the UI, blue #0A70B3 (Floo's family, same as the mobile app) is
  *  reserved for primary actions, active state and focus. 8-pt spacing,
  *  1-px hairlines instead of shadows (shadows only for floating layers).
  * ------------------------------------------------------------------------ */
@@ -27,12 +27,12 @@
   --ff-text-subtle: #98a2b3;
   --ff-text-inverse: #ffffff;
 
-  --ff-brand: #6d5df6;
-  --ff-brand-hover: #5a49e8;
-  --ff-brand-active: #4c3cd6;
-  --ff-brand-soft: #eeecfe;
-  --ff-brand-line: #d6d1fc;
-  --ff-brand-text: #4c3cd6;
+  --ff-brand: #0a70b3;
+  --ff-brand-hover: #085f99;
+  --ff-brand-active: #075a91;
+  --ff-brand-soft: #e2f1fb;
+  --ff-brand-line: #b9ddf3;
+  --ff-brand-text: #075a91;
 
   --ff-success: #0f9f68;
   --ff-success-soft: #e4f7ef;
@@ -66,12 +66,12 @@
     --ff-text-subtle: #6b7484;
     --ff-text-inverse: #0a0c11;
 
-    --ff-brand: #7f70fa;
-    --ff-brand-hover: #9285ff;
-    --ff-brand-active: #a99fff;
-    --ff-brand-soft: #1c1a35;
-    --ff-brand-line: #322d5c;
-    --ff-brand-text: #a99fff;
+    --ff-brand: #1f86c9;
+    --ff-brand-hover: #1a78b5;
+    --ff-brand-active: #166aa0;
+    --ff-brand-soft: #0f2b40;
+    --ff-brand-line: #1d4563;
+    --ff-brand-text: #52b7ee;
 
     --ff-success: #34cd87;
     --ff-success-soft: #0f2a1f;
@@ -105,12 +105,12 @@ html.dark {
   --ff-text-subtle: #6b7484;
   --ff-text-inverse: #0a0c11;
 
-  --ff-brand: #7f70fa;
-  --ff-brand-hover: #9285ff;
-  --ff-brand-active: #a99fff;
-  --ff-brand-soft: #1c1a35;
-  --ff-brand-line: #322d5c;
-  --ff-brand-text: #a99fff;
+  --ff-brand: #1f86c9;
+  --ff-brand-hover: #1a78b5;
+  --ff-brand-active: #166aa0;
+  --ff-brand-soft: #0f2b40;
+  --ff-brand-line: #1d4563;
+  --ff-brand-text: #52b7ee;
 
   --ff-success: #34cd87;
   --ff-success-soft: #0f2a1f;
