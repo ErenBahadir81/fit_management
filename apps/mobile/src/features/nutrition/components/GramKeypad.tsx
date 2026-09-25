@@ -4,6 +4,7 @@ import { fmtInt } from "../../../lib/format";
 import { useTheme } from "../../../theme/ThemeProvider";
 import { radii, spacing } from "../../../theme/tokens";
 import { Icon } from "../../../ui/Icon";
+import { Pop } from "../../../ui/Juice";
 import { Pressable } from "../../../ui/Pressable";
 import { Text } from "../../../ui/Text";
 
@@ -55,9 +56,14 @@ export function GramKeypad({ value, onChange, onDone, testID = "gram-keypad" }: 
 
   return (
     <View style={styles.grid} testID={testID}>
-      <Text variant="caption" color="inkMuted" style={styles.readout} tabular accessibilityLiveRegion="polite" testID={`${testID}-draft`}>
-        {draft ? `${fmtInt(Number(draft))} g` : "— g"}
-      </Text>
+      {/* Each key press boings the readout, so the amount is felt as it is typed. */}
+      <View style={styles.readout}>
+        <Pop trigger={draft} amount={0.12} style={styles.readoutPop}>
+          <Text variant="caption" color="inkMuted" tabular accessibilityLiveRegion="polite" testID={`${testID}-draft`}>
+            {draft ? `${fmtInt(Number(draft))} g` : "— g"}
+          </Text>
+        </Pop>
+      </View>
       {KEYS.map((key) => {
         const done = key === "done";
         return (
@@ -88,5 +94,6 @@ export function GramKeypad({ value, onChange, onDone, testID = "gram-keypad" }: 
 const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   readout: { width: "100%" },
+  readoutPop: { alignSelf: "flex-start" },
   key: { width: "31.5%", flexGrow: 1, height: 48, borderRadius: radii.control, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
 });

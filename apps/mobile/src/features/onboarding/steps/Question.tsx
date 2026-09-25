@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { spacing } from "../../../theme/tokens";
 import { Text } from "../../../ui/Text";
-import { useDropIn } from "../components/Juice";
+import { useDropIn } from "../../../ui/Juice";
 
 /**
  * One question inside a step: what it is, why it is asked, the control, and what is wrong. The
