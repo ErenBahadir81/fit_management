@@ -406,6 +406,7 @@ export async function acceptAdjustment(ctx: AppContext, userId: string, answer: 
     if (chosen.change.tdeeOverride !== undefined) set.tdeeOverride = chosen.change.tdeeOverride;
     if (chosen.change.targetBodyFatPct !== undefined) set.targetBodyFatPct = chosen.change.targetBodyFatPct;
     if (chosen.change.targetLeanGainKg !== undefined) set.targetLeanGainKg = chosen.change.targetLeanGainKg;
+    if (chosen.change.profile !== undefined) set.profile = chosen.change.profile;
     if (e.dto.direction === "bulk") set.targetBodyFatPct = plan.roadmap.at(-1)?.endBfPct ?? e.dto.targetBodyFatPct;
     record.after = planSnapshot(plan, {
       targetBodyFatPct: (set.targetBodyFatPct as number | undefined) ?? e.dto.targetBodyFatPct,
