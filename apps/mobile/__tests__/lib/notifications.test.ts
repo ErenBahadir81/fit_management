@@ -28,7 +28,8 @@ function nativeMock(overrides: Partial<NativeMock> = {}): NativeMock {
  */
 const NATIVE_IS_INSTALLED = (() => {
   try {
-    require.resolve("expo-notifications");
+    // `require.resolve` exists at runtime under jest; the RN typings just do not declare it.
+    (require as unknown as { resolve: (id: string) => string }).resolve("expo-notifications");
     return true;
   } catch {
     return false;
